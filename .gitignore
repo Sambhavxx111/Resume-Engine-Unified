@@ -1,0 +1,24 @@
+.env
+.env.*
+node_modules/
+dist/
+__pycache__/
+*.pyc
+*.pyo
+
+# App-specific secrets
+apps/backend/.env
+apps/career-service/.env
+apps/frontend/.env
+
+# Logs and generated outputs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

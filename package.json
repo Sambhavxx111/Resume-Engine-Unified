@@ -1,0 +1,12 @@
+{
+  "name": "resume-engine-unified",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "backend": "npm --prefix apps/backend run start",
+    "backend:dev": "npm --prefix apps/backend run dev",
+    "frontend": "npm --prefix apps/frontend run dev",
+    "frontend:start": "npm --prefix apps/frontend run start",
+    "career-service": "py -m uvicorn main:app --host 127.0.0.1 --port 8000 --app-dir apps/career-service"
+  }
+}

@@ -1,0 +1,45 @@
+<svg width="640" height="640" viewBox="0 0 640 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="goldGradient" x1="128" y1="96" x2="512" y2="544" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF3D6"/>
+      <stop offset="0.35" stop-color="#F6D38A"/>
+      <stop offset="0.7" stop-color="#D8A84F"/>
+      <stop offset="1" stop-color="#9C6826"/>
+    </linearGradient>
+    <linearGradient id="rubyGradient" x1="320" y1="180" x2="320" y2="408" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4C0CB"/>
+      <stop offset="1" stop-color="#9F2F48"/>
+    </linearGradient>
+    <radialGradient id="glowGradient" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(320 320) rotate(90) scale(240)">
+      <stop stop-color="#F6D38A" stop-opacity="0.36"/>
+      <stop offset="1" stop-color="#F6D38A" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softGlow" x="60" y="60" width="520" height="520" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur stdDeviation="16" result="effect1_foregroundBlur"/>
+    </filter>
+  </defs>
+
+  <circle cx="320" cy="320" r="220" fill="url(#glowGradient)"/>
+  <circle cx="320" cy="320" r="184" stroke="url(#goldGradient)" stroke-width="8"/>
+  <circle cx="320" cy="320" r="146" stroke="#F5E6C3" stroke-opacity="0.7" stroke-width="4"/>
+  <circle cx="320" cy="320" r="106" stroke="url(#goldGradient)" stroke-opacity="0.9" stroke-width="3"/>
+
+  <g filter="url(#softGlow)">
+    <path d="M320 180L368 230L347 322C339 353 331 380 320 408C309 380 301 353 293 322L272 230L320 180Z" fill="url(#rubyGradient)"/>
+    <path d="M320 152L386 222L360 328C351 366 340 402 320 446C300 402 289 366 280 328L254 222L320 152Z" stroke="url(#goldGradient)" stroke-width="14" stroke-linejoin="round"/>
+  </g>
+
+  <path d="M212 286C249 244 282 224 320 224C358 224 391 244 428 286" stroke="url(#goldGradient)" stroke-width="18" stroke-linecap="round"/>
+  <path d="M194 318C237 369 275 392 320 392C365 392 403 369 446 318" stroke="url(#goldGradient)" stroke-width="18" stroke-linecap="round"/>
+
+  <circle cx="320" cy="142" r="16" fill="#FFF3D6"/>
+  <circle cx="320" cy="142" r="8" fill="#F6D38A"/>
+  <circle cx="188" cy="320" r="10" fill="#F6D38A"/>
+  <circle cx="452" cy="320" r="10" fill="#F6D38A"/>
+  <circle cx="230" cy="230" r="8" fill="#F5E6C3"/>
+  <circle cx="410" cy="230" r="8" fill="#F5E6C3"/>
+  <circle cx="230" cy="410" r="8" fill="#F5E6C3"/>
+  <circle cx="410" cy="410" r="8" fill="#F5E6C3"/>
+</svg>
