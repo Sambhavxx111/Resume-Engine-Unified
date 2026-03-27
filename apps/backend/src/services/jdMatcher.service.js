@@ -1,4 +1,4 @@
-const { callGeminiWithTimeout } = require('../config/gemini');
+const { callGeminiWithTimeout, jdMatcherApiKey } = require('../config/gemini');
 
 // Common stop words to exclude from keyword extraction
 const STOP_WORDS = new Set([
@@ -199,6 +199,7 @@ const matchResumeWithJD = async (resumeJson, jobDescription) => {
     const rawText = await callGeminiWithTimeout(JD_MATCH_PROMPT(resumeJson, jobDescription), {
       timeoutMs: 25000,
       retries: 2,
+      apiKey: jdMatcherApiKey,
     });
     const parsed = parseGeminiJson(rawText);
     const matchScore = normalizePercentage(parsed.matchScore);
@@ -238,3 +239,4 @@ module.exports = {
   extractKeywords,
   extractText
 };
+

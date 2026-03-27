@@ -3,6 +3,22 @@ import axiosInstance from "../api/axios";
 import { API } from "../api/services";
 import Loader from "../components/Loader";
 
+const formatMatchPercentage = (value, fallbackScore) => {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return `${value}%`;
+  }
+
+  if (typeof fallbackScore === "number" && Number.isFinite(fallbackScore)) {
+    return `${fallbackScore}%`;
+  }
+
+  return "--";
+};
+
 function JDMatcher() {
   const [jobDescription, setJobDescription] = useState("");
   const [loading, setLoading] = useState(false);
@@ -128,10 +144,10 @@ function JDMatcher() {
               <div className="rounded-[2rem] border border-cyan-300/20 bg-gradient-to-br from-cyan-400/18 to-blue-500/12 p-6 shadow-[0_24px_60px_rgba(34,211,238,0.16)]">
                 <p className="text-sm uppercase tracking-[0.24em] text-cyan-200">Match Percentage</p>
                 <p className="mt-3 text-5xl font-bold text-white">
-                  {result.matchPercentage ?? "--"}%
+                  {formatMatchPercentage(result.matchPercentage, result.matchScore)}
                 </p>
                 {result.fileName ? (
-                  <p className="mt-3 text-sm text-slate-300">Analyzed file: {result.fileName}</p>
+                  <p className="mt-3 break-all text-sm text-slate-300">Analyzed file: {result.fileName}</p>
                 ) : null}
               </div>
 

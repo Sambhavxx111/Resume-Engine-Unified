@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 const ATSAnalysis = lazy(() => import('./pages/ATSAnalysis'));
 const CareerGuidance = lazy(() => import('./pages/CareerGuidance'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const JDMatcher = lazy(() => import('./pages/JDMatcher'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Login = lazy(() => import('./pages/Login'));
 const ResumeBuilder = lazy(() => import('./pages/ResumeBuilder'));
@@ -35,7 +36,7 @@ function App() {
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/resume" element={<ProtectedRoute><ResumeBuilder /></ProtectedRoute>} />
             <Route path="/ats" element={<ProtectedRoute><ATSAnalysis /></ProtectedRoute>} />
-            <Route path="/jd-match" element={<Navigate to="/career-guidance" replace />} />
+            <Route path="/jd-match" element={<ProtectedRoute><JDMatcher /></ProtectedRoute>} />
             <Route path="/career-guidance" element={<ProtectedRoute><CareerGuidance /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

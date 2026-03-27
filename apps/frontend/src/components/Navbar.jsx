@@ -5,6 +5,7 @@ const protectedLinks = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/resume', label: 'Resume Builder' },
   { to: '/ats', label: 'ATS Analyzer' },
+  { to: '/jd-match', label: 'JD Matcher' },
   { to: '/career-guidance', label: 'Career Guidance' },
 ];
 
