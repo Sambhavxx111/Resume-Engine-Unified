@@ -8,12 +8,23 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
+  const persistToken = (token) => {
+    if (token) {
+      localStorage.setItem("authToken", token);
+    }
+  };
+
+  const clearAuthState = () => {
+    localStorage.removeItem("authToken");
+    setUser(null);
+  };
+
   const hydrateAuth = async () => {
     try {
       const { data } = await axiosInstance.get(API.me);
       setUser(data.user ?? null);
     } catch {
-      setUser(null);
+      clearAuthState();
     } finally {
       setAuthLoading(false);
     }
@@ -23,13 +34,14 @@ export function AuthProvider({ children }) {
     try {
       await axiosInstance.post(API.logout);
     } catch {}
-    setUser(null);
+    clearAuthState();
   };
 
   const login = async (payload) => {
     setAuthLoading(true);
     try {
       const { data } = await axiosInstance.post(API.login, payload);
+      persistToken(data.token);
       setUser(data.user ?? null);
       return data;
     } finally {
@@ -41,6 +53,7 @@ export function AuthProvider({ children }) {
     setAuthLoading(true);
     try {
       const { data } = await axiosInstance.post(API.signup, payload);
+      persistToken(data.token);
       setUser(data.user ?? null);
       return data;
     } finally {
@@ -52,7 +65,7 @@ export function AuthProvider({ children }) {
     hydrateAuth();
 
     const handleForcedLogout = () => {
-      setUser(null);
+      clearAuthState();
       setAuthLoading(false);
     };
     window.addEventListener("auth:logout", handleForcedLogout);

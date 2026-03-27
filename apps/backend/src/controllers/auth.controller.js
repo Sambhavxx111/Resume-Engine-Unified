@@ -12,7 +12,7 @@ const getJwtSecret = () => {
 
 const buildAuthCookieOptions = () => {
   const isProduction = process.env.NODE_ENV === 'production';
-  const sameSite = isProduction ? 'Strict' : 'Lax';
+  const sameSite = isProduction ? 'None' : 'Lax';
   const maxAge = parseInt(process.env.AUTH_COOKIE_MAX_AGE_MS || `${7 * 24 * 60 * 60 * 1000}`, 10);
 
   return {
@@ -102,6 +102,7 @@ const signup = async (req, res) => {
 
     return res.status(201).json({
       message: 'User registered successfully',
+      token,
       userId: result.insertId,
       user: {
         id: result.insertId,
@@ -146,6 +147,7 @@ const login = async (req, res) => {
 
     return res.status(200).json({
       message: 'Login successful',
+      token,
       user: sanitizeUser(user),
       userId: user.id,
     });
@@ -184,3 +186,4 @@ module.exports = {
   me,
   logout,
 };
+
