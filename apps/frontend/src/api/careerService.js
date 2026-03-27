@@ -11,14 +11,13 @@ export function getCareerServiceBaseUrl() {
 
   try {
     const url = new URL(configuredUrl);
-    const hasBrowserHost = Boolean(browserHostname);
     const browserIsLocal = ['localhost', '127.0.0.1'].includes(browserHostname);
     const configuredIsLocal = ['localhost', '127.0.0.1'].includes(url.hostname);
 
-    if (hasBrowserHost && browserIsLocal) {
+    // Only normalize localhost variants in local development. In production,
+    // preserve the configured external service hostname.
+    if (browserIsLocal && configuredIsLocal) {
       url.hostname = 'localhost';
-    } else if (hasBrowserHost && !browserIsLocal && (configuredIsLocal || url.hostname !== browserHostname)) {
-      url.hostname = browserHostname;
     }
 
     return trimTrailingSlash(url.toString());
