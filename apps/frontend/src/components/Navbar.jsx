@@ -25,7 +25,7 @@ function Navbar() {
             <span className="text-lg font-bold text-cyan-300">RB</span>
           </div>
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.32em] text-cyan-300">HireCraft</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.32em] text-cyan-300">Resume Engine</p>
             <p className="text-sm text-slate-300">Resume Builder + ATS + Career Guidance</p>
           </div>
         </Link>

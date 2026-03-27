@@ -67,7 +67,7 @@ function Landing() {
               Build a sharper resume and measure how well it lands.
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-slate-300">
-              HireCraft blends a polished resume builder with ATS analysis, job description matching,
+              Resume Engine blends a polished resume builder with ATS analysis, job description matching,
               and AI-powered optimization in one fast workflow.
             </p>
           </div>
