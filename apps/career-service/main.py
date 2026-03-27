@@ -89,9 +89,12 @@ async def detailed_health_check() -> HealthCheckResponse:
 if __name__ == '__main__':
     import uvicorn
 
+    host = os.getenv('HOST') or os.getenv('CAREER_SERVICE_HOST') or '0.0.0.0'
+    port = int(os.getenv('PORT') or os.getenv('CAREER_SERVICE_PORT') or '8000')
+
     uvicorn.run(
         'main:app',
-        host=os.getenv('CAREER_SERVICE_HOST', '127.0.0.1'),
-        port=int(os.getenv('CAREER_SERVICE_PORT', '8000')),
+        host=host,
+        port=port,
         reload=False,
     )
