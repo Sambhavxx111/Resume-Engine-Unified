@@ -1,9 +1,10 @@
 const resumeModel = require('../models/resume.model');
+const { sanitizeResumePayload } = require('../utils/sanitizeResume');
 
 const saveResume = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const resumeJson = req.body;
+    const resumeJson = sanitizeResumePayload(req.body);
 
     if (!resumeJson || Object.keys(resumeJson).length === 0) {
       return res.status(400).json({ error: 'Resume data is required' });
