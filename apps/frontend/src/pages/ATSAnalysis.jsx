@@ -67,11 +67,12 @@ function ATSAnalysis() {
       });
 
       setOptimizedUpload(data);
-      exportOptimizedUploadPdf(data.fileName, data.headline, data.optimizedResumeText, {
-        originalScore: data.originalScore,
-        optimizedScore: data.optimizedScore,
-        scoreGain: data.scoreGain,
-      });
+      exportOptimizedUploadPdf(
+        data.fileName,
+        data.headline,
+        data.optimizedResumeText,
+        data.optimizedResumeData,
+      );
     } catch (requestError) {
       setError(
         requestError.response?.data?.message ||

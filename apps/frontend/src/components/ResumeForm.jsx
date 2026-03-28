@@ -29,6 +29,20 @@ const normalizeTemplateId = (templateId) => TEMPLATE_ID_ALIASES[templateId] || t
 
 const TEMPLATE_OPTIONS = [
   {
+    id: "enhancv-replica",
+    name: "Signature Timeline",
+    blurb: "A polished statement layout with a crisp top banner, editorial spacing, and premium ATS-safe rhythm.",
+    accent: "from-orange-200/35 to-blue-300/20",
+    recommended: true,
+  },
+  {
+    id: "enhancv-columns",
+    name: "Emerald Columns",
+    blurb: "A refined multi-column resume with elegant structure, balanced density, and strong recruiter readability.",
+    accent: "from-emerald-200/35 to-slate-300/20",
+    recommended: true,
+  },
+  {
     id: "contemporary",
     name: "Modern Arc",
     blurb: "A crisp premium layout with modern hierarchy, clean whitespace, and ATS-safe structure.",
@@ -59,6 +73,27 @@ const TEMPLATE_OPTIONS = [
     accent: "from-cyan-300/30 to-sky-200/20",
   },
 ];
+
+const formatMonthYear = (value) => {
+  if (!value) return "";
+  const [year, month] = String(value).split("-");
+  if (!year) return "";
+  if (!month) return year;
+  return `${month.padStart(2, "0")}/${year}`;
+};
+
+const formatDateRange = (startDate, endDate) => {
+  const start = formatMonthYear(startDate);
+  const end = formatMonthYear(endDate);
+  if (start && end) return `${start} - ${end}`;
+  return start || end || "Date period";
+};
+
+const splitLines = (value = "") =>
+  String(value)
+    .split(/\r?\n+/)
+    .map((line) => line.replace(/^\s*[-*•]\s*/, "").trim())
+    .filter(Boolean);
 
 const TemplateThumbnail = ({ templateId }) => {
   const normalizedTemplateId = normalizeTemplateId(templateId);
@@ -163,6 +198,69 @@ const TemplateThumbnail = ({ templateId }) => {
     );
   }
 
+  if (normalizedTemplateId === "enhancv-replica") {
+    return (
+      <div className="grid h-16 grid-cols-[0.26fr_0.74fr] overflow-hidden rounded-2xl border border-white/10 bg-white">
+        <div className="border-r border-slate-200 bg-white px-2 py-2">
+          <div className="h-3 w-16 rounded-full bg-blue-900" />
+          <div className="mt-2 h-2 w-12 rounded-full bg-orange-400" />
+          <div className="mt-2 space-y-1">
+            <div className="h-1.5 w-full rounded-full bg-slate-100" />
+            <div className="h-1.5 w-5/6 rounded-full bg-slate-100" />
+          </div>
+        </div>
+        <div className="space-y-1 px-2.5 py-2">
+          <div className="grid grid-cols-[0.24fr_0.06fr_0.7fr] gap-2">
+            <div className="space-y-1">
+              <div className="h-1.5 w-10 rounded-full bg-blue-200" />
+              <div className="h-1.5 w-8 rounded-full bg-slate-100" />
+            </div>
+            <div className="relative">
+              <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-slate-300" />
+              <div className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
+            </div>
+            <div className="space-y-1">
+              <div className="h-1.5 w-8 rounded-full bg-slate-300" />
+              <div className="h-2 w-16 rounded-full bg-orange-300" />
+              <div className="h-1.5 w-full rounded-full bg-slate-100" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (normalizedTemplateId === "enhancv-columns") {
+    return (
+      <div className="grid h-16 grid-cols-[0.56fr_0.26fr_0.18fr] overflow-hidden rounded-2xl border border-white/10 bg-white">
+        <div className="border-r border-slate-200 px-2.5 py-2">
+          <div className="h-3 w-16 rounded-full bg-emerald-900" />
+          <div className="mt-1.5 h-2 w-11 rounded-full bg-emerald-400" />
+          <div className="mt-3 space-y-1">
+            <div className="h-1.5 w-full rounded-full bg-slate-100" />
+            <div className="h-1.5 w-5/6 rounded-full bg-slate-100" />
+            <div className="h-1.5 w-4/6 rounded-full bg-slate-100" />
+          </div>
+        </div>
+        <div className="border-r border-slate-200 px-2 py-2">
+          <div className="h-1.5 w-10 rounded-full bg-emerald-900" />
+          <div className="mt-2 space-y-1">
+            <div className="h-1.5 w-7 rounded-full bg-slate-300" />
+            <div className="h-2 w-12 rounded-full bg-emerald-200" />
+            <div className="h-1.5 w-full rounded-full bg-slate-100" />
+          </div>
+        </div>
+        <div className="px-2 py-2">
+          <div className="mx-auto h-6 w-6 rounded-full border-2 border-slate-300" />
+          <div className="mt-2 space-y-1">
+            <div className="h-1.5 w-full rounded-full bg-slate-100" />
+            <div className="h-1.5 w-4/5 rounded-full bg-slate-100" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-20 rounded-2xl border border-white/10 bg-white p-3">
       <div className="h-2 w-20 rounded-full bg-slate-800" />
@@ -235,6 +333,24 @@ const templatePreviewClasses = {
     title: "mt-1 text-sm font-medium uppercase tracking-[0.22em] text-slate-600",
     sectionTitle: "text-xs font-semibold uppercase tracking-[0.32em] text-cyan-700",
     skill: "rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700",
+  },
+  "enhancv-replica": {
+    layout: "enhancv-replica",
+    shell: "border-slate-300 bg-white",
+    header: "border-b border-slate-200 pb-3",
+    name: "text-[2rem] font-black uppercase tracking-[0.02em] text-blue-900",
+    title: "mt-1 text-[15px] font-bold text-orange-500",
+    sectionTitle: "text-[13px] font-black uppercase tracking-[0.02em] text-blue-900",
+    skill: "border-b border-slate-400 pb-1 text-[11px] font-semibold text-slate-600",
+  },
+  "enhancv-columns": {
+    layout: "enhancv-columns",
+    shell: "border-slate-300 bg-white",
+    header: "border-b border-slate-200 pb-3",
+    name: "text-[2rem] font-black uppercase tracking-[0.01em] text-emerald-900",
+    title: "mt-0.5 text-[13px] font-bold text-emerald-400",
+    sectionTitle: "text-[11px] font-black uppercase tracking-[0.01em] text-emerald-900",
+    skill: "border-b border-slate-400 pb-1 text-[10px] font-semibold text-emerald-900",
   },
 };
 
@@ -488,6 +604,12 @@ function ResumeForm({
   const normalizedTemplate = normalizeTemplateId(formData.template);
   const templateStyle =
     templatePreviewClasses[normalizedTemplate] || templatePreviewClasses.contemporary;
+  const filledExperience = (formData.experience || []).filter(
+    (item) => item.company || item.role || item.description,
+  );
+  const filledEducation = (formData.education || []).filter(
+    (item) => item.institution || item.degree || item.fieldOfStudy,
+  );
 
   const previewSections = useMemo(() => {
     const allSections = getPreviewSections(formData);
@@ -497,6 +619,8 @@ function ResumeForm({
       compact: ["summary", "experience", "skills", "education"],
       creative: ["skills", "summary", "experience", "education"],
       timeline: ["summary", "experience", "education", "skills"],
+      "enhancv-replica": ["summary", "experience", "education", "skills"],
+      "enhancv-columns": ["summary", "experience", "education", "skills"],
     };
 
     const desiredOrder = orderMap[normalizedTemplate] || orderMap.contemporary;
@@ -592,7 +716,14 @@ function ResumeForm({
                   <div className={`mb-4 rounded-[1.4rem] bg-gradient-to-br p-[1px] ${template.accent}`}>
                     <TemplateThumbnail templateId={template.id} />
                   </div>
-                  <p className="text-sm font-semibold text-white">{template.name}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-semibold text-white">{template.name}</p>
+                    {template.recommended ? (
+                      <span className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200">
+                        Recommended
+                      </span>
+                    ) : null}
+                  </div>
                   <p className="mt-2 min-h-[4.75rem] text-xs leading-5 text-slate-300">{template.blurb}</p>
                   <p className="mt-auto pt-4 text-[11px] font-medium uppercase tracking-[0.24em] text-cyan-300">
                     {active ? "Selected" : "Use Template"}
@@ -828,7 +959,279 @@ function ResumeForm({
                 ref={previewRef}
                 className={`mt-4 min-h-[720px] rounded-[1.75rem] border p-6 text-slate-900 shadow-2xl ${templateStyle.shell}`}
               >
-                {templateStyle.layout === "creative" ? (
+                {templateStyle.layout === "enhancv-columns" ? (
+                  <div className="min-h-[672px] bg-white px-6 py-6 text-slate-900">
+                    <div className="flex items-start justify-between gap-6 border-b border-slate-200 pb-3">
+                      <div className="min-w-0 flex-1">
+                        <h2 className={templateStyle.name}>{previewName}</h2>
+                        <p className={templateStyle.title}>{previewTitle}</p>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-500">
+                          <span>{formData.personalInfo.phone || "[Phone Number]"}</span>
+                          <span>{formData.personalInfo.email || "yourname@email.com"}</span>
+                          <span>{formData.personalInfo.title || "LinkedIn/Portfolio"}</span>
+                          <span>{formData.personalInfo.location || "[Location]"}</span>
+                        </div>
+                      </div>
+                      <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-slate-100">
+                        <div className="relative h-14 w-14 rounded-full border-[3px] border-slate-400">
+                          <div className="absolute left-1/2 top-2 h-5 w-5 -translate-x-1/2 rounded-full border-[3px] border-slate-400" />
+                          <div className="absolute left-1/2 bottom-1 h-6 w-9 -translate-x-1/2 rounded-t-full border-[3px] border-b-0 border-slate-400" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 grid gap-6 md:grid-cols-[0.98fr_1.38fr_1.08fr]">
+                      <div className="space-y-5">
+                        <section>
+                          <div className="border-b border-emerald-900 pb-1">
+                            <h3 className={templateStyle.sectionTitle}>SUMMARY</h3>
+                          </div>
+                          <p className="mt-2 text-[11px] leading-[1.4] text-slate-600">
+                            {formData.summary || "Your professional summary will appear here once you add it."}
+                          </p>
+                        </section>
+                      </div>
+
+                      <div className="space-y-5">
+                        <section>
+                          <div className="border-b border-emerald-900 pb-1">
+                            <h3 className={templateStyle.sectionTitle}>EXPERIENCE</h3>
+                          </div>
+                          <div className="mt-3 space-y-4">
+                            {filledExperience.length ? (
+                              filledExperience.map((item, index) => {
+                                const bullets = splitLines(item.description);
+                                return (
+                                  <div key={`columns-exp-${index}`}>
+                                    <p className="text-[12px] text-slate-300">{item.role || "Title"}</p>
+                                    <p className="text-[15px] font-semibold leading-4 text-emerald-300">{item.company || "Company Name"}</p>
+                                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400">
+                                      <span>{formatDateRange(item.startDate, item.endDate)}</span>
+                                      <span>{formData.personalInfo.location || "Location"}</span>
+                                    </div>
+                                    <ul className="mt-1 list-disc pl-4 text-[10px] leading-4 text-slate-400">
+                                      {(bullets.length ? bullets : ["Highlight your accomplishments, using numbers if possible."]).slice(0, 3).map((bullet, bulletIndex) => (
+                                        <li key={`columns-exp-bullet-${index}-${bulletIndex}`}>{bullet}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              Array.from({ length: 3 }).map((_, index) => (
+                                <div key={`columns-exp-placeholder-${index}`}>
+                                  <p className="text-[12px] text-slate-300">Title</p>
+                                  <p className="text-[15px] font-semibold leading-4 text-emerald-300">Company Name</p>
+                                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400">
+                                    <span>Date period</span>
+                                    <span>Location</span>
+                                  </div>
+                                  <ul className="mt-1 list-disc pl-4 text-[10px] leading-4 text-slate-400">
+                                    <li>Highlight your accomplishments, using numbers if possible.</li>
+                                  </ul>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </section>
+                      </div>
+
+                      <div className="space-y-5">
+                        <section>
+                          <div className="border-b border-emerald-900 pb-1">
+                            <h3 className={templateStyle.sectionTitle}>EDUCATION</h3>
+                          </div>
+                          <div className="mt-3 space-y-3">
+                            {filledEducation.length ? (
+                              filledEducation.map((item, index) => (
+                                <div key={`columns-edu-${index}`}>
+                                  <p className="text-[13px] font-semibold leading-4 text-slate-800">
+                                    {item.degree || "Degree / Program"}
+                                  </p>
+                                  <p className="mt-1 text-[13px] font-semibold leading-4 text-emerald-300">
+                                    {item.institution || "Institution Name"}
+                                  </p>
+                                  <p className="mt-1 text-[10px] text-slate-400">{formatDateRange(item.startDate, item.endDate)}</p>
+                                  <p className="text-[10px] text-slate-400">{formData.personalInfo.location || "[Location]"}</p>
+                                </div>
+                              ))
+                            ) : (
+                              <div>
+                                <p className="text-[13px] font-semibold leading-4 text-slate-800">Degree / Program</p>
+                                <p className="mt-1 text-[13px] font-semibold leading-4 text-emerald-300">Institution Name</p>
+                                <p className="mt-1 text-[10px] text-slate-400">Date period</p>
+                                <p className="text-[10px] text-slate-400">[Location]</p>
+                              </div>
+                            )}
+                          </div>
+                        </section>
+
+                        <section>
+                          <div className="border-b border-emerald-900 pb-1">
+                            <h3 className={templateStyle.sectionTitle}>SKILLS</h3>
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
+                            {formData.skills.length ? (
+                              formData.skills.map((skill, index) => (
+                                <span key={`columns-skill-${index}`} className={templateStyle.skill}>
+                                  {skill}
+                                </span>
+                              ))
+                            ) : (
+                              ["Skill One", "Skill Two", "Skill Three", "Skill Four", "Skill Five", "Skill Six"].map((skill) => (
+                                <span key={skill} className={templateStyle.skill}>
+                                  {skill}
+                                </span>
+                              ))
+                            )}
+                          </div>
+                        </section>
+                      </div>
+                    </div>
+                  </div>
+                ) : templateStyle.layout === "enhancv-replica" ? (
+                  <div className="min-h-[672px] bg-white px-6 py-7 text-slate-900">
+                    <div className="border-b border-slate-200 pb-3">
+                      <h2 className={templateStyle.name}>{previewName}</h2>
+                      <p className={templateStyle.title}>{previewTitle}</p>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600">
+                        <span>{formData.personalInfo.phone || "[Phone Number]"}</span>
+                        <span>{formData.personalInfo.email || "yourname@email.com"}</span>
+                        <span>{formData.personalInfo.title || "LinkedIn/Portfolio"}</span>
+                        <span>{formData.personalInfo.location || "[Location]"}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 space-y-5">
+                      <section>
+                        <h3 className={templateStyle.sectionTitle}>SUMMARY</h3>
+                        <p className="mt-2 text-[11px] leading-[1.45] text-slate-600">
+                          {formData.summary ||
+                            "Your professional summary will appear here once you add it."}
+                        </p>
+                      </section>
+
+                      <section>
+                        <h3 className={templateStyle.sectionTitle}>EXPERIENCE</h3>
+                        <div className="mt-3 space-y-4">
+                          {filledExperience.length ? (
+                            filledExperience.map((item, index) => {
+                                const bullets = splitLines(item.description);
+                                return (
+                                  <div key={`enhancv-exp-${index}`} className="grid grid-cols-[88px_18px_minmax(0,1fr)] gap-3">
+                                    <div className="text-[10px] leading-4 text-slate-400">
+                                      <p className="font-bold text-blue-300">{formatDateRange(item.startDate, item.endDate)}</p>
+                                      <p>{formData.personalInfo.location || "Location"}</p>
+                                    </div>
+                                    <div className="relative">
+                                      <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
+                                      <span className="absolute left-1/2 top-3 bottom-0 w-px -translate-x-1/2 bg-slate-400" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-[11px] text-slate-300">{item.role || "Title"}</p>
+                                      <p className="text-[15px] font-bold leading-4 text-orange-400">{item.company || "Company Name"}</p>
+                                      {bullets.length ? (
+                                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[10px] leading-4 text-slate-300">
+                                          {bullets.map((bullet, bulletIndex) => (
+                                            <li key={`enhancv-exp-bullet-${index}-${bulletIndex}`}>{bullet}</li>
+                                          ))}
+                                        </ul>
+                                      ) : (
+                                        <ul className="mt-1 list-disc pl-4 text-[10px] leading-4 text-slate-300">
+                                          <li>Highlight your accomplishments, using numbers if possible.</li>
+                                        </ul>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                          ) : (
+                            <div className="grid grid-cols-[88px_18px_minmax(0,1fr)] gap-3">
+                              <div className="text-[10px] leading-4 text-slate-400">
+                                <p className="font-bold text-blue-300">Date period</p>
+                                <p>Location</p>
+                              </div>
+                              <div className="relative">
+                                <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
+                                <span className="absolute left-1/2 top-3 bottom-0 w-px -translate-x-1/2 bg-slate-400" />
+                              </div>
+                              <div>
+                                <p className="text-[11px] text-slate-300">Title</p>
+                                <p className="text-[15px] font-bold leading-4 text-orange-400">Company Name</p>
+                                <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                                  Add experience entries to build your preview.
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </section>
+
+                      <section>
+                        <h3 className={templateStyle.sectionTitle}>EDUCATION</h3>
+                        <div className="mt-3 space-y-3">
+                          {filledEducation.length ? (
+                            filledEducation.map((item, index) => (
+                                <div key={`enhancv-edu-${index}`} className="grid grid-cols-[88px_18px_minmax(0,1fr)] gap-3">
+                                  <div className="text-[10px] leading-4 text-slate-400">
+                                    <p className="font-bold text-blue-300">{formatDateRange(item.startDate, item.endDate)}</p>
+                                    <p>{formData.personalInfo.location || "Location"}</p>
+                                  </div>
+                                  <div className="relative">
+                                    <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
+                                    <span className="absolute left-1/2 top-3 bottom-0 w-px -translate-x-1/2 bg-slate-400" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-[13px] text-blue-400">
+                                      {item.degree || "Bachelor of Technology"}
+                                      {item.fieldOfStudy ? `, ${item.fieldOfStudy}` : ""}
+                                    </p>
+                                    <p className="text-[13px] font-bold leading-4 text-orange-500">
+                                      {item.institution || "University / Institute"}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))
+                          ) : (
+                            <div className="grid grid-cols-[88px_18px_minmax(0,1fr)] gap-3">
+                              <div className="text-[10px] leading-4 text-slate-400">
+                                <p className="font-bold text-blue-300">Date period</p>
+                                <p>Location</p>
+                              </div>
+                              <div className="relative">
+                                <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
+                              </div>
+                              <div>
+                                <p className="text-[13px] text-blue-400">Degree / Program</p>
+                                <p className="text-[13px] font-bold leading-4 text-orange-500">Institution Name</p>
+                                <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                                  Add education details to complete the preview.
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </section>
+
+                      <section>
+                        <h3 className={templateStyle.sectionTitle}>SKILLS</h3>
+                        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-3">
+                          {formData.skills.length ? (
+                            formData.skills.map((skill, index) => (
+                              <span key={`${skill}-enhancv-${index}`} className={templateStyle.skill}>
+                                {skill}
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-[10px] leading-4 text-slate-400">
+                              Add skills to populate the preview.
+                            </p>
+                          )}
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                ) : templateStyle.layout === "creative" ? (
                   <div className="min-h-[672px] overflow-hidden rounded-[1.5rem] border border-slate-200">
                     <div className="grid gap-6 bg-slate-900 px-6 py-6 text-white md:grid-cols-[1fr_180px] md:items-center">
                       <div>

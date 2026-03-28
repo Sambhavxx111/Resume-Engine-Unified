@@ -1,5 +1,5 @@
 const resumeModel = require('../models/resume.model');
-const { calculateATSScore } = require('../services/ats.service');
+const { calculateATSScore, calculateATSScoreFallback } = require('../services/ats.service');
 const { matchResumeWithJD, matchResumeWithJDFallback } = require('../services/jdMatcher.service');
 const {
   recommendJobsForResumeText,
@@ -89,13 +89,208 @@ const extractUploadedText = async (file) => {
   return sanitizeExtractedResumeText(text, file.originalname || 'uploaded resume');
 };
 
-const buildUploadedResumeJson = (text, originalName) => ({
-  personalInfo: { name: originalName },
-  raw_text: text,
-  experience: text.toLowerCase().includes('experience') ? [{}] : undefined,
-  education: text.toLowerCase().includes('education') ? [{}] : undefined,
-  skills: text.toLowerCase().includes('skills') ? [{}] : undefined,
-});
+const SECTION_NAME_MAP = {
+  contact: 'contact',
+  'professional_summary': 'summary',
+  summary: 'summary',
+  profile: 'summary',
+  experience: 'experience',
+  'work_experience': 'experience',
+  education: 'education',
+  skills: 'skills',
+  technical_skills: 'skills',
+  projects: 'projects',
+  certifications: 'certifications',
+  achievements: 'achievements',
+};
+
+const normalizeSectionName = (line = '') =>
+  SECTION_NAME_MAP[line.toLowerCase().replace(/[^\w\s]/g, '').trim().replace(/\s+/g, '_')] ||
+  line.toLowerCase().replace(/[^\w\s]/g, '').trim().replace(/\s+/g, '_');
+
+const sanitizeOptimizedLines = (resumeText = '') =>
+  String(resumeText)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^ATS OPTIMIZATION DRAFT$/i.test(line))
+    .filter((line) => !/^ORIGINAL CONTENT FOR REFERENCE$/i.test(line))
+    .filter((line) => !/^Rewrite your summary/i.test(line))
+    .filter((line) => !/^Add your best email/i.test(line))
+    .filter((line) => !/^Highlight one strong project/i.test(line))
+    .map((line) => line.replace(/\s+/g, ' ').trim());
+
+const filterFilled = (items = []) => items.filter(Boolean);
+
+const extractContactDetails = (lines = []) => {
+  const contactText = lines.join(' ');
+  const email = contactText.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || '';
+  const phone =
+    contactText.match(/(\+?\d[\d\s\-()]{7,}\d)/)?.[0]?.trim() || '';
+  const location = lines.find((line) => {
+    if (!line) return false;
+    if (email && line.includes(email)) return false;
+    if (phone && line.includes(phone)) return false;
+    return /(india|dehradun|uttarakhand|delhi|mumbai|bangalore|hyderabad|pune|remote|onsite|hybrid|[A-Z][a-z]+,\s*[A-Z][a-z]+)/i.test(
+      line,
+    );
+  }) || '';
+
+  return { email, phone, location };
+};
+
+const inferProfessionalTitle = (lines = []) =>
+  lines.find((line) =>
+    /(engineer|developer|analyst|intern|manager|designer|specialist|consultant|architect|undergraduate|student)/i.test(
+      line,
+    ),
+  ) || '';
+
+const splitSkillTokens = (lines = []) =>
+  Array.from(
+    new Set(
+      lines
+        .flatMap((line) => line.split(/[,|/]/))
+        .map((skill) => skill.replace(/^[-*]\s*/, '').trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 16);
+
+const inferSummary = (lines = [], title = '') => {
+  const longLine = lines.find(
+    (line) =>
+      line.length > 70 &&
+      !/^(contact|summary|experience|education|skills|projects|certifications|achievements)$/i.test(
+        line,
+      ),
+  );
+
+  if (longLine) {
+    return longLine;
+  }
+
+  if (title) {
+    return `Results-driven ${title.toLowerCase()} with relevant technical skills and hands-on project experience.`;
+  }
+
+  return 'Results-driven candidate with relevant technical skills and hands-on project experience.';
+};
+
+const buildExperienceItems = (lines = []) => {
+  if (!lines.length) return [];
+
+  const groups = [];
+  let current = null;
+
+  lines.forEach((line) => {
+    const cleaned = line.replace(/^[-*]\s*/, '').trim();
+    if (!cleaned) return;
+
+    const looksLikeHeading =
+      !line.startsWith('-') &&
+      !line.startsWith('*') &&
+      cleaned.length < 90 &&
+      /(^[A-Z])/.test(cleaned);
+
+    if (!current || looksLikeHeading) {
+      if (current) groups.push(current);
+      current = { heading: cleaned, details: [] };
+      return;
+    }
+
+    current.details.push(cleaned);
+  });
+
+  if (current) groups.push(current);
+
+  return groups.map((group) => {
+    const metaLine =
+      group.details.find((item) => /\b(20\d{2}|present|current|intern|remote|hybrid)\b/i.test(item)) || '';
+    const detailLines = group.details.filter((item) => item !== metaLine);
+    return {
+      company: '',
+      role: group.heading,
+      startDate: '',
+      endDate: metaLine,
+      description: detailLines.join(' ').trim(),
+    };
+  });
+};
+
+const buildEducationItems = (lines = []) => {
+  if (!lines.length) return [];
+
+  return [
+    {
+      institution: lines[1] || '',
+      degree: lines[0] || '',
+      fieldOfStudy: lines[2] || '',
+      startDate: '',
+      endDate: lines.find((line) => /\b(20\d{2}|present|current)\b/i.test(line)) || '',
+    },
+  ];
+};
+
+const buildUploadedResumeJson = (text, originalName) => {
+  const lines = sanitizeOptimizedLines(text);
+  const introLines = [];
+  const sectionMap = {};
+  let currentSection = 'summary';
+  sectionMap[currentSection] = [];
+
+  lines.forEach((line) => {
+    if (/^[A-Z][A-Z\s&/-]{2,}$/.test(line)) {
+      currentSection = normalizeSectionName(line);
+      if (!sectionMap[currentSection]) {
+        sectionMap[currentSection] = [];
+      }
+      return;
+    }
+
+    if (currentSection === 'summary') {
+      introLines.push(line);
+    }
+
+    sectionMap[currentSection].push(line.replace(/^[-*]\s*/, ''));
+  });
+
+  const derivedName = String(originalName || 'uploaded resume')
+    .replace(/\.[^/.]+$/, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (match) => match.toUpperCase())
+    .trim();
+
+  const introName =
+    introLines.find((line) => /^[A-Z][A-Za-z\s.]{4,40}$/.test(line) && !/@/.test(line)) || '';
+  const contactDetails = extractContactDetails([...(sectionMap.contact || []), ...lines]);
+  const title = inferProfessionalTitle([...introLines, ...(sectionMap.summary || [])]);
+  const skills = splitSkillTokens(sectionMap.skills || []);
+  const experience = buildExperienceItems(sectionMap.experience || []);
+  const education = buildEducationItems(sectionMap.education || []);
+  const summaryLines = (sectionMap.summary || []).filter((line) => line.length > 25);
+
+  return {
+    personalInfo: {
+      name: introName || derivedName,
+      fullName: introName || derivedName,
+      title,
+      email: contactDetails.email,
+      phone: contactDetails.phone,
+      location: contactDetails.location,
+    },
+    summary: summaryLines.join(' ').trim() || inferSummary(lines, title),
+    skills,
+    experience,
+    education,
+    customSections: Object.entries(sectionMap)
+      .filter(([key]) => !['summary', 'skills', 'experience', 'education', 'contact'].includes(key))
+      .map(([key, values]) => ({
+        title: key.replace(/_/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase()),
+        items: values,
+      })),
+    raw_text: text,
+  };
+};
 
 const stripScoreLanguage = (text = '') =>
   text
@@ -103,6 +298,15 @@ const stripScoreLanguage = (text = '') =>
     .filter((line) => !/\b(score|gain|before|after)\b/i.test(line))
     .join('\n')
     .trim();
+
+const scoreResumeSafely = async (resumeJson, jobDescription = null) => {
+  try {
+    return await calculateATSScore(resumeJson, jobDescription);
+  } catch (error) {
+    console.error('Primary ATS scoring failed, using local fallback:', error.message);
+    return calculateATSScoreFallback(resumeJson, jobDescription);
+  }
+};
 
 const scoreResume = async (req, res) => {
   try {
@@ -120,7 +324,7 @@ const scoreResume = async (req, res) => {
     const resumeJson = resume.resume_json;
 
     // Calculate ATS score
-    const scoreData = await calculateATSScore(resumeJson, jobDescription);
+    const scoreData = await scoreResumeSafely(resumeJson, jobDescription);
 
     // Check if optimization is needed
     const needsOptimization = scoreData.totalScore < 80;
@@ -220,7 +424,7 @@ const scoreUploadedResume = async (req, res) => {
     const fakeJson = buildUploadedResumeJson(text, req.file.originalname);
 
     const jobDescription = req.body.jobDescription || null;
-    const scoreData = await calculateATSScore(fakeJson, jobDescription);
+    const scoreData = await scoreResumeSafely(fakeJson, jobDescription);
     const needsOptimization = scoreData.totalScore < 80;
 
     return res.status(200).json({
@@ -270,7 +474,7 @@ const optimizeUploadedResume = async (req, res) => {
 
     const text = await extractUploadedText(req.file);
     const uploadedResumeJson = buildUploadedResumeJson(text, req.file.originalname);
-    const originalScoreData = await calculateATSScore(uploadedResumeJson, null);
+    const originalScoreData = await scoreResumeSafely(uploadedResumeJson, null);
 
     const optimized = await optimizeUploadedResumeText(text, {
       totalScore: originalScoreData.totalScore,
@@ -281,8 +485,33 @@ const optimizeUploadedResume = async (req, res) => {
     });
 
     const bestOptimizedText = stripScoreLanguage(optimized.optimizedResumeText);
-    const optimizedResumeJson = buildUploadedResumeJson(bestOptimizedText, req.file.originalname);
-    const optimizedScoreData = await calculateATSScore(optimizedResumeJson, null);
+    const optimizedResumeJson =
+      optimized.optimizedResumeData && typeof optimized.optimizedResumeData === 'object'
+        ? {
+            ...optimized.optimizedResumeData,
+            raw_text: bestOptimizedText,
+            personalInfo: {
+              ...(optimized.optimizedResumeData.personalInfo || {}),
+              name:
+                optimized.optimizedResumeData.personalInfo?.fullName ||
+                optimized.optimizedResumeData.personalInfo?.name ||
+                req.file.originalname,
+            },
+            skills: Array.isArray(optimized.optimizedResumeData.skills)
+              ? filterFilled(optimized.optimizedResumeData.skills)
+              : [],
+            experience: Array.isArray(optimized.optimizedResumeData.experience)
+              ? optimized.optimizedResumeData.experience
+              : [],
+            education: Array.isArray(optimized.optimizedResumeData.education)
+              ? optimized.optimizedResumeData.education
+              : [],
+            customSections: Array.isArray(optimized.optimizedResumeData.customSections)
+              ? optimized.optimizedResumeData.customSections
+              : [],
+          }
+        : buildUploadedResumeJson(bestOptimizedText, req.file.originalname);
+    const optimizedScoreData = await scoreResumeSafely(optimizedResumeJson, null);
 
     return res.status(200).json({
       message: 'Uploaded resume optimized successfully',
@@ -292,6 +521,7 @@ const optimizeUploadedResume = async (req, res) => {
       scoreGain: Math.round((optimizedScoreData.totalScore - originalScoreData.totalScore) * 100) / 100,
       keyChanges: optimized.keyChanges,
       optimizedResumeText: bestOptimizedText,
+      optimizedResumeData: optimizedResumeJson,
       optimizedBreakdown: optimizedScoreData.breakdown,
       optimizedMissingKeywords: optimizedScoreData.missingKeywords,
       optimizedMissingSections: optimizedScoreData.missingSections,

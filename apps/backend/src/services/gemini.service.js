@@ -61,8 +61,10 @@ const PROMPTS = {
     Keep it truthful, concise, and directly usable as resume content.
     Improve section headings, action verbs, measurable impact, and keyword coverage.
     Aim for a 90+ ATS outcome if the content allows it.
-    Do NOT include ATS score numbers, explanations, before/after text, or commentary inside the resume itself.
-    Return resume-ready plain text only inside the JSON field.
+    Do NOT invent achievements, companies, degrees, dates, or certifications that are not supported by the original text.
+    Do NOT include ATS score numbers, explanations, before/after text, markdown, or commentary inside the resume itself.
+    Return a structured resume JSON that can be rendered directly into a resume layout.
+    Use empty strings or empty arrays when a detail is missing instead of hallucinating content.
 
     Original Resume Text:
     ${resumeText}
@@ -74,6 +76,36 @@ const PROMPTS = {
     {
       "headline": "short string",
       "optimizedResumeText": "full ATS-optimized plain text resume",
+      "optimizedResumeData": {
+        "personalInfo": {
+          "fullName": "string",
+          "title": "string",
+          "email": "string",
+          "phone": "string",
+          "location": "string"
+        },
+        "summary": "string",
+        "skills": ["skill 1", "skill 2"],
+        "experience": [
+          {
+            "company": "string",
+            "role": "string",
+            "startDate": "YYYY-MM or empty string",
+            "endDate": "YYYY-MM or empty string",
+            "description": "plain text bullet-style achievements in one string"
+          }
+        ],
+        "education": [
+          {
+            "institution": "string",
+            "degree": "string",
+            "fieldOfStudy": "string",
+            "startDate": "YYYY-MM or empty string",
+            "endDate": "YYYY-MM or empty string"
+          }
+        ],
+        "customSections": []
+      },
       "keyChanges": ["change 1", "change 2", "change 3"]
     }
   `,
@@ -306,10 +338,16 @@ const optimizeUploadedResumeText = async (resumeText, atsInsights = {}) => {
       throw new Error('Invalid optimized resume response');
     }
 
+    const optimizedResumeData =
+      parsed.optimizedResumeData && typeof parsed.optimizedResumeData === 'object'
+        ? parsed.optimizedResumeData
+        : null;
+
     return {
       success: true,
       headline: parsed.headline || 'ATS-ready revision prepared',
       optimizedResumeText: parsed.optimizedResumeText,
+      optimizedResumeData,
       keyChanges: Array.isArray(parsed.keyChanges) ? parsed.keyChanges : []
     };
   } catch (error) {

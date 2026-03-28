@@ -18,6 +18,8 @@ const TEMPLATE_FILE_NAMES = {
   compact: "compact",
   "single-column": "single-column",
   creative: "creative",
+  "enhancv-replica": "enhancv-replica",
+  "enhancv-columns": "enhancv-columns",
 };
 
 const normalizeTemplateId = (templateId) =>
@@ -109,9 +111,63 @@ const TEMPLATE_CONFIG = {
     skillMode: "light-box",
     order: ["summary", "experience", "education", "skills"],
   },
+  "enhancv-replica": {
+    layout: "enhancv-replica",
+    background: [255, 255, 255],
+    headingFont: "helvetica",
+    headingStyle: "bold",
+    headingSize: 24,
+    titleFont: "helvetica",
+    titleStyle: "bold",
+    titleSize: 12,
+    nameColor: [22, 63, 143],
+    titleColor: [255, 124, 31],
+    contactColor: [60, 72, 88],
+    sectionColor: [22, 63, 143],
+    lineColor: [160, 170, 185],
+    skillMode: "enhancv-line",
+    order: ["summary", "experience", "education", "skills"],
+  },
+  "enhancv-columns": {
+    layout: "enhancv-columns",
+    background: [255, 255, 255],
+    headingFont: "helvetica",
+    headingStyle: "bold",
+    headingSize: 22,
+    titleFont: "helvetica",
+    titleStyle: "bold",
+    titleSize: 10.5,
+    nameColor: [25, 92, 81],
+    titleColor: [75, 180, 144],
+    contactColor: [95, 103, 117],
+    sectionColor: [25, 92, 81],
+    lineColor: [25, 92, 81],
+    skillMode: "enhancv-line",
+    order: ["summary", "experience", "education", "skills"],
+  },
 };
 
 const filterFilled = (items = []) => items.filter(Boolean);
+const formatMonthYear = (value = "") => {
+  if (!value) return "";
+  const [year, month] = String(value).split("-");
+  if (!year) return "";
+  if (!month) return year;
+  return `${String(month).padStart(2, "0")}/${year}`;
+};
+
+const formatDateRange = (startDate, endDate) => {
+  const start = formatMonthYear(startDate);
+  const end = formatMonthYear(endDate);
+  if (start && end) return `${start} - ${end}`;
+  return start || end || "Date period";
+};
+
+const splitBulletLines = (value = "") =>
+  String(value)
+    .split(/\r?\n+/)
+    .map((line) => line.replace(/^\s*[-*•]\s*/, "").trim())
+    .filter(Boolean);
 
 const getResumeSections = (formData) => {
   const sections = [];
@@ -239,6 +295,11 @@ const drawSkills = (doc, skills, x, y, width, config) => {
       doc.setFillColor(15, 23, 42);
       doc.setTextColor(255, 255, 255);
       doc.roundedRect(cursorX, cursorY - 5, pillWidth, pillHeight, 2, 2, "F");
+    } else if (config.skillMode === "enhancv-line") {
+      doc.setTextColor(79, 86, 97);
+      doc.setDrawColor(169, 175, 187);
+      doc.setLineWidth(0.2);
+      doc.line(cursorX, cursorY + 2.2, cursorX + pillWidth - 2, cursorY + 2.2);
     } else if (config.skillMode === "outlined") {
       doc.setTextColor(30, 41, 59);
     } else if (config.skillMode === "light-box") {
@@ -254,7 +315,11 @@ const drawSkills = (doc, skills, x, y, width, config) => {
 
     doc.setFont("helvetica", config.skillMode === "compact" ? "bold" : "normal");
     doc.setFontSize(config.skillMode === "compact" ? 8.2 : 8.8);
-    doc.text(skill, cursorX + (config.skillMode === "outlined" ? 0 : 4), cursorY);
+    doc.text(
+      skill,
+      cursorX + (config.skillMode === "outlined" || config.skillMode === "enhancv-line" ? 0 : 4),
+      cursorY,
+    );
     cursorX += pillWidth + 3;
   });
 
@@ -531,6 +596,316 @@ const renderTimelineTemplate = (doc, formData, config) => {
   });
 };
 
+const renderEnhancvReplicaTemplate = (doc, formData, config) => {
+  const name = (formData.personalInfo.fullName || "Your Name").toUpperCase();
+  const title = formData.personalInfo.title || "Professional Title";
+  const contactParts = filterFilled([
+    formData.personalInfo.phone || "[Phone Number]",
+    formData.personalInfo.email || "yourname@email.com",
+    formData.personalInfo.title || "LinkedIn/Portfolio",
+    formData.personalInfo.location || "[Location]",
+  ]);
+
+  doc.setTextColor(...config.nameColor);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(24);
+  doc.text(name, 12, 18);
+
+  doc.setTextColor(...config.titleColor);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11.5);
+  doc.text(title, 12, 25);
+
+  doc.setTextColor(...config.contactColor);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.8);
+  let cursorX = 12;
+  contactParts.forEach((part, index) => {
+    doc.text(part, cursorX, 31);
+    cursorX += doc.getTextWidth(part) + (index === contactParts.length - 1 ? 0 : 8);
+  });
+
+  let y = 41;
+  const drawTitle = (label) => {
+    doc.setTextColor(...config.sectionColor);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text(label, 12, y);
+    y += 5;
+  };
+
+  drawTitle("SUMMARY");
+  doc.setTextColor(95, 103, 117);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.2);
+  y = drawWrappedText(
+    doc,
+    formData.summary ||
+      "Your professional summary will appear here once you add it.",
+    12,
+    y,
+    186,
+    4,
+  ) + 4;
+
+  drawTitle("EXPERIENCE");
+  const experienceItems = (formData.experience || []).filter(
+    (item) => item.company || item.role || item.description,
+  );
+  const renderedExperience =
+    experienceItems.length > 0
+      ? experienceItems
+      : [
+          {
+            role: "Title",
+            company: "Company Name",
+            startDate: "",
+            endDate: "",
+            description: "Add experience entries to build your preview.",
+          },
+        ];
+
+  renderedExperience.forEach((item) => {
+    const startY = y;
+    doc.setTextColor(106, 135, 192);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.8);
+    doc.text(formatDateRange(item.startDate, item.endDate), 12, startY);
+    doc.setTextColor(180, 188, 200);
+    doc.setFont("helvetica", "normal");
+    doc.text(formData.personalInfo.location || "Location", 12, startY + 4);
+
+    doc.setDrawColor(138, 143, 153);
+    doc.setLineWidth(0.25);
+    doc.circle(44, startY - 0.5, 0.9, "F");
+    doc.line(44, startY + 1.2, 44, startY + 14);
+
+    doc.setTextColor(154, 167, 190);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.text(item.role || "Title", 50, startY);
+
+    doc.setTextColor(255, 139, 57);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.text(item.company || "Company Name", 50, startY + 4);
+
+    const bullets = splitBulletLines(item.description);
+    const fallbackBullet = bullets.length ? bullets : [item.description || "Add experience entries to build your preview."];
+    doc.setTextColor(168, 175, 185);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.4);
+    let bulletY = startY + 8;
+    fallbackBullet.forEach((bullet) => {
+      doc.text("-", 50, bulletY);
+      bulletY = drawWrappedText(doc, bullet, 53, bulletY, 138, 3.8);
+    });
+    y = bulletY + 2;
+  });
+
+  drawTitle("EDUCATION");
+  const educationItems = (formData.education || []).filter(
+    (item) => item.institution || item.degree || item.fieldOfStudy,
+  );
+  const renderedEducation =
+    educationItems.length > 0
+      ? educationItems
+      : [
+          {
+            degree: "Degree / Program",
+            fieldOfStudy: "",
+            institution: "Institution Name",
+            startDate: "",
+            endDate: "",
+          },
+        ];
+
+  renderedEducation.forEach((item) => {
+    const startY = y;
+    doc.setTextColor(106, 135, 192);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.8);
+    doc.text(formatDateRange(item.startDate, item.endDate), 12, startY);
+    doc.setTextColor(180, 188, 200);
+    doc.setFont("helvetica", "normal");
+    doc.text(formData.personalInfo.location || "Location", 12, startY + 4);
+
+    doc.setDrawColor(138, 143, 153);
+    doc.setLineWidth(0.25);
+    doc.circle(44, startY - 0.5, 0.9, "F");
+
+    doc.setTextColor(106, 135, 192);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(
+      `${item.degree || "Degree"}${item.fieldOfStudy ? `, ${item.fieldOfStudy}` : ""}`,
+      50,
+      startY,
+    );
+
+    doc.setTextColor(255, 124, 31);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.6);
+    doc.text(item.institution || "Institution", 50, startY + 4);
+    y = startY + 10;
+  });
+
+  drawTitle("SKILLS");
+  if (filterFilled(formData.skills).length) {
+    y = drawSkills(doc, filterFilled(formData.skills), 12, y, 180, config);
+  } else {
+    doc.setTextColor(148, 163, 184);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    y = drawWrappedText(doc, "Add skills to populate the preview.", 12, y + 2, 180, 4) + 2;
+  }
+};
+
+const renderEnhancvColumnsTemplate = (doc, formData, config) => {
+  const educationItems = (formData.education || []).filter(
+    (item) => item.institution || item.degree || item.fieldOfStudy,
+  );
+  const experienceItems = (formData.experience || []).filter(
+    (item) => item.company || item.role || item.description,
+  );
+
+  doc.setTextColor(...config.nameColor);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(21);
+  doc.text((formData.personalInfo.fullName || "Your Name").toUpperCase(), 12, 18);
+
+  doc.setTextColor(...config.titleColor);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text(formData.personalInfo.title || "Professional Title", 12, 24);
+
+  doc.setTextColor(...config.contactColor);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  const contactParts = filterFilled([
+    formData.personalInfo.phone || "[Phone Number]",
+    formData.personalInfo.email || "yourname@email.com",
+    formData.personalInfo.title || "LinkedIn/Portfolio",
+    formData.personalInfo.location || "[Location]",
+  ]);
+  let contactX = 12;
+  contactParts.forEach((part, index) => {
+    doc.text(part, contactX, 29);
+    contactX += doc.getTextWidth(part) + (index === contactParts.length - 1 ? 0 : 7);
+  });
+
+  doc.setDrawColor(190, 196, 201);
+  doc.setFillColor(245, 245, 245);
+  doc.circle(183, 20, 11, "F");
+  doc.setDrawColor(140, 140, 140);
+  doc.setLineWidth(0.8);
+  doc.circle(183, 17.5, 3.8);
+  doc.ellipse(183, 25, 6.5, 4.2);
+
+  const drawColumnTitle = (label, x, y, width) => {
+    doc.setTextColor(...config.sectionColor);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text(label, x, y);
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(...config.lineColor);
+    doc.line(x, y + 1.5, x + width, y + 1.5);
+    return y + 6;
+  };
+
+  const leftX = 12;
+  const centerX = 76;
+  const rightX = 148;
+  const leftWidth = 46;
+  const centerWidth = 64;
+  const rightWidth = 44;
+  let leftY = 40;
+  let centerY = 40;
+  let rightY = 40;
+
+  leftY = drawColumnTitle("SUMMARY", leftX, leftY, leftWidth);
+  doc.setTextColor(100, 108, 115);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  leftY = drawWrappedText(
+    doc,
+    formData.summary || "Your professional summary will appear here once you add it.",
+    leftX,
+    leftY,
+    leftWidth,
+    3.8,
+  ) + 5;
+
+  centerY = drawColumnTitle("EXPERIENCE", centerX, centerY, centerWidth);
+  const renderedExperience = experienceItems.length
+    ? experienceItems
+    : [{ role: "Title", company: "Company Name", startDate: "", endDate: "", description: "Highlight your accomplishments, using numbers if possible." }];
+  renderedExperience.slice(0, 3).forEach((item) => {
+    doc.setTextColor(160, 170, 178);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.2);
+    doc.text(item.role || "Title", centerX, centerY);
+    doc.setTextColor(124, 195, 173);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.4);
+    doc.text(item.company || "Company Name", centerX, centerY + 4);
+    doc.setTextColor(190, 196, 201);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.4);
+    doc.text(formatDateRange(item.startDate, item.endDate), centerX, centerY + 8);
+    doc.text(formData.personalInfo.location || "Location", centerX + 22, centerY + 8);
+    const bullets = splitBulletLines(item.description);
+    const bulletItems = bullets.length ? bullets : ["Highlight your accomplishments, using numbers if possible."];
+    doc.setTextColor(180, 185, 190);
+    doc.setFontSize(6.6);
+    bulletItems.slice(0, 3).forEach((bullet) => {
+      doc.text("-", centerX, centerY + 12);
+      centerY = drawWrappedText(doc, bullet, centerX + 3, centerY + 12, centerWidth - 3, 3.2);
+    });
+    centerY += 4;
+  });
+
+  rightY = drawColumnTitle("EDUCATION", rightX, rightY, rightWidth);
+  const renderedEducation = educationItems.length
+    ? educationItems
+    : [{ degree: "Degree / Program", institution: "Institution Name", fieldOfStudy: "", startDate: "", endDate: "" }];
+  renderedEducation.slice(0, 1).forEach((item) => {
+    doc.setTextColor(40, 54, 68);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.2);
+    doc.text(item.degree || "Degree / Program", rightX, rightY);
+    doc.setTextColor(124, 195, 173);
+    doc.setFontSize(7.8);
+    rightY = drawWrappedText(doc, item.institution || "Institution Name", rightX, rightY + 4, rightWidth, 3.6);
+    doc.setTextColor(160, 170, 178);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.4);
+    doc.text(formatDateRange(item.startDate, item.endDate), rightX, rightY + 1);
+    rightY += 6;
+  });
+
+  rightY = drawColumnTitle("SKILLS", rightX, rightY, rightWidth);
+  const skills = filterFilled(formData.skills);
+  const skillItems = skills.length ? skills : ["Skill One", "Skill Two", "Skill Three", "Skill Four", "Skill Five", "Skill Six"];
+  let skillX = rightX;
+  let skillY = rightY + 1;
+  skillItems.slice(0, 8).forEach((skill, index) => {
+    if (index > 0 && index % 2 === 0) {
+      skillY += 7;
+      skillX = rightX;
+    }
+    doc.setTextColor(25, 92, 81);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.8);
+    doc.text(skill, skillX, skillY);
+    const width = Math.min(doc.getTextWidth(skill) + 1, 18);
+    doc.setDrawColor(160, 170, 178);
+    doc.setLineWidth(0.2);
+    doc.line(skillX, skillY + 1.2, skillX + width, skillY + 1.2);
+    skillX += 21;
+  });
+};
+
 const renderTemplatePdf = (doc, formData, config) => {
   resetPage(doc, config.background);
 
@@ -551,6 +926,16 @@ const renderTemplatePdf = (doc, formData, config) => {
 
   if (config.layout === "timeline") {
     renderTimelineTemplate(doc, formData, config);
+    return;
+  }
+
+  if (config.layout === "enhancv-replica") {
+    renderEnhancvReplicaTemplate(doc, formData, config);
+    return;
+  }
+
+  if (config.layout === "enhancv-columns") {
+    renderEnhancvColumnsTemplate(doc, formData, config);
     return;
   }
 
@@ -815,6 +1200,122 @@ const parseOptimizedResumeText = (optimizedResumeText = "", fileName = "", headl
   };
 };
 
+const KNOWN_SKILL_PATTERN =
+  /(python|java|javascript|typescript|react|node(?:\.js)?|express|mongodb|mysql|sql|postgres(?:ql)?|aws|azure|gcp|docker|kubernetes|linux|git|github|html|css|tailwind|bootstrap|c\+\+|c#|java|spring|django|flask|machine learning|data structures|algorithms|oop|dbms|siem|vapt|soc|incident response|digital forensics|wireshark|burp suite|nmap|metasploit|threat intelligence|malware analysis|api|rest|rest api|cloud security|network security|cybersecurity)/i;
+
+const isLikelyName = (value = "") =>
+  /^[A-Za-z]+(?:[.\s'-][A-Za-z]+){1,4}$/.test(String(value).trim()) &&
+  !/(summary|experience|education|skills|projects|certifications|achievements|contact|technical|resume)/i.test(
+    String(value),
+  );
+
+const sanitizeSkillItems = (skills = [], personalInfo = {}) => {
+  const forbiddenTokens = new Set(
+    [
+      personalInfo.fullName,
+      personalInfo.name,
+      personalInfo.email,
+      personalInfo.phone,
+      personalInfo.location,
+      personalInfo.title,
+    ]
+      .filter(Boolean)
+      .flatMap((value) =>
+        String(value)
+          .split(/[\s|,/@._-]+/)
+          .map((token) => token.trim().toLowerCase())
+          .filter((token) => token.length > 1),
+      ),
+  );
+
+  return Array.from(
+    new Set(
+      (skills || [])
+        .map((skill) => String(skill || "").trim())
+        .filter(Boolean)
+        .filter((skill) => !/@|https?:\/\/|linkedin\.com|github\.com/i.test(skill))
+        .filter((skill) => !forbiddenTokens.has(skill.toLowerCase()))
+        .filter((skill) => !/^(candidate|experience|critical|flaws|detection|security|digital)$/i.test(skill))
+        .filter((skill) => KNOWN_SKILL_PATTERN.test(skill)),
+    ),
+  ).slice(0, 16);
+};
+
+const sanitizeOptimizedResumeData = (optimizedResume = {}, fileName = "") => {
+  const personalInfo = {
+    ...(optimizedResume.personalInfo || {}),
+  };
+
+  const customSections = Array.isArray(optimizedResume.customSections)
+    ? optimizedResume.customSections
+    : [];
+
+  const possibleNameSection = customSections.find((section) => {
+    const title = String(section?.title || "").trim();
+    const items = Array.isArray(section?.items) ? section.items : [];
+    return (
+      isLikelyName(title) &&
+      items.some((item) => /@|\+?\d[\d\s\-()]{7,}|linkedin\.com|github\.com/i.test(String(item)))
+    );
+  });
+
+  const rawFullName =
+    personalInfo.fullName ||
+    personalInfo.name ||
+    possibleNameSection?.title ||
+    fileName.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ").trim();
+
+  const cleanedFullName = /resume|final|boss|optimized/i.test(rawFullName)
+    ? possibleNameSection?.title || rawFullName
+    : rawFullName;
+
+  const normalizedSkills = sanitizeSkillItems(optimizedResume.skills, {
+    ...personalInfo,
+    fullName: cleanedFullName,
+  });
+
+  const skillsFromCustomSection = customSections
+    .filter((section) => /technical skills|skills/i.test(String(section?.title || "")))
+    .flatMap((section) => (Array.isArray(section.items) ? section.items : []))
+    .flatMap((item) => String(item).split(/[,|]/))
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const mergedSkills = normalizedSkills.length
+    ? normalizedSkills
+    : sanitizeSkillItems(skillsFromCustomSection, {
+        ...personalInfo,
+        fullName: cleanedFullName,
+      });
+
+  const filteredCustomSections = customSections.filter((section) => {
+    const title = String(section?.title || "").trim();
+    const items = Array.isArray(section?.items) ? section.items : [];
+
+    if (!title && !items.length) return false;
+    if (/technical skills|skills/i.test(title)) return false;
+    if (
+      isLikelyName(title) &&
+      items.some((item) => /@|\+?\d[\d\s\-()]{7,}|linkedin\.com|github\.com/i.test(String(item)))
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+  return {
+    ...optimizedResume,
+    personalInfo: {
+      ...personalInfo,
+      fullName: cleanedFullName || "Optimized Resume",
+      name: cleanedFullName || "Optimized Resume",
+    },
+    skills: mergedSkills,
+    customSections: filteredCustomSections,
+  };
+};
+
 export async function exportResumePdf(formData) {
   const doc = new jsPDF();
   const template = normalizeTemplateId(formData.template);
@@ -824,12 +1325,40 @@ export async function exportResumePdf(formData) {
   doc.save(getResumeFileName(formData, template));
 }
 
-export function exportOptimizedUploadPdf(fileName, headline, optimizedResumeText) {
+export function exportOptimizedUploadPdf(
+  fileName,
+  headline,
+  optimizedResumeText,
+  optimizedResumeData = null,
+) {
   const safeName = (fileName || "optimized_resume").replace(/\.[^/.]+$/, "").replace(/\s+/g, "_");
-  const randomTemplates = ["contemporary", "timeline", "compact", "single-column", "creative"];
-  const chosenTemplate = randomTemplates[Math.floor(Math.random() * randomTemplates.length)];
+  const chosenTemplate = "single-column";
   const doc = new jsPDF();
-  const optimizedResume = parseOptimizedResumeText(optimizedResumeText, fileName, headline);
+  const optimizedResume = sanitizeOptimizedResumeData(
+    optimizedResumeData && typeof optimizedResumeData === "object"
+      ? {
+          ...optimizedResumeData,
+          personalInfo: {
+            ...(optimizedResumeData.personalInfo || {}),
+            fullName:
+              optimizedResumeData.personalInfo?.fullName ||
+              optimizedResumeData.personalInfo?.name ||
+              "Optimized Resume",
+          },
+          skills: Array.isArray(optimizedResumeData.skills) ? optimizedResumeData.skills : [],
+          experience: Array.isArray(optimizedResumeData.experience)
+            ? optimizedResumeData.experience
+            : [],
+          education: Array.isArray(optimizedResumeData.education)
+            ? optimizedResumeData.education
+            : [],
+          customSections: Array.isArray(optimizedResumeData.customSections)
+            ? optimizedResumeData.customSections
+            : [],
+        }
+      : parseOptimizedResumeText(optimizedResumeText, fileName, headline),
+    fileName,
+  );
   const config = TEMPLATE_CONFIG[chosenTemplate];
 
   renderTemplatePdf(doc, { ...optimizedResume, template: chosenTemplate }, config);
