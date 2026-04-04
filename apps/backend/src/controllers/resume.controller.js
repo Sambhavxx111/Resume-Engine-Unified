@@ -1,5 +1,66 @@
 const resumeModel = require('../models/resume.model');
 const { sanitizeResumePayload } = require('../utils/sanitizeResume');
+const { parseResumeForBuilder } = require('../services/gemini.service');
+const { PDFParse } = require('pdf-parse');
+
+const sanitizeExtractedResumeText = (text = '', originalName = '') => {
+  const normalized = String(text || '')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter(
+      (line) =>
+        !/^(%PDF|obj\b|endobj\b|xref\b|trailer\b|startxref\b|stream\b|endstream\b)/i.test(line) &&
+        !/[<>]{2,}/.test(line) &&
+        !/^\/[A-Z]/.test(line) &&
+        !/(Producer|Creator|CreationDate|ModDate|Type|Length|Filter|Contents)/i.test(line),
+    )
+    .filter((line) => /[A-Za-z]/.test(line))
+    .map((line) => line.replace(/\s+/g, ' ').trim());
+
+  const cleaned = normalized.join('\n').trim();
+  if (cleaned.length >= 80) {
+    return cleaned;
+  }
+
+  return originalName
+    .replace(/\.[^/.]+$/, '')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+};
+
+const extractUploadedText = async (file) => {
+  if (!file) {
+    throw new Error('No resume file uploaded');
+  }
+
+  let text = '';
+  if (file.mimetype === 'application/pdf') {
+    let parser;
+
+    try {
+      parser = new PDFParse({ data: file.buffer });
+      const pdfData = await parser.getText();
+      text = pdfData?.text || '';
+    } catch (pdfError) {
+      console.error('PDF parsing warning:', pdfError.message);
+      text = file.originalname || 'uploaded resume';
+    } finally {
+      if (parser && typeof parser.destroy === 'function') {
+        await parser.destroy().catch(() => {});
+      }
+    }
+  } else {
+    text = file.buffer.toString('utf-8');
+  }
+
+  if (!text.trim()) {
+    text = file.originalname || 'uploaded resume';
+  }
+
+  return sanitizeExtractedResumeText(text, file.originalname || 'uploaded resume');
+};
 
 const saveResume = async (req, res) => {
   try {
@@ -59,7 +120,32 @@ const getResume = async (req, res) => {
   }
 };
 
+const importResumeFromFile = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Resume file is required' });
+    }
+
+    const extractedText = await extractUploadedText(req.file);
+    const parsed = await parseResumeForBuilder(extractedText, req.file.originalname || 'uploaded resume');
+
+    return res.status(200).json({
+      message: 'Resume parsed successfully',
+      resume: parsed.resumeData,
+      extractedText,
+      fileName: req.file.originalname || 'uploaded resume',
+    });
+  } catch (error) {
+    console.error('Import resume from file error:', error.message);
+    return res.status(500).json({
+      error: 'Unable to parse the uploaded resume right now.',
+      details: error.message,
+    });
+  }
+};
+
 module.exports = {
   saveResume,
   getResume,
+  importResumeFromFile,
 };

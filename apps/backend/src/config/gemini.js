@@ -4,6 +4,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 // IMPORTANT: new SDK requires models/ prefix
 const MODEL_NAME = process.env.GEMINI_MODEL || "models/gemini-1.5-flash";
 const jdMatcherApiKey = process.env.GEMINI_API_KEY_JD_MATCHER;
+const resumeParsingModelConfig = process.env.GEMINI_RESUME_PARSING_MODEL;
 
 function resolveApiKey(apiKeyOverride) {
   const resolvedApiKey = apiKeyOverride || process.env.GEMINI_API_KEY;
@@ -15,6 +16,31 @@ function resolveApiKey(apiKeyOverride) {
   return resolvedApiKey;
 }
 
+function resolveModelName(modelOverride) {
+  if (!modelOverride) {
+    return MODEL_NAME;
+  }
+
+  return modelOverride.startsWith("models/") ? modelOverride : `models/${modelOverride}`;
+}
+
+function getResumeParsingGeminiOptions() {
+  if (!resumeParsingModelConfig) {
+    return {};
+  }
+
+  const normalized = String(resumeParsingModelConfig).trim();
+  if (!normalized) {
+    return {};
+  }
+
+  if (/^(models\/|gemini-)/i.test(normalized)) {
+    return { model: resolveModelName(normalized) };
+  }
+
+  return { apiKey: normalized };
+}
+
 async function callGeminiWithTimeout(prompt, options = {}) {
   if (!prompt) throw new Error("Prompt is required");
 
@@ -22,11 +48,12 @@ async function callGeminiWithTimeout(prompt, options = {}) {
     timeoutMs = 15000,
     retries = 2,
     apiKey,
+    model: modelOverride,
   } = typeof options === "number" ? { timeoutMs: options } : options;
 
   const genAI = new GoogleGenerativeAI(resolveApiKey(apiKey));
   const model = genAI.getGenerativeModel({
-    model: MODEL_NAME,
+    model: resolveModelName(modelOverride),
   });
 
   for (let attempt = 0; attempt < retries; attempt++) {
@@ -60,4 +87,5 @@ async function callGeminiWithTimeout(prompt, options = {}) {
 module.exports = {
   callGeminiWithTimeout,
   jdMatcherApiKey,
+  getResumeParsingGeminiOptions,
 };

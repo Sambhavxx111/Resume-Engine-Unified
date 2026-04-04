@@ -95,6 +95,32 @@ const splitLines = (value = "") =>
     .map((line) => line.replace(/^\s*[-*•]\s*/, "").trim())
     .filter(Boolean);
 
+const splitCustomSectionItems = (items = []) =>
+  items
+    .flatMap((item) => {
+      const raw = String(item || "").trim();
+      if (!raw) return [];
+
+      const primaryParts = raw
+        .split(/\r?\n|•|●|▪|\s+\|\s+/)
+        .map((part) => part.replace(/^\s*[-*]\s*/, "").trim())
+        .filter(Boolean);
+
+      if (primaryParts.length > 1) {
+        return primaryParts;
+      }
+
+      if (raw.length > 120 && /[.]\s+[A-Z]/.test(raw)) {
+        return raw
+          .split(/(?<=\.)\s+(?=[A-Z])/)
+          .map((part) => part.replace(/^\s*[-*]\s*/, "").trim())
+          .filter(Boolean);
+      }
+
+      return [raw];
+    })
+    .filter(Boolean);
+
 const TemplateThumbnail = ({ templateId }) => {
   const normalizedTemplateId = normalizeTemplateId(templateId);
 
@@ -293,65 +319,75 @@ const templatePreviewClasses = {
     layout: "standard",
     shell: "border-slate-200 bg-white",
     header: "border-b border-slate-200 pb-5",
-    name: "text-3xl font-bold tracking-tight text-slate-900",
-    title: "mt-1 text-base font-medium text-cyan-700",
-    sectionTitle: "text-xs font-bold uppercase tracking-[0.25em] text-slate-500",
-    skill: "rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700",
+    name: "text-[2.15rem] font-bold tracking-tight text-slate-900",
+    title: "mt-1.5 text-lg font-semibold text-cyan-800",
+    sectionTitle: "text-[13px] font-bold uppercase tracking-[0.22em] text-slate-700",
+    skill: "rounded-full bg-slate-100 px-3 py-1.5 text-[13px] font-medium text-slate-800",
   },
   "single-column": {
     layout: "single-column",
     shell: "border-slate-300 bg-white",
     header: "border-b-2 border-slate-900 pb-4",
-    name: "text-3xl font-serif font-bold tracking-tight text-slate-900",
-    title: "mt-1 text-sm font-semibold uppercase tracking-[0.18em] text-slate-700",
-    sectionTitle: "text-sm font-bold uppercase tracking-[0.22em] text-slate-800",
-    skill: "rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700",
+    name: "text-[2.15rem] font-serif font-bold tracking-tight text-slate-900",
+    title: "mt-1.5 text-[15px] font-semibold uppercase tracking-[0.14em] text-slate-700",
+    sectionTitle: "text-[15px] font-bold uppercase tracking-[0.18em] text-slate-800",
+    skill: "rounded-md border border-slate-300 px-3 py-1.5 text-[13px] font-medium text-slate-800",
   },
   compact: {
     layout: "compact",
     shell: "border-slate-200 bg-white",
     header: "border-b border-slate-300 pb-4",
-    name: "text-[2rem] font-black uppercase tracking-[0.04em] text-slate-900",
-    title: "mt-1 text-sm font-semibold text-slate-600",
-    sectionTitle: "text-[11px] font-black uppercase tracking-[0.3em] text-slate-700",
-    skill: "rounded-full bg-cyan-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-800",
+    name: "text-[2.15rem] font-black uppercase tracking-[0.03em] text-slate-900",
+    title: "mt-1.5 text-[15px] font-semibold text-slate-700",
+    sectionTitle: "text-[12px] font-black uppercase tracking-[0.24em] text-slate-800",
+    skill: "rounded-full bg-cyan-50 px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-cyan-900",
   },
   creative: {
     layout: "creative",
     shell: "border-slate-200 bg-gradient-to-br from-white via-white to-cyan-50/50",
     header: "border-b border-cyan-100 pb-5",
-    name: "text-3xl font-bold tracking-tight text-slate-900",
-    title: "mt-1 text-base font-medium text-cyan-800",
-    sectionTitle: "text-xs font-bold uppercase tracking-[0.3em] text-cyan-800",
-    skill: "rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white",
+    name: "text-[2.1rem] font-bold tracking-tight text-slate-900",
+    title: "mt-1.5 text-lg font-semibold text-cyan-900",
+    sectionTitle: "text-[13px] font-bold uppercase tracking-[0.24em] text-cyan-900",
+    skill: "rounded-md bg-slate-900 px-3 py-1.5 text-[13px] font-medium text-white",
   },
   timeline: {
     layout: "timeline",
     shell: "border-slate-200 bg-slate-50",
     header: "border-b border-slate-300 pb-5",
-    name: "text-3xl font-semibold tracking-tight text-slate-950",
-    title: "mt-1 text-sm font-medium uppercase tracking-[0.22em] text-slate-600",
-    sectionTitle: "text-xs font-semibold uppercase tracking-[0.32em] text-cyan-700",
-    skill: "rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700",
+    name: "text-[2.1rem] font-semibold tracking-tight text-slate-950",
+    title: "mt-1.5 text-[15px] font-semibold uppercase tracking-[0.16em] text-slate-700",
+    sectionTitle: "text-[13px] font-semibold uppercase tracking-[0.22em] text-cyan-800",
+    skill: "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[13px] font-medium text-slate-800",
   },
   "enhancv-replica": {
     layout: "enhancv-replica",
     shell: "border-slate-300 bg-white",
     header: "border-b border-slate-200 pb-3",
-    name: "text-[2rem] font-black uppercase tracking-[0.02em] text-blue-900",
-    title: "mt-1 text-[15px] font-bold text-orange-500",
-    sectionTitle: "text-[13px] font-black uppercase tracking-[0.02em] text-blue-900",
-    skill: "border-b border-slate-400 pb-1 text-[11px] font-semibold text-slate-600",
+    name: "text-[2.2rem] font-black uppercase tracking-[0.02em] text-blue-950",
+    title: "mt-1.5 text-[17px] font-bold text-orange-600",
+    sectionTitle: "text-[15px] font-black uppercase tracking-[0.02em] text-blue-950",
+    skill: "border-b border-slate-500 pb-1.5 text-[13px] font-semibold text-slate-700",
   },
   "enhancv-columns": {
     layout: "enhancv-columns",
     shell: "border-slate-300 bg-white",
     header: "border-b border-slate-200 pb-3",
-    name: "text-[2rem] font-black uppercase tracking-[0.01em] text-emerald-900",
-    title: "mt-0.5 text-[13px] font-bold text-emerald-400",
-    sectionTitle: "text-[11px] font-black uppercase tracking-[0.01em] text-emerald-900",
-    skill: "border-b border-slate-400 pb-1 text-[10px] font-semibold text-emerald-900",
+    name: "text-[2.15rem] font-black uppercase tracking-[0.01em] text-emerald-950",
+    title: "mt-1 text-[16px] font-bold text-emerald-700",
+    sectionTitle: "text-[13px] font-black uppercase tracking-[0.01em] text-emerald-950",
+    skill: "border-b border-slate-500 pb-1.5 text-[12px] font-semibold text-emerald-950",
   },
+};
+
+const getCustomSectionSortKey = (title = "") => {
+  const normalized = String(title || "").trim().toLowerCase();
+  if (/project/.test(normalized)) return "projects";
+  if (/certification|certificate|course/.test(normalized)) return "certifications";
+  if (/achievement|award/.test(normalized)) return "achievements";
+  if (/language/.test(normalized)) return "languages";
+  if (/interest/.test(normalized)) return "interests";
+  return "custom";
 };
 
 const getPreviewSections = (formData) => [
@@ -371,7 +407,10 @@ const getPreviewSections = (formData) => [
       <div className="mt-2 flex flex-wrap gap-2">
         {formData.skills.length ? (
           formData.skills.map((skill, index) => (
-            <span key={`${skill}-preview-${index}`} className={templateStyle.skill}>
+            <span
+              key={`${skill}-preview-${index}`}
+              className={`${templateStyle.skill} max-w-full break-words whitespace-normal`}
+            >
               {skill}
             </span>
           ))
@@ -442,6 +481,7 @@ const getPreviewSections = (formData) => [
     .filter((section) => section.title || section.items.some((item) => item.trim()))
     .map((section, sectionIndex) => ({
       key: `custom-${sectionIndex}`,
+      sortKey: getCustomSectionSortKey(section.title),
       title: section.title || "Custom Section",
       render: () => (
         <div className="mt-2 space-y-2">
@@ -466,6 +506,10 @@ function ResumeForm({
   setFormData,
   onSave,
   onAIAction,
+  onImportResume,
+  onImportFileChange,
+  importFile,
+  importLoading,
   loading,
   aiLoading,
   error,
@@ -610,26 +654,40 @@ function ResumeForm({
   const filledEducation = (formData.education || []).filter(
     (item) => item.institution || item.degree || item.fieldOfStudy,
   );
+  const filledCustomSections = (formData.customSections || [])
+    .map((section) => ({
+      title: String(section?.title || "").trim(),
+      items: (section?.items || []).map((item) => String(item || "").trim()).filter(Boolean),
+    }))
+    .filter((section) => section.title || section.items.length);
 
   const previewSections = useMemo(() => {
     const allSections = getPreviewSections(formData);
     const orderMap = {
-      contemporary: ["summary", "skills", "experience", "education"],
-      "single-column": ["summary", "experience", "education", "skills"],
-      compact: ["summary", "experience", "skills", "education"],
-      creative: ["skills", "summary", "experience", "education"],
-      timeline: ["summary", "experience", "education", "skills"],
-      "enhancv-replica": ["summary", "experience", "education", "skills"],
-      "enhancv-columns": ["summary", "experience", "education", "skills"],
+      contemporary: ["summary", "skills", "experience", "projects", "education", "certifications", "achievements", "languages", "interests", "custom"],
+      "single-column": ["summary", "experience", "projects", "education", "certifications", "skills", "achievements", "languages", "interests", "custom"],
+      compact: ["summary", "experience", "projects", "skills", "education", "certifications", "achievements", "languages", "interests", "custom"],
+      creative: ["skills", "summary", "experience", "projects", "education", "certifications", "achievements", "languages", "interests", "custom"],
+      timeline: ["summary", "experience", "projects", "education", "certifications", "skills", "achievements", "languages", "interests", "custom"],
+      "enhancv-replica": ["summary", "experience", "projects", "education", "certifications", "achievements", "skills", "languages", "interests", "custom"],
+      "enhancv-columns": ["summary", "experience", "projects", "education", "certifications", "achievements", "skills", "languages", "interests", "custom"],
     };
 
     const desiredOrder = orderMap[normalizedTemplate] || orderMap.contemporary;
-    const weight = (key) => {
-      const index = desiredOrder.indexOf(key);
+    const weight = (sortKey) => {
+      const resolvedKey = sortKey || "custom";
+      const index = desiredOrder.indexOf(resolvedKey);
       return index === -1 ? desiredOrder.length + 1 : index;
     };
 
-    return [...allSections].sort((a, b) => weight(a.key) - weight(b.key));
+    return [...allSections].sort((a, b) => {
+      const weightA = weight(a.sortKey || a.key);
+      const weightB = weight(b.sortKey || b.key);
+      if (weightA !== weightB) {
+        return weightA - weightB;
+      }
+      return String(a.title || "").localeCompare(String(b.title || ""));
+    });
   }, [formData, normalizedTemplate]);
 
   const skillsPreviewSection = previewSections.find((section) => section.key === "skills");
@@ -689,6 +747,44 @@ function ResumeForm({
           </div>
         ) : null}
 
+        <div className="mb-8 rounded-3xl border border-cyan-300/15 bg-gradient-to-br from-cyan-400/10 via-slate-900/85 to-slate-900 p-5 shadow-[0_20px_50px_rgba(8,47,73,0.18)]">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Import Existing Resume</p>
+              <h3 className="mt-2 text-xl font-semibold text-white">Upload a resume and continue upgrading it here</h3>
+              <p className="mt-3 text-sm leading-6 text-slate-300">
+                Bring in your current PDF, DOCX, or TXT resume. We will extract the visible content into the
+                builder so you can refine sections, improve wording, and use the existing AI tools without
+                rebuilding everything from scratch.
+              </p>
+            </div>
+            <div className="w-full max-w-xl space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <span className="block text-sm text-slate-300">Choose a resume file to import</span>
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.txt"
+                  className="mt-4 block w-full text-sm text-slate-300 file:mr-4 file:rounded-full file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-medium file:text-slate-950"
+                  onChange={(event) => onImportFileChange(event.target.files?.[0] || null)}
+                />
+                {importFile ? (
+                  <span className="mt-4 block text-sm text-white">{importFile.name}</span>
+                ) : (
+                  <span className="mt-4 block text-sm text-slate-400">No file selected yet.</span>
+                )}
+              </div>
+              <button
+                type="button"
+                className="button-primary w-full"
+                disabled={importLoading}
+                onClick={onImportResume}
+              >
+                {importLoading ? <Loader label="Importing your resume..." /> : "Import Into Builder"}
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="mb-8 rounded-3xl border border-white/10 bg-slate-900/70 p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -743,6 +839,7 @@ function ResumeForm({
                 <input className="field" name="title" placeholder="Professional title" value={formData.personalInfo.title} onChange={updatePersonalInfo} />
                 <input className="field" name="email" placeholder="Email" type="email" value={formData.personalInfo.email} onChange={updatePersonalInfo} />
                 <input className="field" name="phone" placeholder="Phone" value={formData.personalInfo.phone} onChange={updatePersonalInfo} />
+                <input className="field" name="portfolio" placeholder="LinkedIn / Portfolio URL" value={formData.personalInfo.portfolio || ""} onChange={updatePersonalInfo} />
                 <input className="field md:col-span-2" name="location" placeholder="Location" value={formData.personalInfo.location} onChange={updatePersonalInfo} />
               </div>
             </div>
@@ -960,275 +1057,278 @@ function ResumeForm({
                 className={`mt-4 min-h-[720px] rounded-[1.75rem] border p-6 text-slate-900 shadow-2xl ${templateStyle.shell}`}
               >
                 {templateStyle.layout === "enhancv-columns" ? (
-                  <div className="min-h-[672px] bg-white px-6 py-6 text-slate-900">
-                    <div className="flex items-start justify-between gap-6 border-b border-slate-200 pb-3">
+                  <div className="min-h-[672px] bg-white px-5 py-5 text-slate-900">
+                    <div className="flex items-start justify-between gap-5 border-b border-slate-300 pb-3.5">
                       <div className="min-w-0 flex-1">
                         <h2 className={templateStyle.name}>{previewName}</h2>
                         <p className={templateStyle.title}>{previewTitle}</p>
-                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-500">
-                          <span>{formData.personalInfo.phone || "[Phone Number]"}</span>
-                          <span>{formData.personalInfo.email || "yourname@email.com"}</span>
-                          <span>{formData.personalInfo.title || "LinkedIn/Portfolio"}</span>
-                          <span>{formData.personalInfo.location || "[Location]"}</span>
+                        <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-slate-700">
+                          <span className="break-words">{formData.personalInfo.phone || "[Phone Number]"}</span>
+                          <span className="break-all">{formData.personalInfo.email || "yourname@email.com"}</span>
+                          <span className="break-all">{formData.personalInfo.portfolio || "LinkedIn/Portfolio"}</span>
+                          <span className="break-words">{formData.personalInfo.location || "[Location]"}</span>
                         </div>
                       </div>
                       <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-slate-100">
-                        <div className="relative h-14 w-14 rounded-full border-[3px] border-slate-400">
-                          <div className="absolute left-1/2 top-2 h-5 w-5 -translate-x-1/2 rounded-full border-[3px] border-slate-400" />
-                          <div className="absolute left-1/2 bottom-1 h-6 w-9 -translate-x-1/2 rounded-t-full border-[3px] border-b-0 border-slate-400" />
+                        <div className="relative h-14 w-14 rounded-full border-[3px] border-slate-500">
+                          <div className="absolute left-1/2 top-2 h-5 w-5 -translate-x-1/2 rounded-full border-[3px] border-slate-500" />
+                          <div className="absolute left-1/2 bottom-1 h-6 w-9 -translate-x-1/2 rounded-t-full border-[3px] border-b-0 border-slate-500" />
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-5 grid gap-6 md:grid-cols-[0.98fr_1.38fr_1.08fr]">
+                    <div className="mt-5 grid gap-5 md:grid-cols-[1.04fr_1.42fr_1.12fr]">
                       <div className="space-y-5">
                         <section>
                           <div className="border-b border-emerald-900 pb-1">
                             <h3 className={templateStyle.sectionTitle}>SUMMARY</h3>
                           </div>
-                          <p className="mt-2 text-[11px] leading-[1.4] text-slate-600">
+                          <p className="mt-2.5 text-[12px] leading-[1.6] text-slate-700">
                             {formData.summary || "Your professional summary will appear here once you add it."}
                           </p>
                         </section>
+
+                        {filledCustomSections.map((section, index) => (
+                          <section key={`columns-custom-${index}`}>
+                            <div className="border-b border-emerald-900 pb-1">
+                              <h3 className={templateStyle.sectionTitle}>
+                                {section.title || `SECTION ${index + 1}`}
+                              </h3>
+                            </div>
+                            <div className="mt-2 space-y-1.5">
+                              {section.items.length ? (
+                                splitCustomSectionItems(section.items).map((item, itemIndex) => (
+                                  <p
+                                    key={`columns-custom-item-${index}-${itemIndex}`}
+                                    className="break-words text-[11px] leading-[1.6] text-slate-700"
+                                  >
+                                    - {item}
+                                  </p>
+                                ))
+                              ) : (
+                                <p className="text-[11px] leading-[1.6] text-slate-500">
+                                  Add items to populate this section.
+                                </p>
+                              )}
+                            </div>
+                          </section>
+                        ))}
                       </div>
 
                       <div className="space-y-5">
+                        {filledExperience.length ? (
                         <section>
                           <div className="border-b border-emerald-900 pb-1">
                             <h3 className={templateStyle.sectionTitle}>EXPERIENCE</h3>
                           </div>
                           <div className="mt-3 space-y-4">
-                            {filledExperience.length ? (
-                              filledExperience.map((item, index) => {
+                            {filledExperience.map((item, index) => {
                                 const bullets = splitLines(item.description);
                                 return (
-                                  <div key={`columns-exp-${index}`}>
-                                    <p className="text-[12px] text-slate-300">{item.role || "Title"}</p>
-                                    <p className="text-[15px] font-semibold leading-4 text-emerald-300">{item.company || "Company Name"}</p>
-                                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400">
+                                  <div key={`columns-exp-${index}`} className="min-w-0">
+                                    <p className="break-words text-[13px] font-semibold leading-5 text-slate-700">
+                                      {item.role || "Title"}
+                                    </p>
+                                    <p className="break-words text-[16px] font-bold leading-5 text-emerald-700">
+                                      {item.company || "Company Name"}
+                                    </p>
+                                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
                                       <span>{formatDateRange(item.startDate, item.endDate)}</span>
-                                      <span>{formData.personalInfo.location || "Location"}</span>
+                                      <span className="break-words">{formData.personalInfo.location || "Location"}</span>
                                     </div>
-                                    <ul className="mt-1 list-disc pl-4 text-[10px] leading-4 text-slate-400">
-                                      {(bullets.length ? bullets : ["Highlight your accomplishments, using numbers if possible."]).slice(0, 3).map((bullet, bulletIndex) => (
-                                        <li key={`columns-exp-bullet-${index}-${bulletIndex}`}>{bullet}</li>
+                                    <ul className="mt-2 list-disc pl-4 text-[11px] leading-[1.55] text-slate-700">
+                                      {(bullets.length ? bullets : ["Highlight your accomplishments, using numbers if possible."]).slice(0, 4).map((bullet, bulletIndex) => (
+                                        <li key={`columns-exp-bullet-${index}-${bulletIndex}`} className="break-words">
+                                          {bullet}
+                                        </li>
                                       ))}
                                     </ul>
                                   </div>
                                 );
-                              })
-                            ) : (
-                              Array.from({ length: 3 }).map((_, index) => (
-                                <div key={`columns-exp-placeholder-${index}`}>
-                                  <p className="text-[12px] text-slate-300">Title</p>
-                                  <p className="text-[15px] font-semibold leading-4 text-emerald-300">Company Name</p>
-                                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400">
-                                    <span>Date period</span>
-                                    <span>Location</span>
-                                  </div>
-                                  <ul className="mt-1 list-disc pl-4 text-[10px] leading-4 text-slate-400">
-                                    <li>Highlight your accomplishments, using numbers if possible.</li>
-                                  </ul>
-                                </div>
-                              ))
-                            )}
+                              })}
                           </div>
                         </section>
+                        ) : null}
                       </div>
 
                       <div className="space-y-5">
+                        {filledEducation.length ? (
                         <section>
                           <div className="border-b border-emerald-900 pb-1">
                             <h3 className={templateStyle.sectionTitle}>EDUCATION</h3>
                           </div>
                           <div className="mt-3 space-y-3">
-                            {filledEducation.length ? (
-                              filledEducation.map((item, index) => (
-                                <div key={`columns-edu-${index}`}>
-                                  <p className="text-[13px] font-semibold leading-4 text-slate-800">
+                            {filledEducation.map((item, index) => (
+                                <div key={`columns-edu-${index}`} className="min-w-0">
+                                  <p className="break-words text-[14px] font-semibold leading-5 text-slate-900">
                                     {item.degree || "Degree / Program"}
                                   </p>
-                                  <p className="mt-1 text-[13px] font-semibold leading-4 text-emerald-300">
+                                  <p className="mt-1 break-words text-[14px] font-bold leading-5 text-emerald-700">
                                     {item.institution || "Institution Name"}
                                   </p>
-                                  <p className="mt-1 text-[10px] text-slate-400">{formatDateRange(item.startDate, item.endDate)}</p>
-                                  <p className="text-[10px] text-slate-400">{formData.personalInfo.location || "[Location]"}</p>
+                                  <p className="mt-1.5 text-[11px] text-slate-600">{formatDateRange(item.startDate, item.endDate)}</p>
+                                  <p className="break-words text-[11px] text-slate-600">{formData.personalInfo.location || "[Location]"}</p>
                                 </div>
-                              ))
-                            ) : (
-                              <div>
-                                <p className="text-[13px] font-semibold leading-4 text-slate-800">Degree / Program</p>
-                                <p className="mt-1 text-[13px] font-semibold leading-4 text-emerald-300">Institution Name</p>
-                                <p className="mt-1 text-[10px] text-slate-400">Date period</p>
-                                <p className="text-[10px] text-slate-400">[Location]</p>
-                              </div>
-                            )}
+                              ))}
                           </div>
                         </section>
+                        ) : null}
 
                         <section>
                           <div className="border-b border-emerald-900 pb-1">
                             <h3 className={templateStyle.sectionTitle}>SKILLS</h3>
                           </div>
-                          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
-                            {formData.skills.length ? (
-                              formData.skills.map((skill, index) => (
-                                <span key={`columns-skill-${index}`} className={templateStyle.skill}>
-                                  {skill}
-                                </span>
-                              ))
-                            ) : (
-                              ["Skill One", "Skill Two", "Skill Three", "Skill Four", "Skill Five", "Skill Six"].map((skill) => (
-                                <span key={skill} className={templateStyle.skill}>
-                                  {skill}
-                                </span>
-                              ))
-                            )}
+                          <div className="mt-3 flex flex-wrap gap-x-[8%] gap-y-2">
+                            {(formData.skills.length
+                              ? formData.skills
+                              : ["Skill One", "Skill Two", "Skill Three", "Skill Four", "Skill Five", "Skill Six"]
+                            ).map((skill, index) => {
+                              const label = String(skill || "").trim();
+                              const isWideSkill = label.length >= 16;
+                              return (
+                                <div
+                                  key={`columns-skill-${index}-${skill}`}
+                                  className={`min-w-0 border-b border-slate-500 pb-1 text-[11px] font-semibold leading-5 text-emerald-900 break-words whitespace-normal ${
+                                    isWideSkill ? "basis-full" : "basis-[46%]"
+                                  }`}
+                                >
+                                  {label}
+                                </div>
+                              );
+                            })}
                           </div>
                         </section>
                       </div>
                     </div>
                   </div>
                 ) : templateStyle.layout === "enhancv-replica" ? (
-                  <div className="min-h-[672px] bg-white px-6 py-7 text-slate-900">
-                    <div className="border-b border-slate-200 pb-3">
+                  <div className="min-h-[672px] bg-white px-5 py-6 text-slate-900">
+                    <div className="border-b border-slate-300 pb-3.5">
                       <h2 className={templateStyle.name}>{previewName}</h2>
                       <p className={templateStyle.title}>{previewTitle}</p>
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600">
-                        <span>{formData.personalInfo.phone || "[Phone Number]"}</span>
-                        <span>{formData.personalInfo.email || "yourname@email.com"}</span>
-                        <span>{formData.personalInfo.title || "LinkedIn/Portfolio"}</span>
-                        <span>{formData.personalInfo.location || "[Location]"}</span>
+                      <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-slate-700">
+                        <span className="break-words">{formData.personalInfo.phone || "[Phone Number]"}</span>
+                        <span className="break-all">{formData.personalInfo.email || "yourname@email.com"}</span>
+                        <span className="break-all">{formData.personalInfo.portfolio || "LinkedIn/Portfolio"}</span>
+                        <span className="break-words">{formData.personalInfo.location || "[Location]"}</span>
                       </div>
                     </div>
 
                     <div className="mt-5 space-y-5">
                       <section>
                         <h3 className={templateStyle.sectionTitle}>SUMMARY</h3>
-                        <p className="mt-2 text-[11px] leading-[1.45] text-slate-600">
+                        <p className="mt-2.5 text-[12px] leading-[1.65] text-slate-700">
                           {formData.summary ||
                             "Your professional summary will appear here once you add it."}
                         </p>
                       </section>
 
+                      {filledExperience.length ? (
                       <section>
                         <h3 className={templateStyle.sectionTitle}>EXPERIENCE</h3>
                         <div className="mt-3 space-y-4">
-                          {filledExperience.length ? (
-                            filledExperience.map((item, index) => {
+                          {filledExperience.map((item, index) => {
                                 const bullets = splitLines(item.description);
                                 return (
-                                  <div key={`enhancv-exp-${index}`} className="grid grid-cols-[88px_18px_minmax(0,1fr)] gap-3">
-                                    <div className="text-[10px] leading-4 text-slate-400">
-                                      <p className="font-bold text-blue-300">{formatDateRange(item.startDate, item.endDate)}</p>
+                                  <div key={`enhancv-exp-${index}`} className="grid grid-cols-[96px_18px_minmax(0,1fr)] gap-3">
+                                    <div className="text-[11px] leading-[1.5] text-slate-600">
+                                      <p className="font-bold text-blue-700">{formatDateRange(item.startDate, item.endDate)}</p>
                                       <p>{formData.personalInfo.location || "Location"}</p>
                                     </div>
                                     <div className="relative">
                                       <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
-                                      <span className="absolute left-1/2 top-3 bottom-0 w-px -translate-x-1/2 bg-slate-400" />
+                                      <span className="absolute left-1/2 top-3 bottom-0 w-px -translate-x-1/2 bg-slate-500" />
                                     </div>
                                     <div className="min-w-0">
-                                      <p className="text-[11px] text-slate-300">{item.role || "Title"}</p>
-                                      <p className="text-[15px] font-bold leading-4 text-orange-400">{item.company || "Company Name"}</p>
+                                      <p className="text-[13px] font-semibold text-slate-700">{item.role || "Title"}</p>
+                                      <p className="text-[16px] font-bold leading-5 text-orange-600">{item.company || "Company Name"}</p>
                                       {bullets.length ? (
-                                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[10px] leading-4 text-slate-300">
+                                        <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-[1.55] text-slate-700">
                                           {bullets.map((bullet, bulletIndex) => (
                                             <li key={`enhancv-exp-bullet-${index}-${bulletIndex}`}>{bullet}</li>
                                           ))}
                                         </ul>
                                       ) : (
-                                        <ul className="mt-1 list-disc pl-4 text-[10px] leading-4 text-slate-300">
+                                        <ul className="mt-2 list-disc pl-4 text-[11px] leading-[1.55] text-slate-700">
                                           <li>Highlight your accomplishments, using numbers if possible.</li>
                                         </ul>
                                       )}
                                     </div>
                                   </div>
                                 );
-                              })
-                          ) : (
-                            <div className="grid grid-cols-[88px_18px_minmax(0,1fr)] gap-3">
-                              <div className="text-[10px] leading-4 text-slate-400">
-                                <p className="font-bold text-blue-300">Date period</p>
-                                <p>Location</p>
-                              </div>
-                              <div className="relative">
-                                <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
-                                <span className="absolute left-1/2 top-3 bottom-0 w-px -translate-x-1/2 bg-slate-400" />
-                              </div>
-                              <div>
-                                <p className="text-[11px] text-slate-300">Title</p>
-                                <p className="text-[15px] font-bold leading-4 text-orange-400">Company Name</p>
-                                <p className="mt-1 text-[10px] leading-4 text-slate-400">
-                                  Add experience entries to build your preview.
-                                </p>
-                              </div>
-                            </div>
-                          )}
+                              })}
                         </div>
                       </section>
+                      ) : null}
 
+                      {filledEducation.length ? (
                       <section>
                         <h3 className={templateStyle.sectionTitle}>EDUCATION</h3>
                         <div className="mt-3 space-y-3">
-                          {filledEducation.length ? (
-                            filledEducation.map((item, index) => (
-                                <div key={`enhancv-edu-${index}`} className="grid grid-cols-[88px_18px_minmax(0,1fr)] gap-3">
-                                  <div className="text-[10px] leading-4 text-slate-400">
-                                    <p className="font-bold text-blue-300">{formatDateRange(item.startDate, item.endDate)}</p>
+                          {filledEducation.map((item, index) => (
+                                <div key={`enhancv-edu-${index}`} className="grid grid-cols-[96px_18px_minmax(0,1fr)] gap-3">
+                                  <div className="text-[11px] leading-[1.5] text-slate-600">
+                                    <p className="font-bold text-blue-700">{formatDateRange(item.startDate, item.endDate)}</p>
                                     <p>{formData.personalInfo.location || "Location"}</p>
                                   </div>
                                   <div className="relative">
                                     <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
-                                    <span className="absolute left-1/2 top-3 bottom-0 w-px -translate-x-1/2 bg-slate-400" />
+                                    <span className="absolute left-1/2 top-3 bottom-0 w-px -translate-x-1/2 bg-slate-500" />
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="text-[13px] text-blue-400">
+                                    <p className="text-[14px] font-semibold leading-5 text-blue-700">
                                       {item.degree || "Bachelor of Technology"}
                                       {item.fieldOfStudy ? `, ${item.fieldOfStudy}` : ""}
                                     </p>
-                                    <p className="text-[13px] font-bold leading-4 text-orange-500">
+                                    <p className="text-[14px] font-bold leading-5 text-orange-600">
                                       {item.institution || "University / Institute"}
                                     </p>
                                   </div>
                                 </div>
-                              ))
-                          ) : (
-                            <div className="grid grid-cols-[88px_18px_minmax(0,1fr)] gap-3">
-                              <div className="text-[10px] leading-4 text-slate-400">
-                                <p className="font-bold text-blue-300">Date period</p>
-                                <p>Location</p>
-                              </div>
-                              <div className="relative">
-                                <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
-                              </div>
-                              <div>
-                                <p className="text-[13px] text-blue-400">Degree / Program</p>
-                                <p className="text-[13px] font-bold leading-4 text-orange-500">Institution Name</p>
-                                <p className="mt-1 text-[10px] leading-4 text-slate-400">
-                                  Add education details to complete the preview.
-                                </p>
-                              </div>
-                            </div>
-                          )}
+                              ))}
                         </div>
                       </section>
+                      ) : null}
 
+                      {filledCustomSections.map((section, index) => (
+                        <section key={`enhancv-custom-${index}`}>
+                          <h3 className={templateStyle.sectionTitle}>
+                            {section.title || `SECTION ${index + 1}`}
+                          </h3>
+                          <div className="mt-2 space-y-1.5">
+                            {section.items.length ? (
+                              splitCustomSectionItems(section.items).map((item, itemIndex) => (
+                                <p
+                                  key={`enhancv-custom-item-${index}-${itemIndex}`}
+                                  className="break-words text-[11px] leading-[1.6] text-slate-700"
+                                >
+                                  - {item}
+                                </p>
+                              ))
+                            ) : (
+                              <p className="text-[11px] leading-[1.6] text-slate-500">
+                                Add items to populate this section.
+                              </p>
+                            )}
+                          </div>
+                        </section>
+                      ))}
+
+                      {formData.skills.length ? (
                       <section>
                         <h3 className={templateStyle.sectionTitle}>SKILLS</h3>
                         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-3">
-                          {formData.skills.length ? (
-                            formData.skills.map((skill, index) => (
-                              <span key={`${skill}-enhancv-${index}`} className={templateStyle.skill}>
-                                {skill}
-                              </span>
-                            ))
-                          ) : (
-                            <p className="text-[10px] leading-4 text-slate-400">
-                              Add skills to populate the preview.
-                            </p>
-                          )}
+                          {formData.skills.map((skill, index) => (
+                            <span
+                              key={`${skill}-enhancv-${index}`}
+                              className={`${templateStyle.skill} max-w-full break-words whitespace-normal leading-4`}
+                            >
+                              {skill}
+                            </span>
+                          ))}
                         </div>
                       </section>
+                      ) : null}
                     </div>
                   </div>
                 ) : templateStyle.layout === "creative" ? (
@@ -1282,7 +1382,7 @@ function ResumeForm({
                                   formData.skills.map((skill, index) => (
                                     <span
                                       key={`${skill}-creative-${index}`}
-                                      className="border-b border-slate-300 pb-1"
+                                      className="min-w-0 break-words border-b border-slate-300 pb-1 whitespace-normal"
                                     >
                                       {skill}
                                     </span>

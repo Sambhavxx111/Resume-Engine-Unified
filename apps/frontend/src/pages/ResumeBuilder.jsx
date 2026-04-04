@@ -45,6 +45,7 @@ const defaultResumeState = {
     email: "",
     phone: "",
     location: "",
+    portfolio: "",
   },
   education: [
     {
@@ -74,6 +75,8 @@ function ResumeBuilder() {
   const [loadingResume, setLoadingResume] = useState(true);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState("");
+  const [importingResume, setImportingResume] = useState(false);
+  const [resumeImportFile, setResumeImportFile] = useState(null);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [aiInsights, setAiInsights] = useState(null);
@@ -139,6 +142,67 @@ function ResumeBuilder() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleImportResume = async () => {
+    if (!resumeImportFile) {
+      setError("Please choose a PDF, DOCX, or TXT resume to import.");
+      setSuccessMessage("");
+      return;
+    }
+
+    setImportingResume(true);
+    setError("");
+    setSuccessMessage("");
+    setAiInsights(null);
+
+    const payload = new FormData();
+    payload.append("file", resumeImportFile);
+
+    try {
+      const { data } = await axiosInstance.post(API.importResumeFile, payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const importedResume = {
+        ...defaultResumeState,
+        ...(data.resume || {}),
+        personalInfo: {
+          ...defaultResumeState.personalInfo,
+          ...(data.resume?.personalInfo || {}),
+        },
+        education:
+          Array.isArray(data.resume?.education) && data.resume.education.length
+            ? data.resume.education
+            : defaultResumeState.education,
+        experience:
+          Array.isArray(data.resume?.experience) && data.resume.experience.length
+            ? data.resume.experience
+            : defaultResumeState.experience,
+        skills: Array.isArray(data.resume?.skills) ? data.resume.skills : [],
+        customSections: Array.isArray(data.resume?.customSections)
+          ? data.resume.customSections
+          : [],
+        template: formData.template || defaultResumeState.template,
+      };
+
+      setFormData((prev) => ({
+        ...defaultResumeState,
+        ...importedResume,
+        template: prev.template || importedResume.template || defaultResumeState.template,
+      }));
+      setSuccessMessage(
+        "Resume imported into the builder. Review the extracted sections, then use the AI tools or save your upgraded draft.",
+      );
+    } catch (requestError) {
+      setError(
+        requestError.response?.data?.details ||
+        requestError.response?.data?.detail ||
+        requestError.response?.data?.error ||
+          "Unable to import this resume right now. Try a clean PDF, DOCX, or TXT file.",
+      );
+    } finally {
+      setImportingResume(false);
     }
   };
 
@@ -256,6 +320,10 @@ function ResumeBuilder() {
           setFormData={setFormData}
           onSave={handleSave}
           onAIAction={handleAIAction}
+          onImportResume={handleImportResume}
+          onImportFileChange={setResumeImportFile}
+          importFile={resumeImportFile}
+          importLoading={importingResume}
           loading={saving}
           aiLoading={aiLoading}
           error={error}

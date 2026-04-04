@@ -4,6 +4,7 @@ export const API = {
   me: "/api/auth/me",
   logout: "/api/auth/logout",
   getResume: "/api/resume",
+  importResumeFile: "/api/resume/import-file",
   saveResume: "/api/resume",
   atsScore: "/api/ats/score",
   atsScoreFile: "/api/ats/score-file",

@@ -18,8 +18,8 @@ const TEMPLATE_FILE_NAMES = {
   compact: "compact",
   "single-column": "single-column",
   creative: "creative",
-  "enhancv-replica": "enhancv-replica",
-  "enhancv-columns": "enhancv-columns",
+  "enhancv-replica": "signature-timeline",
+  "enhancv-columns": "emerald-columns",
 };
 
 const normalizeTemplateId = (templateId) =>
@@ -31,88 +31,105 @@ const TEMPLATE_CONFIG = {
     background: [255, 255, 255],
     headingFont: "helvetica",
     headingStyle: "bold",
-    headingSize: 24,
+    headingSize: 26,
     titleFont: "helvetica",
     titleStyle: "normal",
-    titleSize: 12,
+    titleSize: 13,
     nameColor: [15, 23, 42],
-    titleColor: [14, 116, 144],
-    contactColor: [51, 65, 85],
-    sectionColor: [51, 65, 85],
-    lineColor: [226, 232, 240],
+    titleColor: [8, 88, 120],
+    contactColor: [30, 41, 59],
+    sectionColor: [30, 41, 59],
+    lineColor: [180, 195, 210],
     skillMode: "pill-light",
-    order: ["summary", "skills", "experience", "education"],
+    order: ["summary", "skills", "experience", "projects", "education", "certifications", "achievements", "languages", "interests", "custom"],
   },
   "single-column": {
     layout: "single-column",
     background: [255, 255, 255],
     headingFont: "times",
     headingStyle: "bold",
-    headingSize: 24,
+    headingSize: 26,
     titleFont: "helvetica",
     titleStyle: "bold",
-    titleSize: 10,
+    titleSize: 11.5,
     nameColor: [15, 23, 42],
     titleColor: [51, 65, 85],
     contactColor: [51, 65, 85],
     sectionColor: [30, 41, 59],
     lineColor: [15, 23, 42],
     skillMode: "outlined",
-    order: ["summary", "experience", "education", "skills"],
+    order: ["summary", "experience", "projects", "education", "certifications", "skills", "achievements", "languages", "interests", "custom"],
   },
   compact: {
     layout: "compact",
     background: [255, 255, 255],
     headingFont: "helvetica",
     headingStyle: "bold",
-    headingSize: 21,
+    headingSize: 24,
     titleFont: "helvetica",
     titleStyle: "bold",
-    titleSize: 10,
+    titleSize: 11.2,
     nameColor: [15, 23, 42],
     titleColor: [51, 65, 85],
     contactColor: [30, 41, 59],
     sectionColor: [51, 65, 85],
     lineColor: [203, 213, 225],
     skillMode: "compact",
-    order: ["summary", "experience", "skills", "education"],
+    order: ["summary", "experience", "projects", "skills", "education", "certifications", "achievements", "languages", "interests", "custom"],
   },
   creative: {
     layout: "creative",
     background: [255, 255, 255],
     headingFont: "helvetica",
     headingStyle: "bold",
-    headingSize: 22,
+    headingSize: 24,
     titleFont: "helvetica",
     titleStyle: "normal",
-    titleSize: 10.5,
+    titleSize: 12,
     nameColor: [255, 255, 255],
-    titleColor: [103, 232, 249],
-    contactColor: [226, 232, 240],
-    sectionColor: [8, 145, 178],
-    lineColor: [186, 230, 253],
+    titleColor: [167, 243, 255],
+    contactColor: [241, 245, 249],
+    sectionColor: [14, 165, 233],
+    lineColor: [125, 211, 252],
     skillMode: "dark",
-    order: ["skills", "summary", "experience", "education"],
+    order: ["skills", "summary", "experience", "projects", "education", "certifications", "achievements", "languages", "interests", "custom"],
   },
   timeline: {
     layout: "timeline",
     background: [248, 250, 252],
     headingFont: "helvetica",
     headingStyle: "bold",
-    headingSize: 23,
+    headingSize: 25,
     titleFont: "helvetica",
     titleStyle: "bold",
-    titleSize: 10,
+    titleSize: 11.4,
     nameColor: [2, 6, 23],
-    titleColor: [51, 65, 85],
+    titleColor: [30, 41, 59],
     contactColor: [30, 41, 59],
     sectionColor: [8, 145, 178],
     lineColor: [203, 213, 225],
     skillMode: "light-box",
-    order: ["summary", "experience", "education", "skills"],
+    order: ["summary", "experience", "projects", "education", "certifications", "skills", "achievements", "languages", "interests", "custom"],
   },
   "enhancv-replica": {
     layout: "enhancv-replica",
+    background: [255, 255, 255],
+    headingFont: "helvetica",
+    headingStyle: "bold",
+    headingSize: 26,
+    titleFont: "helvetica",
+    titleStyle: "bold",
+    titleSize: 13,
+    nameColor: [15, 43, 110],
+    titleColor: [210, 96, 16],
+    contactColor: [55, 65, 81],
+    sectionColor: [15, 43, 110],
+    lineColor: [120, 138, 168],
+    skillMode: "enhancv-line",
+    order: ["summary", "experience", "projects", "education", "certifications", "achievements", "skills", "languages", "interests", "custom"],
+  },
+  "enhancv-columns": {
+    layout: "enhancv-columns",
     background: [255, 255, 255],
     headingFont: "helvetica",
     headingStyle: "bold",
@@ -120,34 +137,26 @@ const TEMPLATE_CONFIG = {
     titleFont: "helvetica",
     titleStyle: "bold",
     titleSize: 12,
-    nameColor: [22, 63, 143],
-    titleColor: [255, 124, 31],
-    contactColor: [60, 72, 88],
-    sectionColor: [22, 63, 143],
-    lineColor: [160, 170, 185],
-    skillMode: "enhancv-line",
-    order: ["summary", "experience", "education", "skills"],
-  },
-  "enhancv-columns": {
-    layout: "enhancv-columns",
-    background: [255, 255, 255],
-    headingFont: "helvetica",
-    headingStyle: "bold",
-    headingSize: 22,
-    titleFont: "helvetica",
-    titleStyle: "bold",
-    titleSize: 10.5,
-    nameColor: [25, 92, 81],
-    titleColor: [75, 180, 144],
-    contactColor: [95, 103, 117],
+    nameColor: [16, 73, 63],
+    titleColor: [34, 132, 102],
+    contactColor: [55, 65, 81],
     sectionColor: [25, 92, 81],
     lineColor: [25, 92, 81],
     skillMode: "enhancv-line",
-    order: ["summary", "experience", "education", "skills"],
+    order: ["summary", "experience", "projects", "education", "certifications", "achievements", "skills", "languages", "interests", "custom"],
   },
 };
 
 const filterFilled = (items = []) => items.filter(Boolean);
+const getCustomSectionSortKey = (title = "") => {
+  const normalized = String(title || "").trim().toLowerCase();
+  if (/project/.test(normalized)) return "projects";
+  if (/certification|certificate|course/.test(normalized)) return "certifications";
+  if (/achievement|award/.test(normalized)) return "achievements";
+  if (/language/.test(normalized)) return "languages";
+  if (/interest/.test(normalized)) return "interests";
+  return "custom";
+};
 const formatMonthYear = (value = "") => {
   if (!value) return "";
   const [year, month] = String(value).split("-");
@@ -167,6 +176,32 @@ const splitBulletLines = (value = "") =>
   String(value)
     .split(/\r?\n+/)
     .map((line) => line.replace(/^\s*[-*•]\s*/, "").trim())
+    .filter(Boolean);
+
+const splitCustomSectionItems = (items = []) =>
+  items
+    .flatMap((item) => {
+      const raw = String(item || "").trim();
+      if (!raw) return [];
+
+      const primaryParts = raw
+        .split(/\r?\n|•|●|▪|\s+\|\s+/)
+        .map((part) => part.replace(/^\s*[-*]\s*/, "").trim())
+        .filter(Boolean);
+
+      if (primaryParts.length > 1) {
+        return primaryParts;
+      }
+
+      if (raw.length > 120 && /[.]\s+[A-Z]/.test(raw)) {
+        return raw
+          .split(/(?<=\.)\s+(?=[A-Z])/)
+          .map((part) => part.replace(/^\s*[-*]\s*/, "").trim())
+          .filter(Boolean);
+      }
+
+      return [raw];
+    })
     .filter(Boolean);
 
 const getResumeSections = (formData) => {
@@ -226,6 +261,7 @@ const getResumeSections = (formData) => {
     .forEach((section, index) => {
       sections.push({
         key: `custom-${index}`,
+        sortKey: getCustomSectionSortKey(section.title),
         title: section.title || "Custom Section",
         lines: section.items.filter((item) => item.trim()).map((item) => item.trim()),
       });
@@ -235,12 +271,19 @@ const getResumeSections = (formData) => {
 };
 
 const sortSections = (sections, order) => {
-  const weight = (key) => {
-    const index = order.indexOf(key);
+  const weight = (sortKey) => {
+    const index = order.indexOf(sortKey || "custom");
     return index === -1 ? order.length + 1 : index;
   };
 
-  return [...sections].sort((a, b) => weight(a.key) - weight(b.key));
+  return [...sections].sort((a, b) => {
+    const weightA = weight(a.sortKey || a.key);
+    const weightB = weight(b.sortKey || b.key);
+    if (weightA !== weightB) {
+      return weightA - weightB;
+    }
+    return String(a.title || "").localeCompare(String(b.title || ""));
+  });
 };
 
 const resetPage = (doc, background) => {
@@ -268,27 +311,39 @@ const drawSectionTitle = (doc, title, x, y, width, config, variant = "default") 
   const label = title.toUpperCase();
   doc.setTextColor(...config.sectionColor);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(variant === "compact" ? 9.5 : 10.5);
+  doc.setFontSize(variant === "compact" ? 10.8 : 11.8);
   doc.text(label, x, y);
-  y += 3.5;
+  y += 4;
   doc.setDrawColor(...config.lineColor);
   doc.setLineWidth(variant === "strong" ? 0.9 : 0.5);
   doc.line(x, y, x + width, y);
-  return y + 5;
+  return y + 6;
 };
 
 const drawSkills = (doc, skills, x, y, width, config) => {
   let cursorX = x;
   let cursorY = y + 4;
+  let rowHeight = 9;
 
   skills.forEach((skill) => {
-    const textWidth = doc.getTextWidth(skill) + 8;
-    const pillWidth = Math.min(textWidth, width);
-    const pillHeight = 7.5;
+    const label = String(skill || "").trim();
+    if (!label) return;
+
+    const maxLabelWidth =
+      config.skillMode === "enhancv-line" ? Math.max(width / 2 - 4, 18) : Math.max(width - 8, 20);
+    const labelLines = doc.splitTextToSize(label, maxLabelWidth);
+    const longestLineWidth = Math.max(...labelLines.map((line) => doc.getTextWidth(line)), 0);
+    const pillWidth = Math.min(
+      longestLineWidth +
+        (config.skillMode === "outlined" || config.skillMode === "enhancv-line" ? 2 : 8),
+      width,
+    );
+    const pillHeight = Math.max(7.5, labelLines.length * 4.1 + 2);
 
     if (cursorX + pillWidth > x + width) {
       cursorX = x;
-      cursorY += 10;
+      cursorY += rowHeight + 2;
+      rowHeight = 9;
     }
 
     if (config.skillMode === "dark") {
@@ -296,10 +351,15 @@ const drawSkills = (doc, skills, x, y, width, config) => {
       doc.setTextColor(255, 255, 255);
       doc.roundedRect(cursorX, cursorY - 5, pillWidth, pillHeight, 2, 2, "F");
     } else if (config.skillMode === "enhancv-line") {
-      doc.setTextColor(79, 86, 97);
-      doc.setDrawColor(169, 175, 187);
+      doc.setTextColor(55, 65, 81);
+      doc.setDrawColor(107, 114, 128);
       doc.setLineWidth(0.2);
-      doc.line(cursorX, cursorY + 2.2, cursorX + pillWidth - 2, cursorY + 2.2);
+      doc.line(
+        cursorX,
+        cursorY + labelLines.length * 3.6 + 0.8,
+        cursorX + pillWidth - 1,
+        cursorY + labelLines.length * 3.6 + 0.8,
+      );
     } else if (config.skillMode === "outlined") {
       doc.setTextColor(30, 41, 59);
     } else if (config.skillMode === "light-box") {
@@ -309,50 +369,58 @@ const drawSkills = (doc, skills, x, y, width, config) => {
       doc.roundedRect(cursorX, cursorY - 5, pillWidth, pillHeight, 2, 2, "FD");
     } else {
       doc.setFillColor(236, 254, 255);
-      doc.setTextColor(14, 116, 144);
+      doc.setTextColor(8, 88, 120);
       doc.roundedRect(cursorX, cursorY - 5, pillWidth, pillHeight, 2, 2, "F");
     }
 
     doc.setFont("helvetica", config.skillMode === "compact" ? "bold" : "normal");
-    doc.setFontSize(config.skillMode === "compact" ? 8.2 : 8.8);
+    doc.setFontSize(config.skillMode === "compact" ? 9.1 : 9.6);
     doc.text(
-      skill,
+      labelLines,
       cursorX + (config.skillMode === "outlined" || config.skillMode === "enhancv-line" ? 0 : 4),
       cursorY,
     );
     cursorX += pillWidth + 3;
+    rowHeight = Math.max(rowHeight, pillHeight);
   });
 
-  return cursorY + 6;
+  return cursorY + rowHeight;
 };
 
 const drawSkillGrid = (doc, skills, x, y, width, columns = 2) => {
   const columnGap = 6;
   const columnWidth = (width - columnGap * (columns - 1)) / columns;
-  let row = 0;
+  let currentY = y;
+  let rowHeight = 0;
 
   skills.forEach((skill, index) => {
     const column = index % columns;
-    row = Math.floor(index / columns);
+    if (column === 0 && index !== 0) {
+      currentY += rowHeight + 4;
+      rowHeight = 0;
+    }
     const itemX = x + column * (columnWidth + columnGap);
-    const itemY = y + row * 11;
+    const itemY = currentY;
+    const lines = doc.splitTextToSize(String(skill || ""), Math.max(columnWidth - 1, 10));
 
     doc.setTextColor(30, 41, 59);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9.2);
-    doc.text(skill, itemX, itemY);
+    doc.text(lines, itemX, itemY);
     doc.setDrawColor(203, 213, 225);
     doc.setLineWidth(0.35);
-    doc.line(itemX, itemY + 2.5, itemX + columnWidth, itemY + 2.5);
+    const lineY = itemY + lines.length * 3.6;
+    doc.line(itemX, lineY + 1.2, itemX + columnWidth, lineY + 1.2);
+    rowHeight = Math.max(rowHeight, lines.length * 3.6 + 3);
   });
 
-  return y + (row + 1) * 11;
+  return currentY + rowHeight;
 };
 
 const drawSectionBody = (doc, section, x, y, width, config) => {
   doc.setTextColor(30, 41, 59);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(10.8);
 
   if (section.skills) {
     return drawSkills(doc, section.skills, x, y, width, config) + 3;
@@ -360,7 +428,7 @@ const drawSectionBody = (doc, section, x, y, width, config) => {
 
   if (section.lines) {
     section.lines.forEach((line) => {
-      y = drawWrappedText(doc, line, x, y, width, 5.4) + 1.5;
+      y = drawWrappedText(doc, line, x, y, width, 5.9) + 1.6;
     });
     return y + 1;
   }
@@ -369,28 +437,28 @@ const drawSectionBody = (doc, section, x, y, width, config) => {
     section.items.forEach((item) => {
       doc.setTextColor(15, 23, 42);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      y = drawWrappedText(doc, item.heading, x, y, width, 5.2);
+      doc.setFontSize(10.9);
+      y = drawWrappedText(doc, item.heading, x, y, width, 5.5);
 
       if (item.subheading) {
         doc.setTextColor(51, 65, 85);
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(9.4);
-        y = drawWrappedText(doc, item.subheading, x, y, width, 5) + 0.5;
+        doc.setFontSize(10);
+        y = drawWrappedText(doc, item.subheading, x, y, width, 5.2) + 0.7;
       }
 
       if (item.meta) {
         doc.setTextColor(71, 85, 105);
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(8.8);
-        y = drawWrappedText(doc, item.meta, x, y, width, 4.6) + 0.8;
+        doc.setFontSize(9.3);
+        y = drawWrappedText(doc, item.meta, x, y, width, 4.9) + 1;
       }
 
       if (item.body) {
         doc.setTextColor(30, 41, 59);
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(9.8);
-        y = drawWrappedText(doc, item.body, x, y, width, 5.1) + 2;
+        doc.setFontSize(10.2);
+        y = drawWrappedText(doc, item.body, x, y, width, 5.4) + 2.2;
       } else {
         y += 1.5;
       }
@@ -401,17 +469,17 @@ const drawSectionBody = (doc, section, x, y, width, config) => {
 };
 
 const drawStandardHeader = (doc, formData, config, centered = false) => {
-  const x = 18;
-  const width = 174;
+  const x = 15;
+  const width = 180;
 
   doc.setTextColor(...config.nameColor);
   doc.setFont(config.headingFont, config.headingStyle);
   doc.setFontSize(config.headingSize);
 
   if (centered) {
-    doc.text(formData.personalInfo.fullName || "Your Name", PAGE_WIDTH / 2, 22, { align: "center" });
+    doc.text(formData.personalInfo.fullName || "Your Name", PAGE_WIDTH / 2, 20, { align: "center" });
   } else {
-    doc.text(formData.personalInfo.fullName || "Your Name", x, 22);
+    doc.text(formData.personalInfo.fullName || "Your Name", x, 20);
   }
 
   doc.setTextColor(...config.titleColor);
@@ -419,28 +487,29 @@ const drawStandardHeader = (doc, formData, config, centered = false) => {
   doc.setFontSize(config.titleSize);
 
   if (centered) {
-    doc.text(formData.personalInfo.title || "Professional Title", PAGE_WIDTH / 2, 30, { align: "center" });
+    doc.text(formData.personalInfo.title || "Professional Title", PAGE_WIDTH / 2, 28, { align: "center" });
   } else {
-    doc.text(formData.personalInfo.title || "Professional Title", x, 30);
+    doc.text(formData.personalInfo.title || "Professional Title", x, 28);
   }
 
   const contactLine = filterFilled([
     formData.personalInfo.email || "email@example.com",
     formData.personalInfo.phone || "+91 0000000000",
+    formData.personalInfo.portfolio || "LinkedIn/Portfolio",
     formData.personalInfo.location || "Your location",
   ]).join(" | ");
 
   doc.setTextColor(...config.contactColor);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.3);
+  doc.setFontSize(10);
 
   if (centered) {
     const lines = doc.splitTextToSize(contactLine, 150);
-    doc.text(lines, PAGE_WIDTH / 2, 38, { align: "center" });
-    return 48 + lines.length * 4.5;
+    doc.text(lines, PAGE_WIDTH / 2, 35.5, { align: "center" });
+    return 45 + lines.length * 4.9;
   }
 
-  return drawWrappedText(doc, contactLine, x, 38, width, 4.6) + 4;
+  return drawWrappedText(doc, contactLine, x, 35.5, width, 4.9) + 4.5;
 };
 
 const renderStandardTemplate = (doc, formData, config) => {
@@ -449,8 +518,8 @@ const renderStandardTemplate = (doc, formData, config) => {
 
   sections.forEach((section) => {
     y = ensurePage(doc, y, 18, config.background);
-    y = drawSectionTitle(doc, section.title, 18, y, 174, config);
-    y = drawSectionBody(doc, section, 18, y, 174, config) + 2;
+    y = drawSectionTitle(doc, section.title, 15, y, 180, config);
+    y = drawSectionBody(doc, section, 15, y, 180, config) + 2.5;
   });
 };
 
@@ -460,8 +529,8 @@ const renderSingleColumnTemplate = (doc, formData, config) => {
 
   sections.forEach((section) => {
     y = ensurePage(doc, y, 18, config.background);
-    y = drawSectionTitle(doc, section.title, 24, y, 162, config, "strong");
-    y = drawSectionBody(doc, section, 24, y, 162, config) + 3;
+    y = drawSectionTitle(doc, section.title, 21, y, 168, config, "strong");
+    y = drawSectionBody(doc, section, 21, y, 168, config) + 3.2;
   });
 };
 
@@ -469,30 +538,31 @@ const renderCompactTemplate = (doc, formData, config) => {
   doc.setTextColor(...config.nameColor);
   doc.setFont(config.headingFont, config.headingStyle);
   doc.setFontSize(config.headingSize);
-  doc.text(formData.personalInfo.fullName || "Your Name", 18, 20);
+  doc.text(formData.personalInfo.fullName || "Your Name", 15, 19);
 
   doc.setTextColor(...config.titleColor);
   doc.setFont(config.titleFont, config.titleStyle);
   doc.setFontSize(config.titleSize);
-  doc.text(formData.personalInfo.title || "Professional Title", 18, 27);
+  doc.text(formData.personalInfo.title || "Professional Title", 15, 26);
 
   const contactLines = filterFilled([
     formData.personalInfo.email || "email@example.com",
     formData.personalInfo.phone || "+91 0000000000",
+    formData.personalInfo.portfolio || "LinkedIn/Portfolio",
     formData.personalInfo.location || "Your location",
   ]);
 
   doc.setTextColor(...config.contactColor);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.4);
-  let contactY = 18;
+  doc.setFontSize(9.1);
+  let contactY = 17;
   contactLines.forEach((line) => {
-    doc.text(line.toUpperCase(), 192, contactY, { align: "right" });
-    contactY += 5.2;
+    doc.text(line.toUpperCase(), 195, contactY, { align: "right" });
+    contactY += 5.6;
   });
 
   doc.setDrawColor(...config.lineColor);
-  doc.line(18, 32, 192, 32);
+  doc.line(15, 31, 195, 31);
 
   const sections = sortSections(getResumeSections(formData), config.order);
   const leftSections = [];
@@ -506,17 +576,17 @@ const renderCompactTemplate = (doc, formData, config) => {
     }
   });
 
-  let leftY = 40;
-  let rightY = 40;
+  let leftY = 37;
+  let rightY = 37;
 
   leftSections.forEach((section) => {
-    leftY = drawSectionTitle(doc, section.title, 18, leftY, 76, config, "compact");
-    leftY = drawSectionBody(doc, section, 18, leftY, 76, config) + 3;
+    leftY = drawSectionTitle(doc, section.title, 15, leftY, 80, config, "compact");
+    leftY = drawSectionBody(doc, section, 15, leftY, 80, config) + 3.4;
   });
 
   rightSections.forEach((section) => {
-    rightY = drawSectionTitle(doc, section.title, 104, rightY, 88, config, "compact");
-    rightY = drawSectionBody(doc, section, 104, rightY, 88, config) + 3;
+    rightY = drawSectionTitle(doc, section.title, 103, rightY, 92, config, "compact");
+    rightY = drawSectionBody(doc, section, 103, rightY, 92, config) + 3.4;
   });
 };
 
@@ -526,24 +596,24 @@ const renderCreativeTemplate = (doc, formData, config) => {
 
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.text((formData.personalInfo.fullName || "Your Name").toUpperCase(), 10, 20);
+  doc.setFontSize(24);
+  doc.text((formData.personalInfo.fullName || "Your Name").toUpperCase(), 12, 19);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11.5);
-  doc.text(formData.personalInfo.title || "Professional Title", 10, 28);
+  doc.setFontSize(13);
+  doc.text(formData.personalInfo.title || "Professional Title", 12, 28);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.6);
+  doc.setFontSize(9.4);
   const leftContact = filterFilled([
     formData.personalInfo.phone || "[Phone Number]",
-    "LinkedIn / Portfolio",
+    formData.personalInfo.portfolio || "LinkedIn/Portfolio",
   ]);
   leftContact.forEach((line, index) => {
-    doc.text(line, 10, 36 + index * 5.5);
+    doc.text(line, 12, 36 + index * 6);
   });
 
-  doc.text(formData.personalInfo.email || "[Email]", 92, 39);
+  doc.text(formData.personalInfo.email || "[Email]", 98, 39);
 
   doc.setDrawColor(148, 163, 184);
   doc.setLineWidth(1.2);
@@ -559,12 +629,12 @@ const renderCreativeTemplate = (doc, formData, config) => {
     ["summary", "skills"].includes(section.key),
   );
 
-  let leftY = 68;
-  let rightY = 68;
-  const leftX = 10;
-  const rightX = 116;
+  let leftY = 64;
+  let rightY = 64;
+  const leftX = 12;
+  const rightX = 114;
   const leftWidth = 96;
-  const rightWidth = 84;
+  const rightWidth = 82;
 
   leftSections.forEach((section) => {
     leftY = drawSectionTitle(doc, section.title, leftX, leftY, leftWidth, config, "strong");
@@ -602,42 +672,44 @@ const renderEnhancvReplicaTemplate = (doc, formData, config) => {
   const contactParts = filterFilled([
     formData.personalInfo.phone || "[Phone Number]",
     formData.personalInfo.email || "yourname@email.com",
-    formData.personalInfo.title || "LinkedIn/Portfolio",
+    formData.personalInfo.portfolio || "LinkedIn/Portfolio",
     formData.personalInfo.location || "[Location]",
   ]);
+  const customSections = (formData.customSections || [])
+    .map((section) => ({
+      title: String(section?.title || "").trim(),
+      items: (section?.items || []).map((item) => String(item || "").trim()).filter(Boolean),
+    }))
+    .filter((section) => section.title || section.items.length);
 
   doc.setTextColor(...config.nameColor);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(24);
-  doc.text(name, 12, 18);
+  doc.setFontSize(27);
+  doc.text(name, 12, 17);
 
   doc.setTextColor(...config.titleColor);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11.5);
-  doc.text(title, 12, 25);
+  doc.setFontSize(13);
+  doc.text(title, 12, 24);
 
   doc.setTextColor(...config.contactColor);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.8);
-  let cursorX = 12;
-  contactParts.forEach((part, index) => {
-    doc.text(part, cursorX, 31);
-    cursorX += doc.getTextWidth(part) + (index === contactParts.length - 1 ? 0 : 8);
-  });
+  doc.setFontSize(9.4);
+  drawWrappedText(doc, contactParts.join("   "), 12, 30, 184, 4.4);
 
-  let y = 41;
+  let y = 38;
   const drawTitle = (label) => {
     doc.setTextColor(...config.sectionColor);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
+    doc.setFontSize(12.2);
     doc.text(label, 12, y);
-    y += 5;
+    y += 6;
   };
 
   drawTitle("SUMMARY");
-  doc.setTextColor(95, 103, 117);
+  doc.setTextColor(55, 65, 81);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.2);
+  doc.setFontSize(9.6);
   y = drawWrappedText(
     doc,
     formData.summary ||
@@ -645,33 +717,25 @@ const renderEnhancvReplicaTemplate = (doc, formData, config) => {
     12,
     y,
     186,
-    4,
-  ) + 4;
+    4.9,
+  ) + 4.5;
 
-  drawTitle("EXPERIENCE");
   const experienceItems = (formData.experience || []).filter(
     (item) => item.company || item.role || item.description,
   );
-  const renderedExperience =
-    experienceItems.length > 0
-      ? experienceItems
-      : [
-          {
-            role: "Title",
-            company: "Company Name",
-            startDate: "",
-            endDate: "",
-            description: "Add experience entries to build your preview.",
-          },
-        ];
+  const renderedExperience = experienceItems;
+
+  if (renderedExperience.length) {
+    drawTitle("EXPERIENCE");
+  }
 
   renderedExperience.forEach((item) => {
     const startY = y;
-    doc.setTextColor(106, 135, 192);
+    doc.setTextColor(56, 88, 148);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.8);
+    doc.setFontSize(9.1);
     doc.text(formatDateRange(item.startDate, item.endDate), 12, startY);
-    doc.setTextColor(180, 188, 200);
+    doc.setTextColor(100, 116, 139);
     doc.setFont("helvetica", "normal");
     doc.text(formData.personalInfo.location || "Location", 12, startY + 4);
 
@@ -680,53 +744,45 @@ const renderEnhancvReplicaTemplate = (doc, formData, config) => {
     doc.circle(44, startY - 0.5, 0.9, "F");
     doc.line(44, startY + 1.2, 44, startY + 14);
 
-    doc.setTextColor(154, 167, 190);
+    doc.setTextColor(71, 85, 105);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
+    doc.setFontSize(9.6);
     doc.text(item.role || "Title", 50, startY);
 
-    doc.setTextColor(255, 139, 57);
+    doc.setTextColor(210, 96, 16);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
+    doc.setFontSize(12);
     doc.text(item.company || "Company Name", 50, startY + 4);
 
     const bullets = splitBulletLines(item.description);
     const fallbackBullet = bullets.length ? bullets : [item.description || "Add experience entries to build your preview."];
-    doc.setTextColor(168, 175, 185);
+    doc.setTextColor(55, 65, 81);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.4);
+    doc.setFontSize(8.9);
     let bulletY = startY + 8;
     fallbackBullet.forEach((bullet) => {
       doc.text("-", 50, bulletY);
-      bulletY = drawWrappedText(doc, bullet, 53, bulletY, 138, 3.8);
+      bulletY = drawWrappedText(doc, bullet, 53, bulletY, 138, 4.5);
     });
-    y = bulletY + 2;
+    y = bulletY + 3;
   });
 
-  drawTitle("EDUCATION");
   const educationItems = (formData.education || []).filter(
     (item) => item.institution || item.degree || item.fieldOfStudy,
   );
-  const renderedEducation =
-    educationItems.length > 0
-      ? educationItems
-      : [
-          {
-            degree: "Degree / Program",
-            fieldOfStudy: "",
-            institution: "Institution Name",
-            startDate: "",
-            endDate: "",
-          },
-        ];
+  const renderedEducation = educationItems;
+
+  if (renderedEducation.length) {
+    drawTitle("EDUCATION");
+  }
 
   renderedEducation.forEach((item) => {
     const startY = y;
-    doc.setTextColor(106, 135, 192);
+    doc.setTextColor(56, 88, 148);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.8);
+    doc.setFontSize(9.1);
     doc.text(formatDateRange(item.startDate, item.endDate), 12, startY);
-    doc.setTextColor(180, 188, 200);
+    doc.setTextColor(100, 116, 139);
     doc.setFont("helvetica", "normal");
     doc.text(formData.personalInfo.location || "Location", 12, startY + 4);
 
@@ -734,30 +790,38 @@ const renderEnhancvReplicaTemplate = (doc, formData, config) => {
     doc.setLineWidth(0.25);
     doc.circle(44, startY - 0.5, 0.9, "F");
 
-    doc.setTextColor(106, 135, 192);
+    doc.setTextColor(30, 41, 59);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFontSize(10.4);
     doc.text(
       `${item.degree || "Degree"}${item.fieldOfStudy ? `, ${item.fieldOfStudy}` : ""}`,
       50,
       startY,
     );
 
-    doc.setTextColor(255, 124, 31);
+    doc.setTextColor(210, 96, 16);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.6);
-    doc.text(item.institution || "Institution", 50, startY + 4);
-    y = startY + 10;
+    doc.setFontSize(10.8);
+    y = drawWrappedText(doc, item.institution || "Institution", 50, startY + 4, 140, 4.6);
+    y += 3.5;
   });
 
-  drawTitle("SKILLS");
-  if (filterFilled(formData.skills).length) {
-    y = drawSkills(doc, filterFilled(formData.skills), 12, y, 180, config);
-  } else {
-    doc.setTextColor(148, 163, 184);
+  customSections.forEach((section, index) => {
+    drawTitle(section.title || `SECTION ${index + 1}`);
+    doc.setTextColor(55, 65, 81);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    y = drawWrappedText(doc, "Add skills to populate the preview.", 12, y + 2, 180, 4) + 2;
+    doc.setFontSize(9.2);
+    const items = splitCustomSectionItems(section.items);
+    items.forEach((item) => {
+      doc.text("-", 12, y);
+      y = drawWrappedText(doc, item, 15, y, 180, 4.8) + 1.2;
+    });
+    y += 2;
+  });
+
+  if (filterFilled(formData.skills).length) {
+    drawTitle("SKILLS");
+    y = drawSkills(doc, filterFilled(formData.skills), 12, y, 180, config);
   }
 };
 
@@ -768,31 +832,33 @@ const renderEnhancvColumnsTemplate = (doc, formData, config) => {
   const experienceItems = (formData.experience || []).filter(
     (item) => item.company || item.role || item.description,
   );
+  const customSections = (formData.customSections || [])
+    .map((section) => ({
+      title: String(section?.title || "").trim(),
+      items: (section?.items || []).map((item) => String(item || "").trim()).filter(Boolean),
+    }))
+    .filter((section) => section.title || section.items.length);
 
   doc.setTextColor(...config.nameColor);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(21);
-  doc.text((formData.personalInfo.fullName || "Your Name").toUpperCase(), 12, 18);
+  doc.setFontSize(24);
+  doc.text((formData.personalInfo.fullName || "Your Name").toUpperCase(), 12, 17);
 
   doc.setTextColor(...config.titleColor);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(11.8);
   doc.text(formData.personalInfo.title || "Professional Title", 12, 24);
 
   doc.setTextColor(...config.contactColor);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
+  doc.setFontSize(8.8);
   const contactParts = filterFilled([
     formData.personalInfo.phone || "[Phone Number]",
     formData.personalInfo.email || "yourname@email.com",
-    formData.personalInfo.title || "LinkedIn/Portfolio",
+    formData.personalInfo.portfolio || "LinkedIn/Portfolio",
     formData.personalInfo.location || "[Location]",
   ]);
-  let contactX = 12;
-  contactParts.forEach((part, index) => {
-    doc.text(part, contactX, 29);
-    contactX += doc.getTextWidth(part) + (index === contactParts.length - 1 ? 0 : 7);
-  });
+  drawWrappedText(doc, contactParts.join("   "), 12, 29, 150, 4.2);
 
   doc.setDrawColor(190, 196, 201);
   doc.setFillColor(245, 245, 245);
@@ -805,62 +871,81 @@ const renderEnhancvColumnsTemplate = (doc, formData, config) => {
   const drawColumnTitle = (label, x, y, width) => {
     doc.setTextColor(...config.sectionColor);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(10.8);
     doc.text(label, x, y);
     doc.setLineWidth(0.5);
     doc.setDrawColor(...config.lineColor);
     doc.line(x, y + 1.5, x + width, y + 1.5);
-    return y + 6;
+    return y + 7;
   };
 
   const leftX = 12;
-  const centerX = 76;
-  const rightX = 148;
-  const leftWidth = 46;
-  const centerWidth = 64;
-  const rightWidth = 44;
-  let leftY = 40;
-  let centerY = 40;
-  let rightY = 40;
+  const centerX = 72;
+  const rightX = 144;
+  const leftWidth = 44;
+  const centerWidth = 66;
+  const rightWidth = 50;
+  let leftY = 37;
+  let centerY = 37;
+  let rightY = 37;
 
   leftY = drawColumnTitle("SUMMARY", leftX, leftY, leftWidth);
-  doc.setTextColor(100, 108, 115);
+  doc.setTextColor(55, 65, 81);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
+  doc.setFontSize(9);
   leftY = drawWrappedText(
     doc,
     formData.summary || "Your professional summary will appear here once you add it.",
     leftX,
     leftY,
     leftWidth,
-    3.8,
-  ) + 5;
+    4.8,
+  ) + 5.5;
+
+  customSections.forEach((section, index) => {
+    leftY = drawColumnTitle(section.title || `SECTION ${index + 1}`, leftX, leftY, leftWidth);
+    doc.setTextColor(55, 65, 81);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.6);
+    const items = splitCustomSectionItems(section.items);
+    items.forEach((item) => {
+      doc.text("-", leftX, leftY);
+      leftY = drawWrappedText(doc, item, leftX + 3, leftY, leftWidth - 3, 4.4) + 1.6;
+    });
+    leftY += 3;
+  });
 
   centerY = drawColumnTitle("EXPERIENCE", centerX, centerY, centerWidth);
   const renderedExperience = experienceItems.length
     ? experienceItems
     : [{ role: "Title", company: "Company Name", startDate: "", endDate: "", description: "Highlight your accomplishments, using numbers if possible." }];
   renderedExperience.slice(0, 3).forEach((item) => {
-    doc.setTextColor(160, 170, 178);
+    doc.setTextColor(55, 65, 81);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.2);
-    doc.text(item.role || "Title", centerX, centerY);
-    doc.setTextColor(124, 195, 173);
+    doc.setFontSize(8.9);
+    centerY = drawWrappedText(doc, item.role || "Title", centerX, centerY, centerWidth, 4.2);
+    doc.setTextColor(34, 132, 102);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.4);
-    doc.text(item.company || "Company Name", centerX, centerY + 4);
-    doc.setTextColor(190, 196, 201);
+    doc.setFontSize(10.2);
+    centerY = drawWrappedText(doc, item.company || "Company Name", centerX, centerY + 1.5, centerWidth, 4.6);
+    doc.setTextColor(100, 116, 139);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.4);
-    doc.text(formatDateRange(item.startDate, item.endDate), centerX, centerY + 8);
-    doc.text(formData.personalInfo.location || "Location", centerX + 22, centerY + 8);
+    doc.setFontSize(8);
+    centerY = drawWrappedText(
+      doc,
+      filterFilled([formatDateRange(item.startDate, item.endDate), formData.personalInfo.location || "Location"]).join(" | "),
+      centerX,
+      centerY + 1.4,
+      centerWidth,
+      4,
+    );
     const bullets = splitBulletLines(item.description);
     const bulletItems = bullets.length ? bullets : ["Highlight your accomplishments, using numbers if possible."];
-    doc.setTextColor(180, 185, 190);
-    doc.setFontSize(6.6);
-    bulletItems.slice(0, 3).forEach((bullet) => {
-      doc.text("-", centerX, centerY + 12);
-      centerY = drawWrappedText(doc, bullet, centerX + 3, centerY + 12, centerWidth - 3, 3.2);
+    doc.setTextColor(55, 65, 81);
+    doc.setFontSize(8.2);
+    bulletItems.slice(0, 4).forEach((bullet) => {
+      doc.text("-", centerX, centerY + 3.2);
+      centerY = drawWrappedText(doc, bullet, centerX + 3, centerY + 3.2, centerWidth - 3, 4.1);
     });
     centerY += 4;
   });
@@ -869,40 +954,98 @@ const renderEnhancvColumnsTemplate = (doc, formData, config) => {
   const renderedEducation = educationItems.length
     ? educationItems
     : [{ degree: "Degree / Program", institution: "Institution Name", fieldOfStudy: "", startDate: "", endDate: "" }];
-  renderedEducation.slice(0, 1).forEach((item) => {
+  renderedEducation.slice(0, 2).forEach((item) => {
     doc.setTextColor(40, 54, 68);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.2);
-    doc.text(item.degree || "Degree / Program", rightX, rightY);
-    doc.setTextColor(124, 195, 173);
-    doc.setFontSize(7.8);
-    rightY = drawWrappedText(doc, item.institution || "Institution Name", rightX, rightY + 4, rightWidth, 3.6);
-    doc.setTextColor(160, 170, 178);
+    doc.setFontSize(9.4);
+    rightY = drawWrappedText(
+      doc,
+      item.degree || "Degree / Program",
+      rightX,
+      rightY,
+      rightWidth,
+      4.3,
+    );
+    doc.setTextColor(34, 132, 102);
+    doc.setFontSize(9);
+    rightY = drawWrappedText(
+      doc,
+      item.institution || "Institution Name",
+      rightX,
+      rightY + 1.4,
+      rightWidth,
+      4.2,
+    );
+    doc.setTextColor(100, 116, 139);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.4);
-    doc.text(formatDateRange(item.startDate, item.endDate), rightX, rightY + 1);
-    rightY += 6;
+    doc.setFontSize(7.8);
+    rightY = drawWrappedText(
+      doc,
+      filterFilled([formatDateRange(item.startDate, item.endDate), formData.personalInfo.location || "[Location]"]).join(" | "),
+      rightX,
+      rightY + 1.2,
+      rightWidth,
+      4,
+    ) + 3;
   });
 
   rightY = drawColumnTitle("SKILLS", rightX, rightY, rightWidth);
   const skills = filterFilled(formData.skills);
-  const skillItems = skills.length ? skills : ["Skill One", "Skill Two", "Skill Three", "Skill Four", "Skill Five", "Skill Six"];
+  const skillItems = skills.length
+    ? skills
+    : ["Skill One", "Skill Two", "Skill Three", "Skill Four", "Skill Five", "Skill Six"];
+  doc.setTextColor(16, 73, 63);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.2);
+  const columnGap = 4;
+  const halfWidth = (rightWidth - columnGap) / 2;
   let skillX = rightX;
-  let skillY = rightY + 1;
-  skillItems.slice(0, 8).forEach((skill, index) => {
-    if (index > 0 && index % 2 === 0) {
-      skillY += 7;
+  let skillRowY = rightY + 1;
+  let skillRowHeight = 0;
+  let inSecondColumn = false;
+
+  skillItems.slice(0, 10).forEach((skill) => {
+    const label = String(skill || "").trim();
+    const estimatedWidth = doc.getTextWidth(label);
+    const shouldTakeFullRow = estimatedWidth >= rightWidth * 0.4;
+
+    if (shouldTakeFullRow && inSecondColumn) {
+      skillRowY += skillRowHeight + 2;
       skillX = rightX;
+      skillRowHeight = 0;
+      inSecondColumn = false;
     }
-    doc.setTextColor(25, 92, 81);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(6.8);
-    doc.text(skill, skillX, skillY);
-    const width = Math.min(doc.getTextWidth(skill) + 1, 18);
-    doc.setDrawColor(160, 170, 178);
+
+    const availableWidth = shouldTakeFullRow ? rightWidth : halfWidth;
+    const wrapped = doc.splitTextToSize(label, availableWidth);
+    doc.text(wrapped, skillX, skillRowY);
+    const underlineY = skillRowY + wrapped.length * 4 + 0.3;
+    const underlineWidth = Math.min(
+      Math.max(...wrapped.map((line) => doc.getTextWidth(line)), 0) + 1,
+      availableWidth,
+    );
+    doc.setDrawColor(120, 138, 168);
     doc.setLineWidth(0.2);
-    doc.line(skillX, skillY + 1.2, skillX + width, skillY + 1.2);
-    skillX += 21;
+    doc.line(skillX, underlineY, skillX + underlineWidth, underlineY);
+    skillRowHeight = Math.max(skillRowHeight, wrapped.length * 4 + 1);
+
+    if (shouldTakeFullRow) {
+      skillRowY += skillRowHeight + 2;
+      skillX = rightX;
+      skillRowHeight = 0;
+      inSecondColumn = false;
+      return;
+    }
+
+    if (!inSecondColumn) {
+      skillX = rightX + halfWidth + columnGap;
+      inSecondColumn = true;
+    } else {
+      skillRowY += skillRowHeight + 2;
+      skillX = rightX;
+      skillRowHeight = 0;
+      inSecondColumn = false;
+    }
   });
 };
 
@@ -949,13 +1092,17 @@ const SECTION_NAME_MAP = {
   contact: "contact",
   "professional_summary": "summary",
   summary: "summary",
+  profile: "summary",
   experience: "experience",
   work_experience: "experience",
   education: "education",
   skills: "skills",
+  technical_skills: "skills",
   projects: "projects",
   certifications: "certifications",
   achievements: "achievements",
+  languages: "languages",
+  interests: "interests",
 };
 
 const normalizeSectionName = (line = "") =>
@@ -1014,12 +1161,39 @@ const inferProfessionalTitle = (lines = [], headline = "") => {
 const splitSkillTokens = (lines = []) =>
   Array.from(
     new Set(
-      lines
-        .flatMap((line) => line.split(/[,|/]/))
-        .map((skill) => skill.replace(/^[-*]\s*/, "").trim())
-        .filter(Boolean),
+      lines.flatMap((line) => {
+        const cleaned = String(line || "").replace(/^[-*]\s*/, "").trim();
+        if (!cleaned) return [];
+
+        const candidateText = cleaned.includes(":") ? cleaned.split(":").slice(1).join(":").trim() : cleaned;
+        const simpleSkillTokenPattern =
+          /^(c|c\+\+|c#|python|java|javascript|typescript|html|css|react|node(?:\.js)?|express(?:\.js)?|mysql|sql|mongodb|postgres(?:ql)?|dbms|dsa|os|oop|aws|docker|linux|git)$/i;
+        const baseParts = candidateText
+          .split(/[,|/]|•|\t+/)
+          .flatMap((part) => part.split(/\s{2,}/))
+          .map((part) => part.trim())
+          .filter(Boolean);
+
+        return baseParts.flatMap((part) => {
+          const normalized = part.replace(/\s+/g, " ").trim();
+          const spaceTokens = normalized.split(" ").filter(Boolean);
+          const averageLength =
+            spaceTokens.reduce((sum, token) => sum + token.length, 0) / Math.max(spaceTokens.length, 1);
+
+          if (
+            spaceTokens.length >= 2 &&
+            !/[()]/.test(normalized) &&
+            spaceTokens.every((token) => simpleSkillTokenPattern.test(token)) &&
+            (averageLength <= 6 || spaceTokens.length >= 3)
+          ) {
+            return spaceTokens;
+          }
+
+          return [normalized];
+        });
+      }),
     ),
-  ).slice(0, 14);
+  ).slice(0, 24);
 
 const extractLikelySkillsFromLines = (lines = []) =>
   Array.from(
@@ -1201,7 +1375,7 @@ const parseOptimizedResumeText = (optimizedResumeText = "", fileName = "", headl
 };
 
 const KNOWN_SKILL_PATTERN =
-  /(python|java|javascript|typescript|react|node(?:\.js)?|express|mongodb|mysql|sql|postgres(?:ql)?|aws|azure|gcp|docker|kubernetes|linux|git|github|html|css|tailwind|bootstrap|c\+\+|c#|java|spring|django|flask|machine learning|data structures|algorithms|oop|dbms|siem|vapt|soc|incident response|digital forensics|wireshark|burp suite|nmap|metasploit|threat intelligence|malware analysis|api|rest|rest api|cloud security|network security|cybersecurity)/i;
+  /(python|java|javascript|typescript|react|node(?:\.js)?|express|mongodb|mysql|sql|postgres(?:ql)?|aws|azure|gcp|docker|kubernetes|linux|git|github|html|css|tailwind|bootstrap|c\+\+|c#|\bc\b|spring|django|flask|machine learning|data structures|algorithms|oop|\bos\b|dbms|dsa|siem|vapt|soc|incident response|digital forensics|wireshark|burp suite|nmap|metasploit|threat intelligence|malware analysis|api|rest|rest api|cloud security|network security|cybersecurity)/i;
 
 const isLikelyName = (value = "") =>
   /^[A-Za-z]+(?:[.\s'-][A-Za-z]+){1,4}$/.test(String(value).trim()) &&
@@ -1218,6 +1392,7 @@ const sanitizeSkillItems = (skills = [], personalInfo = {}) => {
       personalInfo.phone,
       personalInfo.location,
       personalInfo.title,
+      personalInfo.portfolio,
     ]
       .filter(Boolean)
       .flatMap((value) =>
@@ -1246,8 +1421,27 @@ const sanitizeOptimizedResumeData = (optimizedResume = {}, fileName = "") => {
     ...(optimizedResume.personalInfo || {}),
   };
 
+  const normalizeEntry = (item = {}, fields = []) =>
+    fields.reduce((acc, field) => {
+      acc[field] = String(item?.[field] || "").trim();
+      return acc;
+    }, {});
+
+  const normalizedExperience = (Array.isArray(optimizedResume.experience) ? optimizedResume.experience : [])
+    .map((item) => normalizeEntry(item, ["role", "company", "startDate", "endDate", "description"]))
+    .filter((item) => item.role || item.company || item.description);
+
+  const normalizedEducation = (Array.isArray(optimizedResume.education) ? optimizedResume.education : [])
+    .map((item) => normalizeEntry(item, ["degree", "institution", "fieldOfStudy", "startDate", "endDate"]))
+    .filter((item) => item.degree || item.institution || item.fieldOfStudy);
+
   const customSections = Array.isArray(optimizedResume.customSections)
-    ? optimizedResume.customSections
+    ? optimizedResume.customSections.map((section) => ({
+        title: String(section?.title || "").trim(),
+        items: Array.isArray(section?.items)
+          ? section.items.map((item) => String(item || "").trim()).filter(Boolean)
+          : [],
+      }))
     : [];
 
   const possibleNameSection = customSections.find((section) => {
@@ -1310,8 +1504,15 @@ const sanitizeOptimizedResumeData = (optimizedResume = {}, fileName = "") => {
       ...personalInfo,
       fullName: cleanedFullName || "Optimized Resume",
       name: cleanedFullName || "Optimized Resume",
+      title: String(personalInfo.title || "").trim(),
+      email: String(personalInfo.email || "").trim(),
+      phone: String(personalInfo.phone || "").trim(),
+      location: String(personalInfo.location || "").trim(),
+      portfolio: String(personalInfo.portfolio || "").trim(),
     },
     skills: mergedSkills,
+    experience: normalizedExperience,
+    education: normalizedEducation,
     customSections: filteredCustomSections,
   };
 };

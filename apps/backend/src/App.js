@@ -27,7 +27,10 @@ app.use(cors({
       return callback(null, true);
     }
 
-    return callback(new Error('CORS origin not allowed'));
+    const corsError = new Error('CORS origin not allowed');
+    corsError.status = 403;
+    corsError.expose = true;
+    return callback(corsError);
   },
   credentials: true,
 }));

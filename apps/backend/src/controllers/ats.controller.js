@@ -102,6 +102,8 @@ const SECTION_NAME_MAP = {
   projects: 'projects',
   certifications: 'certifications',
   achievements: 'achievements',
+  languages: 'languages',
+  interests: 'interests',
 };
 
 const normalizeSectionName = (line = '') =>
@@ -149,12 +151,39 @@ const inferProfessionalTitle = (lines = []) =>
 const splitSkillTokens = (lines = []) =>
   Array.from(
     new Set(
-      lines
-        .flatMap((line) => line.split(/[,|/]/))
-        .map((skill) => skill.replace(/^[-*]\s*/, '').trim())
-        .filter(Boolean),
+      lines.flatMap((line) => {
+        const cleaned = String(line || '').replace(/^[-*]\s*/, '').trim();
+        if (!cleaned) return [];
+
+        const candidateText = cleaned.includes(':') ? cleaned.split(':').slice(1).join(':').trim() : cleaned;
+        const simpleSkillTokenPattern =
+          /^(c|c\+\+|c#|python|java|javascript|typescript|html|css|react|node(?:\.js)?|express(?:\.js)?|mysql|sql|mongodb|postgres(?:ql)?|dbms|dsa|os|oop|aws|docker|linux|git)$/i;
+        const baseParts = candidateText
+          .split(/[,|/]|•|\t+/)
+          .flatMap((part) => part.split(/\s{2,}/))
+          .map((part) => part.trim())
+          .filter(Boolean);
+
+        return baseParts.flatMap((part) => {
+          const normalized = part.replace(/\s+/g, ' ').trim();
+          const spaceTokens = normalized.split(' ').filter(Boolean);
+          const averageLength =
+            spaceTokens.reduce((sum, token) => sum + token.length, 0) / Math.max(spaceTokens.length, 1);
+
+          if (
+            spaceTokens.length >= 2 &&
+            !/[()]/.test(normalized) &&
+            spaceTokens.every((token) => simpleSkillTokenPattern.test(token)) &&
+            (averageLength <= 6 || spaceTokens.length >= 3)
+          ) {
+            return spaceTokens;
+          }
+
+          return [normalized];
+        });
+      }),
     ),
-  ).slice(0, 16);
+  ).slice(0, 24);
 
 const inferSummary = (lines = [], title = '') => {
   const longLine = lines.find(
@@ -353,7 +382,8 @@ const scoreResume = async (req, res) => {
 
 const matchWithJD = async (req, res) => {
   try {
-    const { jobDescription } = req.body;
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const jobDescription = typeof body.jobDescription === 'string' ? body.jobDescription.trim() : body.jobDescription;
 
     if (!jobDescription) {
       return res.status(400).json({ error: 'Job description is required' });

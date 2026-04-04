@@ -1,4 +1,12 @@
-const { callGeminiWithTimeout } = require('../config/gemini');
+const { callGeminiWithTimeout, getResumeParsingGeminiOptions } = require('../config/gemini');
+const {
+  buildImportedResumeData,
+  generateSummaryFallback,
+  groundImportedResumeData,
+  suggestSkillsFallback,
+  optimizeResumeFallback,
+  optimizeUploadedResumeTextFallback,
+} = require('../utils/resumeHeuristics');
 
 // Prompt Templates
 const PROMPTS = {
@@ -110,6 +118,59 @@ const PROMPTS = {
     }
   `,
 
+  PARSE_RESUME_FOR_BUILDER: (resumeText, originalName = '') => `
+    Parse this resume into the exact structured JSON needed by a resume builder form.
+    Keep everything truthful to the source resume.
+    Do NOT invent facts, achievements, dates, companies, institutions, or links.
+    If something is missing, return an empty string or empty array instead.
+    Convert bullet points into plain text strings joined naturally inside description fields.
+    Use only these top-level keys and no markdown.
+
+    Original file name:
+    ${originalName}
+
+    Resume text:
+    ${resumeText}
+
+    Return ONLY a valid JSON object with this exact structure:
+    {
+      "personalInfo": {
+        "fullName": "string",
+        "title": "string",
+        "email": "string",
+        "phone": "string",
+        "location": "string",
+        "portfolio": "string"
+      },
+      "education": [
+        {
+          "institution": "string",
+          "degree": "string",
+          "fieldOfStudy": "string",
+          "startDate": "YYYY-MM or empty string",
+          "endDate": "YYYY-MM or empty string"
+        }
+      ],
+      "experience": [
+        {
+          "company": "string",
+          "role": "string",
+          "startDate": "YYYY-MM or empty string",
+          "endDate": "YYYY-MM or empty string",
+          "description": "string"
+        }
+      ],
+      "skills": ["skill 1", "skill 2"],
+      "summary": "string",
+      "customSections": [
+        {
+          "title": "string",
+          "items": ["item 1", "item 2"]
+        }
+      ]
+    }
+  `,
+
   RECOMMEND_JOBS_FOR_RESUME: (resumeText) => `
     Analyze this resume text and recommend the most suitable job roles for the candidate.
     Focus on realistic job titles, fit score, matching reason, and the most relevant skills.
@@ -166,20 +227,28 @@ const generateSummary = async (data) => {
       console.warn('SUMMARY prompt length:', prompt.length);
     }
 
-    const rawText = await callGeminiWithTimeout(prompt, { timeoutMs: 30000, retries: 2 });
+    try {
+      const rawText = await callGeminiWithTimeout(prompt, { timeoutMs: 30000, retries: 2 });
 
-    if (process.env.GEMINI_DEBUG === 'true') console.warn('Raw summary response:', String(rawText).substring(0, 1000));
+      if (process.env.GEMINI_DEBUG === 'true') console.warn('Raw summary response:', String(rawText).substring(0, 1000));
 
-    const parsed = parseGeminiJSON(String(rawText));
+      const parsed = parseGeminiJSON(String(rawText));
 
-    if (!parsed.summary) {
-      throw new Error('Missing summary in response');
+      if (!parsed.summary) {
+        throw new Error('Missing summary in response');
+      }
+
+      return {
+        success: true,
+        summary: parsed.summary
+      };
+    } catch (apiError) {
+      console.warn('Gemini summary unavailable, returning local fallback summary');
+      return {
+        success: true,
+        summary: generateSummaryFallback(resumeContent),
+      };
     }
-
-    return {
-      success: true,
-      summary: parsed.summary
-    };
   } catch (error) {
     console.error('Generate summary error:', error.message);
     throw new Error(`Error generating summary: ${error.message}`);
@@ -197,21 +266,29 @@ const suggestSkills = async (existingSkills) => {
 
     if (process.env.GEMINI_DEBUG === 'true') console.warn('SUGGEST_SKILLS prompt length:', prompt.length);
 
-    const rawText = await callGeminiWithTimeout(prompt, { timeoutMs: 30000, retries: 2 });
+    try {
+      const rawText = await callGeminiWithTimeout(prompt, { timeoutMs: 30000, retries: 2 });
 
-    if (process.env.GEMINI_DEBUG === 'true') console.warn('Raw suggestSkills response:', String(rawText).substring(0, 1000));
+      if (process.env.GEMINI_DEBUG === 'true') console.warn('Raw suggestSkills response:', String(rawText).substring(0, 1000));
 
-    const parsed = parseGeminiJSON(String(rawText));
+      const parsed = parseGeminiJSON(String(rawText));
 
-    if (!parsed.suggestedSkills || !Array.isArray(parsed.suggestedSkills)) {
-      throw new Error('Invalid response');
+      if (!parsed.suggestedSkills || !Array.isArray(parsed.suggestedSkills)) {
+        throw new Error('Invalid response');
+      }
+
+      return {
+        success: true,
+        suggestedSkills: parsed.suggestedSkills,
+        reasoning: parsed.reasoning || 'Skills suggested based on current profile'
+      };
+    } catch (apiError) {
+      console.warn('Gemini skill suggestion unavailable, returning local fallback skills');
+      return {
+        success: true,
+        ...suggestSkillsFallback(existingSkills),
+      };
     }
-
-    return {
-      success: true,
-      suggestedSkills: parsed.suggestedSkills,
-      reasoning: parsed.reasoning || 'Skills suggested based on current profile'
-    };
   } catch (error) {
     console.error('Suggest skills error:', error.message);
     throw new Error(`Error suggesting skills: ${error.message}`);
@@ -298,22 +375,30 @@ const optimizeResume = async (resumeJson, jobDescription = null) => {
 
     if (process.env.GEMINI_DEBUG === 'true') console.warn('OPTIMIZE prompt length:', prompt.length);
 
-    const rawText = await callGeminiWithTimeout(prompt, { timeoutMs: 30000, retries: 2 });
+    try {
+      const rawText = await callGeminiWithTimeout(prompt, { timeoutMs: 30000, retries: 2 });
 
-    if (process.env.GEMINI_DEBUG === 'true') console.warn('Raw optimize response:', String(rawText).substring(0, 1000));
+      if (process.env.GEMINI_DEBUG === 'true') console.warn('Raw optimize response:', String(rawText).substring(0, 1000));
 
-    const parsed = parseGeminiJSON(String(rawText));
+      const parsed = parseGeminiJSON(String(rawText));
 
-    if (!parsed.improvements || !Array.isArray(parsed.improvements)) {
-      throw new Error('Invalid response structure');
+      if (!parsed.improvements || !Array.isArray(parsed.improvements)) {
+        throw new Error('Invalid response structure');
+      }
+
+      return {
+        success: true,
+        improvements: parsed.improvements,
+        priorityImprovements: parsed.priorityImprovements || [],
+        overallAssessment: parsed.overallAssessment || 'Resume reviewed and improvements suggested'
+      };
+    } catch (apiError) {
+      console.warn('Gemini optimization unavailable, returning local fallback suggestions');
+      return {
+        success: true,
+        ...optimizeResumeFallback(resumeContent, jobDescription),
+      };
     }
-
-    return {
-      success: true,
-      improvements: parsed.improvements,
-      priorityImprovements: parsed.priorityImprovements || [],
-      overallAssessment: parsed.overallAssessment || 'Resume reviewed and improvements suggested'
-    };
   } catch (error) {
     console.error('Optimize resume error:', error.message);
     throw new Error(`Error optimizing resume: ${error.message}`);
@@ -328,31 +413,90 @@ const optimizeUploadedResumeText = async (resumeText, atsInsights = {}) => {
 
     const prompt = PROMPTS.OPTIMIZE_UPLOADED_RESUME(resumeText, atsInsights);
 
-    const rawText = await callGeminiWithTimeout(prompt, {
-      timeoutMs: 20000,
-      retries: 2,
-    });
-    const parsed = parseGeminiJSON(String(rawText));
+    try {
+      const rawText = await callGeminiWithTimeout(prompt, {
+        timeoutMs: 20000,
+        retries: 2,
+      });
+      const parsed = parseGeminiJSON(String(rawText));
 
-    if (!parsed.optimizedResumeText || typeof parsed.optimizedResumeText !== 'string') {
-      throw new Error('Invalid optimized resume response');
+      if (!parsed.optimizedResumeText || typeof parsed.optimizedResumeText !== 'string') {
+        throw new Error('Invalid optimized resume response');
+      }
+
+      const optimizedResumeData =
+        parsed.optimizedResumeData && typeof parsed.optimizedResumeData === 'object'
+          ? parsed.optimizedResumeData
+          : null;
+
+      return {
+        success: true,
+        headline: parsed.headline || 'ATS-ready revision prepared',
+        optimizedResumeText: parsed.optimizedResumeText,
+        optimizedResumeData,
+        keyChanges: Array.isArray(parsed.keyChanges) ? parsed.keyChanges : []
+      };
+    } catch (apiError) {
+      console.warn('Gemini uploaded optimization unavailable, returning local fallback draft');
+      return {
+        success: true,
+        ...optimizeUploadedResumeTextFallback(resumeText, atsInsights),
+      };
     }
-
-    const optimizedResumeData =
-      parsed.optimizedResumeData && typeof parsed.optimizedResumeData === 'object'
-        ? parsed.optimizedResumeData
-        : null;
-
-    return {
-      success: true,
-      headline: parsed.headline || 'ATS-ready revision prepared',
-      optimizedResumeText: parsed.optimizedResumeText,
-      optimizedResumeData,
-      keyChanges: Array.isArray(parsed.keyChanges) ? parsed.keyChanges : []
-    };
   } catch (error) {
     console.error('Optimize uploaded resume text error:', error.message);
     throw new Error(`Error optimizing uploaded resume text: ${error.message}`);
+  }
+};
+
+const parseResumeForBuilder = async (resumeText, originalName = '') => {
+  try {
+    if (!resumeText || typeof resumeText !== 'string') {
+      throw new Error('Resume text is required');
+    }
+
+    const prompt = PROMPTS.PARSE_RESUME_FOR_BUILDER(resumeText, originalName);
+
+    try {
+      const rawText = await callGeminiWithTimeout(prompt, {
+        timeoutMs: 25000,
+        retries: 2,
+        ...getResumeParsingGeminiOptions(),
+      });
+      const parsed = parseGeminiJSON(String(rawText));
+
+      if (!parsed || typeof parsed !== 'object' || !parsed.personalInfo) {
+        throw new Error('Invalid parsed resume response');
+      }
+
+      return {
+        success: true,
+        resumeData: groundImportedResumeData({
+          personalInfo: {
+            fullName: parsed.personalInfo?.fullName || '',
+            title: parsed.personalInfo?.title || '',
+            email: parsed.personalInfo?.email || '',
+            phone: parsed.personalInfo?.phone || '',
+            location: parsed.personalInfo?.location || '',
+            portfolio: parsed.personalInfo?.portfolio || '',
+          },
+          education: Array.isArray(parsed.education) ? parsed.education : [],
+          experience: Array.isArray(parsed.experience) ? parsed.experience : [],
+          skills: Array.isArray(parsed.skills) ? parsed.skills : [],
+          summary: parsed.summary || '',
+          customSections: Array.isArray(parsed.customSections) ? parsed.customSections : [],
+        }, resumeText, originalName),
+      };
+    } catch (apiError) {
+      console.warn('Gemini resume parsing unavailable, returning local fallback parse');
+      return {
+        success: true,
+        resumeData: groundImportedResumeData(buildImportedResumeData(resumeText, originalName), resumeText, originalName),
+      };
+    }
+  } catch (error) {
+    console.error('Parse resume for builder error:', error.message);
+    throw new Error(`Error parsing resume for builder: ${error.message}`);
   }
 };
 
@@ -480,5 +624,6 @@ module.exports = {
   diagnoseResume,
   optimizeResume,
   optimizeUploadedResumeText,
-  recommendJobsForResumeText
+  recommendJobsForResumeText,
+  parseResumeForBuilder
 };
