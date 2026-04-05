@@ -158,11 +158,11 @@ function CareerGuidance() {
   const jobsCount = jobsResult.length;
 
   return (
-    <main className="page-shell">
+    <main className="page-shell career-guidance-legacy">
       <div className="ambient-orb left-[-5rem] top-24 h-56 w-56 bg-cyan-400/20" />
       <div className="ambient-orb right-[-4rem] top-80 h-64 w-64 bg-blue-500/20 [animation-delay:1.3s]" />
 
-      <section className="hero-panel panel-grid overflow-hidden p-6 sm:p-8 lg:p-10">
+      <section className="hero-panel panel-grid reveal-soft overflow-hidden p-6 sm:p-8 lg:p-10">
         <div className="chrome-line" />
         <div className="spotlight-ring" />
         <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
@@ -174,6 +174,7 @@ function CareerGuidance() {
             <p className="mt-5 max-w-2xl text-base leading-8 text-slate-300">
               Upload your resume, uncover the skills it signals, discover relevant opportunities, and get focused guidance in one place.
             </p>
+
             <div className="mt-8 flex flex-wrap gap-3">
               <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-200">Resume insights</span>
               <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-200">Job discovery</span>
@@ -213,7 +214,7 @@ function CareerGuidance() {
         </div>
       </section>
 
-      <section className="mt-10 grid gap-8 xl:grid-cols-[1.02fr_0.98fr]">
+      <section className="reveal-up delay-2 mt-10 grid gap-8 xl:grid-cols-[1.02fr_0.98fr]">
         <div className="space-y-8">
           <article className="glass-card p-6 sm:p-8">
             <div className="flex flex-wrap items-center justify-between gap-4">

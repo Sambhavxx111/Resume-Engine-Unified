@@ -27,14 +27,14 @@ const upload = multer({
   },
 });
 
-// Protect all routes with auth middleware
+// POST /resume/import-file - Parse uploaded resume into builder structure
+router.post('/import-file', upload.single('file'), resumeController.importResumeFromFile);
+
+// Protect saved-resume routes with auth middleware
 router.use(authMiddleware);
 
 // GET /resume - Get user's resume
 router.get('/', resumeController.getResume);
-
-// POST /resume/import-file - Parse uploaded resume into builder structure
-router.post('/import-file', upload.single('file'), resumeController.importResumeFromFile);
 
 // POST /resume - Save/Update user's resume (validate payload)
 router.post('/', validateBody(resumeSchema), resumeController.saveResume);

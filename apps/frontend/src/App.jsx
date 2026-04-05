@@ -14,9 +14,21 @@ const Signup = lazy(() => import('./pages/Signup'));
 
 function App() {
   const location = useLocation();
+  const pageToneClass = (() => {
+    if (location.pathname === "/resume") return "tone-resume";
+    if (location.pathname === "/ats") return "tone-ats";
+    if (location.pathname === "/jd-match") return "tone-jd";
+    if (location.pathname === "/career-guidance") return "tone-career";
+    if (location.pathname === "/dashboard") return "tone-dashboard";
+    if (location.pathname === "/login" || location.pathname === "/signup") return "tone-auth";
+    return "tone-landing";
+  })();
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
+    <div className={`app-shell ${pageToneClass} min-h-screen bg-slate-50 text-slate-900`}>
+      <div className="page-vibe page-vibe-primary" />
+      <div className="page-vibe page-vibe-secondary" />
+      <div className="page-vibe page-vibe-tertiary" />
       <Navbar />
       <div key={location.pathname} className="route-stage">
         <Suspense

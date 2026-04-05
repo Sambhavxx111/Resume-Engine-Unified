@@ -59,33 +59,33 @@ function Landing() {
 
       <section className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:py-14">
         <div className="space-y-8">
-          <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-200 shadow-[0_18px_35px_rgba(34,211,238,0.12)]">
-            Design-led resume intelligence for ambitious applicants
+          <div className="reveal-up inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500 shadow-sm">
+            Resume intelligence for ambitious applicants
           </div>
-          <div className="space-y-5">
-            <h1 className="max-w-3xl text-5xl font-semibold tracking-tight text-white sm:text-6xl">
-              Build a sharper resume and measure how well it lands.
+          <div className="reveal-up delay-1 space-y-5">
+            <h1 className="max-w-4xl text-5xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-6xl lg:text-7xl">
+              Build a sharper resume with a cleaner, more production-ready workflow.
             </h1>
-            <p className="max-w-2xl text-lg leading-8 text-slate-300">
+            <p className="max-w-2xl text-[17px] font-medium leading-8 text-slate-500">
               Resume Engine blends a polished resume builder with ATS analysis, job description matching,
               and AI-powered optimization in one fast workflow.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="reveal-up delay-2 grid gap-4 sm:grid-cols-3">
             <div className="metric-tile">
-              <p className="text-xs uppercase tracking-[0.22em] text-cyan-300">Realtime</p>
-              <p className="mt-3 text-2xl font-semibold text-white">ATS + AI</p>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Realtime</p>
+              <p className="mt-3 text-2xl font-semibold text-slate-900">ATS + AI</p>
             </div>
             <div className="metric-tile">
-              <p className="text-xs uppercase tracking-[0.22em] text-cyan-300">Workflow</p>
-              <p className="mt-3 text-2xl font-semibold text-white">One Hub</p>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Workflow</p>
+              <p className="mt-3 text-2xl font-semibold text-slate-900">One Hub</p>
             </div>
             <div className="metric-tile">
-              <p className="text-xs uppercase tracking-[0.22em] text-cyan-300">Output</p>
-              <p className="mt-3 text-2xl font-semibold text-white">PDF Ready</p>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Output</p>
+              <p className="mt-3 text-2xl font-semibold text-slate-900">PDF Ready</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-4">
+          <div className="reveal-up delay-3 flex flex-wrap gap-4">
             <Link to="/dashboard" className="button-primary">
               Continue as Guest
             </Link>
@@ -98,37 +98,37 @@ function Landing() {
           </div>
         </div>
 
-        <div className="relative">
-          <div className="absolute inset-0 -translate-y-5 rounded-[2rem] bg-cyan-400/20 blur-3xl" />
+        <div className="reveal-soft delay-2 relative">
+          <div className="absolute inset-0 -translate-y-5 rounded-[2rem] bg-sky-100/80 blur-3xl" />
           <div className="hero-panel panel-grid p-6 shadow-glow">
             <div className="chrome-line" />
             <div className="spotlight-ring" />
-            <div className="animate-float rounded-[1.75rem] border border-white/10 bg-slate-900/80 p-6 shadow-[0_26px_65px_rgba(8,47,73,0.38)]">
+            <div className="animate-float rounded-[1.75rem] border border-slate-200 bg-white/90 p-6 shadow-[0_24px_60px_rgba(148,163,184,0.16)]">
               <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Live Snapshot</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-white">Candidate Readiness</h2>
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Live Snapshot</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-slate-900">Candidate Readiness</h2>
                 </div>
-                <div className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-center">
-                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-200">ATS Score</p>
-                  <p className="text-3xl font-bold text-white">89</p>
+                <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-3 text-center shadow-sm">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">ATS Score</p>
+                  <p className="mt-2 text-3xl font-bold text-slate-900">89</p>
                 </div>
               </div>
               <div className="space-y-4">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-sm text-slate-300">Summary quality</p>
-                  <div className="mt-3 h-3 rounded-full bg-slate-800">
-                    <div className="h-3 w-[82%] rounded-full bg-cyan-300" />
+                <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Summary quality</p>
+                  <div className="mt-3 h-3 rounded-full bg-slate-200">
+                    <div className="h-3 w-[82%] rounded-full bg-slate-900" />
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="metric-tile">
-                    <p className="text-sm text-slate-300">JD Match</p>
-                    <p className="mt-2 text-3xl font-semibold text-white">76%</p>
+                    <p className="text-sm text-slate-500">JD Match</p>
+                    <p className="mt-2 text-3xl font-semibold text-slate-900">76%</p>
                   </div>
                   <div className="metric-tile">
-                    <p className="text-sm text-slate-300">Missing Skills</p>
-                    <p className="mt-2 text-3xl font-semibold text-white">3</p>
+                    <p className="text-sm text-slate-500">Missing Skills</p>
+                    <p className="mt-2 text-3xl font-semibold text-slate-900">3</p>
                   </div>
                 </div>
               </div>
@@ -137,19 +137,21 @@ function Landing() {
         </div>
       </section>
 
-      <section className="mt-12 grid gap-6 md:grid-cols-3">
+      <section className="reveal-up delay-4 mt-12 grid gap-6 md:grid-cols-3">
         {features.map((feature) => (
           <Link
             key={feature.title}
             to={feature.to}
             className="feature-card"
           >
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 shadow-[0_14px_30px_rgba(34,211,238,0.14)]">
-              <feature.icon />
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[18px] border border-slate-200 bg-slate-900 shadow-sm">
+              <div className="text-white">
+                <feature.icon />
+              </div>
             </div>
-            <h3 className="text-xl font-semibold text-white">{feature.title}</h3>
-            <p className="mt-3 text-sm leading-6 text-slate-300">{feature.description}</p>
-            <div className="mt-5 inline-flex items-center text-sm font-semibold text-cyan-300">
+            <h3 className="text-xl font-semibold text-slate-900">{feature.title}</h3>
+            <p className="mt-3 text-sm leading-6 text-slate-500">{feature.description}</p>
+            <div className="mt-5 inline-flex items-center text-sm font-semibold text-slate-900">
               {feature.cta}
             </div>
           </Link>

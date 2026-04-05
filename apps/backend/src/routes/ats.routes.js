@@ -26,14 +26,14 @@ const upload = multer({
   },
 });
 
-// Protect all routes with auth middleware
-router.use(authMiddleware);
-
-// POST /ats/score - Score resume
-router.post('/score', atsController.scoreResume);
-
 // POST /ats/score-file - Score uploaded resume
 router.post('/score-file', upload.single('resume'), atsController.scoreUploadedResume);
+
+// Protect saved-resume and gated ATS routes with auth middleware
+router.use(authMiddleware);
+
+// POST /ats/score - Score saved resume
+router.post('/score', atsController.scoreResume);
 
 // POST /ats/optimize-file - Optimize uploaded resume
 router.post('/optimize-file', upload.single('resume'), atsController.optimizeUploadedResume);

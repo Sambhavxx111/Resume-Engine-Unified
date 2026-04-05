@@ -89,26 +89,26 @@ function JDMatcher() {
       <div className="ambient-orb right-[-4rem] top-72 h-60 w-60 bg-blue-500/20 [animation-delay:2s]" />
 
       <section className="grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
-        <div className="hero-panel panel-grid p-6 sm:p-8">
+        <div className="hero-panel panel-grid reveal-soft p-6 sm:p-8">
           <div className="chrome-line" />
-          <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Job Description Matcher</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
+          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Job Description Matcher</p>
+          <h1 className="mt-3 max-w-2xl text-4xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-5xl">
             Compare your resume against a target role
           </h1>
-          <p className="mt-4 text-base leading-7 text-slate-300">
+          <p className="mt-4 max-w-2xl text-[17px] leading-8 text-slate-500">
             Upload your resume, paste the target job description, and get a direct read on keyword overlap, missing requirements, and fit.
           </p>
           <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <label className="glass-card block p-5">
-              <span className="block text-sm uppercase tracking-[0.24em] text-cyan-300">Resume Upload</span>
-              <span className="mt-3 block text-sm text-slate-300">PDF, DOC, or DOCX resume</span>
+              <span className="block text-[11px] uppercase tracking-[0.22em] text-slate-500">Resume Upload</span>
+              <span className="mt-3 block text-sm text-slate-500">PDF, DOC, or DOCX resume</span>
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
                 className="mt-5 block w-full text-sm text-slate-300 file:mr-4 file:rounded-full file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-medium file:text-slate-950"
                 onChange={(event) => setResumeFile(event.target.files?.[0] || null)}
               />
-              {resumeFile ? <span className="mt-4 block text-sm text-white">{resumeFile.name}</span> : null}
+              {resumeFile ? <span className="mt-4 block text-sm text-slate-900">{resumeFile.name}</span> : null}
             </label>
 
             <textarea
@@ -124,13 +124,17 @@ function JDMatcher() {
               </div>
             ) : null}
 
-            <button type="submit" className="button-primary w-full" disabled={loading}>
+            <button
+              type="submit"
+              className="inline-flex w-full items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={loading}
+            >
               {loading ? <Loader label="Matching..." /> : "Analyze Resume Against JD"}
             </button>
           </form>
         </div>
 
-        <div className="hero-panel panel-grid p-6 sm:p-8">
+        <div className="hero-panel panel-grid reveal-soft delay-2 p-6 sm:p-8">
           <div className="chrome-line" />
           <h2 className="section-title">Match Results</h2>
 
@@ -149,8 +153,8 @@ function JDMatcher() {
           {result ? (
             <div className="mt-6 space-y-5">
               <div className="glass-card p-6">
-                <p className="text-sm uppercase tracking-[0.24em] text-cyan-300">Match Percentage</p>
-                <p className="mt-3 text-5xl font-bold text-white">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Match Percentage</p>
+                <p className="mt-3 text-5xl font-bold text-slate-900">
                   {formatMatchPercentage(result.matchPercentage, result.matchScore)}
                 </p>
                 {result.fileName ? (
@@ -159,7 +163,7 @@ function JDMatcher() {
               </div>
 
               <div className="glass-card p-6">
-                <h3 className="text-lg font-semibold text-white">Matched Keywords</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Matched Keywords</h3>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {Array.isArray(result.matchedKeywords) && result.matchedKeywords.length ? (
                     result.matchedKeywords.map((keyword) => (
@@ -174,7 +178,7 @@ function JDMatcher() {
               </div>
 
               <div className="glass-card p-6">
-                <h3 className="text-lg font-semibold text-white">Missing Keywords</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Missing Keywords</h3>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {Array.isArray(result.missingKeywords) && result.missingKeywords.length ? (
                     result.missingKeywords.map((keyword) => (
@@ -190,7 +194,7 @@ function JDMatcher() {
 
               {result.summary ? (
                 <div className="glass-card p-6">
-                  <h3 className="text-lg font-semibold text-white">Analysis Summary</h3>
+                  <h3 className="text-lg font-semibold text-slate-900">Analysis Summary</h3>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className="metric-tile text-sm text-slate-200">
                       Matched requirements: {result.summary.matched ?? "--"} / {result.summary.total ?? "--"}
@@ -210,8 +214,8 @@ function JDMatcher() {
 
               {result.recommendations ? (
                 <div className="glass-card p-6">
-                  <h3 className="text-lg font-semibold text-white">Recommendation</h3>
-                  <p className="mt-4 text-sm leading-6 text-slate-300">{result.recommendations}</p>
+                  <h3 className="text-lg font-semibold text-slate-900">Recommendation</h3>
+                  <p className="mt-4 text-sm leading-6 text-slate-500">{result.recommendations}</p>
                 </div>
               ) : null}
             </div>

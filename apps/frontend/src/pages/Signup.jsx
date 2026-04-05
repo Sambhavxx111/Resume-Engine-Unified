@@ -65,18 +65,22 @@ function Signup() {
           <input className="field" type="password" name="password" placeholder="Password" minLength={6} value={formState.password} onChange={handleChange} required />
 
           {error ? (
-            <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-[0_10px_24px_rgba(244,63,94,0.08)]">
               {error}
             </div>
           ) : null}
 
           {info ? (
-            <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 shadow-[0_10px_24px_rgba(245,158,11,0.08)]">
               {info}
             </div>
           ) : null}
 
-          <button type="submit" className="button-primary w-full" disabled={authLoading}>
+          <button
+            type="submit"
+            className="inline-flex w-full items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={authLoading}
+          >
             {authLoading ? <Loader label="Creating account..." /> : "Signup"}
           </button>
         </form>

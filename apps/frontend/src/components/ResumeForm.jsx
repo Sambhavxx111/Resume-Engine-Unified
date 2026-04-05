@@ -736,7 +736,7 @@ function ResumeForm({
         </div>
 
         {error ? (
-          <div className="mb-4 rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <div className="mb-4 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-[0_10px_24px_rgba(244,63,94,0.08)]">
             {error}
           </div>
         ) : null}
@@ -747,20 +747,20 @@ function ResumeForm({
           </div>
         ) : null}
 
-        <div className="mb-8 rounded-3xl border border-cyan-300/15 bg-gradient-to-br from-cyan-400/10 via-slate-900/85 to-slate-900 p-5 shadow-[0_20px_50px_rgba(8,47,73,0.18)]">
+        <div className="mb-8 rounded-[30px] border border-slate-200 bg-gradient-to-br from-sky-50 via-white to-slate-50 p-6 shadow-[0_24px_60px_rgba(148,163,184,0.14)]">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
-              <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Import Existing Resume</p>
-              <h3 className="mt-2 text-xl font-semibold text-white">Upload a resume and continue upgrading it here</h3>
-              <p className="mt-3 text-sm leading-6 text-slate-300">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Import Existing Resume</p>
+              <h3 className="mt-2 text-2xl font-semibold text-slate-900">Upload a resume and continue upgrading it here</h3>
+              <p className="mt-3 text-sm leading-6 text-slate-500">
                 Bring in your current PDF, DOCX, or TXT resume. We will extract the visible content into the
                 builder so you can refine sections, improve wording, and use the existing AI tools without
                 rebuilding everything from scratch.
               </p>
             </div>
             <div className="w-full max-w-xl space-y-4">
-              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-                <span className="block text-sm text-slate-300">Choose a resume file to import</span>
+              <div className="rounded-[22px] border border-slate-200 bg-white/90 p-4">
+                <span className="block text-sm font-medium text-slate-600">Choose a resume file to import</span>
                 <input
                   type="file"
                   accept=".pdf,.docx,.txt"
@@ -768,14 +768,14 @@ function ResumeForm({
                   onChange={(event) => onImportFileChange(event.target.files?.[0] || null)}
                 />
                 {importFile ? (
-                  <span className="mt-4 block text-sm text-white">{importFile.name}</span>
+                  <span className="mt-4 block text-sm text-slate-900">{importFile.name}</span>
                 ) : (
                   <span className="mt-4 block text-sm text-slate-400">No file selected yet.</span>
                 )}
               </div>
               <button
                 type="button"
-                className="button-primary w-full"
+                className="inline-flex w-full items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white"
                 disabled={importLoading}
                 onClick={onImportResume}
               >
@@ -785,11 +785,11 @@ function ResumeForm({
           </div>
         </div>
 
-        <div className="mb-8 rounded-3xl border border-white/10 bg-slate-900/70 p-5">
+        <div className="mb-8 rounded-[30px] border border-slate-200 bg-white/90 p-6 shadow-[0_18px_45px_rgba(148,163,184,0.12)]">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-white">ATS-Friendly Templates</h3>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+              <h3 className="text-xl font-semibold text-slate-900">ATS-Friendly Templates</h3>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
                 Pick one of five layouts designed to stay readable for recruiters while keeping a
                 straightforward structure for ATS parsing and PDF export.
               </p>
@@ -805,23 +805,23 @@ function ResumeForm({
                   onClick={() => setFormData((prev) => ({ ...prev, template: template.id }))}
                   className={`flex min-h-[15.5rem] flex-col rounded-3xl border p-4 text-left transition ${
                     active
-                      ? "border-cyan-300/60 bg-cyan-400/10 shadow-[0_18px_45px_rgba(34,211,238,0.14)]"
-                      : "border-white/10 bg-slate-950/40 hover:border-cyan-300/30 hover:bg-slate-900/80"
+                      ? "border-slate-900 bg-slate-50 shadow-[0_18px_45px_rgba(15,23,42,0.08)]"
+                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                   }`}
                 >
                   <div className={`mb-4 rounded-[1.4rem] bg-gradient-to-br p-[1px] ${template.accent}`}>
                     <TemplateThumbnail templateId={template.id} />
                   </div>
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-semibold text-white">{template.name}</p>
+                    <p className="text-sm font-semibold text-slate-900">{template.name}</p>
                     {template.recommended ? (
-                      <span className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200">
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
                         Recommended
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-2 min-h-[4.75rem] text-xs leading-5 text-slate-300">{template.blurb}</p>
-                  <p className="mt-auto pt-4 text-[11px] font-medium uppercase tracking-[0.24em] text-cyan-300">
+                  <p className="mt-2 min-h-[4.75rem] text-xs leading-5 text-slate-500">{template.blurb}</p>
+                  <p className="mt-auto pt-4 text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">
                     {active ? "Selected" : "Use Template"}
                   </p>
                 </button>
@@ -832,8 +832,8 @@ function ResumeForm({
 
         <div className="grid gap-8 xl:grid-cols-[0.7fr_0.95fr_1.35fr]">
           <div className="space-y-8">
-            <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-5">
-              <h3 className="mb-4 text-lg font-semibold text-white">Personal Info</h3>
+            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
+              <h3 className="mb-4 text-lg font-semibold text-slate-900">Personal Info</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <input className="field" name="fullName" placeholder="Full name" value={formData.personalInfo.fullName} onChange={updatePersonalInfo} />
                 <input className="field" name="title" placeholder="Professional title" value={formData.personalInfo.title} onChange={updatePersonalInfo} />
@@ -844,19 +844,19 @@ function ResumeForm({
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-5">
+            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-white">Education</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Education</h3>
                 <button type="button" className="button-secondary" onClick={() => addCollectionItem("education", blankEducation)}>
                   Add Education
                 </button>
               </div>
               <div className="space-y-4">
                 {formData.education.map((item, index) => (
-                  <div key={`education-${index}`} className="rounded-2xl border border-white/10 p-4">
+                  <div key={`education-${index}`} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
                     <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-medium text-cyan-200">Entry {index + 1}</p>
-                      <button type="button" className="text-sm text-rose-200 transition hover:text-rose-100" onClick={() => removeCollectionItem("education", index)}>
+                      <p className="text-sm font-medium text-slate-600">Entry {index + 1}</p>
+                      <button type="button" className="text-sm text-rose-500 transition hover:text-rose-600" onClick={() => removeCollectionItem("education", index)}>
                         Remove
                       </button>
                     </div>
@@ -874,19 +874,19 @@ function ResumeForm({
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-5">
+            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-white">Experience</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Experience</h3>
                 <button type="button" className="button-secondary" onClick={() => addCollectionItem("experience", blankExperience)}>
                   Add Experience
                 </button>
               </div>
               <div className="space-y-4">
                 {formData.experience.map((item, index) => (
-                  <div key={`experience-${index}`} className="rounded-2xl border border-white/10 p-4">
+                  <div key={`experience-${index}`} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
                     <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-medium text-cyan-200">Role {index + 1}</p>
-                      <button type="button" className="text-sm text-rose-200 transition hover:text-rose-100" onClick={() => removeCollectionItem("experience", index)}>
+                      <p className="text-sm font-medium text-slate-600">Role {index + 1}</p>
+                      <button type="button" className="text-sm text-rose-500 transition hover:text-rose-600" onClick={() => removeCollectionItem("experience", index)}>
                         Remove
                       </button>
                     </div>
@@ -904,9 +904,9 @@ function ResumeForm({
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-5">
+            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-white">Additional Sections</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Additional Sections</h3>
                 <button type="button" className="button-secondary" onClick={addCustomSection}>
                   Add Section
                 </button>
@@ -916,13 +916,13 @@ function ResumeForm({
                   formData.customSections.map((section, sectionIndex) => (
                     <div
                       key={`custom-section-${sectionIndex}`}
-                      className="rounded-2xl border border-white/10 p-4"
+                      className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4"
                     >
                       <div className="mb-3 flex items-center justify-between">
-                        <p className="text-sm font-medium text-cyan-200">Custom Section {sectionIndex + 1}</p>
+                        <p className="text-sm font-medium text-slate-600">Custom Section {sectionIndex + 1}</p>
                         <button
                           type="button"
-                          className="text-sm text-rose-200 transition hover:text-rose-100"
+                          className="text-sm text-rose-500 transition hover:text-rose-600"
                           onClick={() => removeCustomSection(sectionIndex)}
                         >
                           Remove
@@ -977,13 +977,13 @@ function ResumeForm({
           </div>
 
           <aside className="space-y-6">
-            <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-5">
-              <h3 className="mb-4 text-lg font-semibold text-white">Professional Summary</h3>
+            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
+              <h3 className="mb-4 text-lg font-semibold text-slate-900">Professional Summary</h3>
               <textarea className="field min-h-44" placeholder="Write a concise, impact-focused professional summary" value={formData.summary} onChange={(event) => setFormData((prev) => ({ ...prev, summary: event.target.value }))} />
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-5">
-              <h3 className="mb-4 text-lg font-semibold text-white">Skills</h3>
+            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
+              <h3 className="mb-4 text-lg font-semibold text-slate-900">Skills</h3>
               <div className="flex gap-3">
                 <input
                   className="field"
@@ -997,14 +997,18 @@ function ResumeForm({
                     }
                   }}
                 />
-                <button type="button" className="button-primary" onClick={addSkill}>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white"
+                  onClick={addSkill}
+                >
                   Add
                 </button>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {formData.skills.length ? (
                   formData.skills.map((skill, index) => (
-                    <button key={`${skill}-${index}`} type="button" className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-100" onClick={() => removeSkill(index)}>
+                    <button key={`${skill}-${index}`} type="button" className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700" onClick={() => removeSkill(index)}>
                       {skill} x
                     </button>
                   ))
@@ -1014,27 +1018,32 @@ function ResumeForm({
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-400/15 to-slate-900 p-5">
-              <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Ready to ship</p>
-              <h3 className="mt-2 text-xl font-semibold text-white">
+            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Ready to ship</p>
+              <h3 className="mt-2 text-xl font-semibold text-slate-900">
                 Save once, reuse across ATS analysis and job matching
               </h3>
-              <p className="mt-3 text-sm leading-6 text-slate-300">
+              <p className="mt-3 text-sm leading-6 text-slate-500">
                 The selected template is saved with your resume and used for the live preview and PDF download.
               </p>
-              <button type="button" className="button-primary mt-6 w-full" disabled={loading} onClick={onSave}>
+              <button
+                type="button"
+                className="mt-6 inline-flex w-full items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={loading}
+                onClick={onSave}
+              >
                 {loading ? <Loader label="Saving resume..." /> : "Save Resume"}
               </button>
             </div>
 
             {aiInsights ? (
-              <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-5">
-                <h3 className="mb-4 text-lg font-semibold text-white">{aiInsights.title}</h3>
+              <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
+                <h3 className="mb-4 text-lg font-semibold text-slate-900">{aiInsights.title}</h3>
                 <div className="grid max-h-[24rem] gap-3 overflow-y-auto pr-1">
                   {aiInsights.lines.map((line, index) => (
                     <div
                       key={`${aiInsights.title}-${index}`}
-                      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                      className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
                     >
                       {line}
                     </div>
@@ -1045,9 +1054,9 @@ function ResumeForm({
           </aside>
 
           <aside className="space-y-6">
-            <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5">
-              <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Live Preview</p>
-              <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">
+            <div className="rounded-[28px] border border-slate-200 bg-white/92 p-5 shadow-[0_22px_50px_rgba(148,163,184,0.14)]">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Live Preview</p>
+              <p className="mt-2 text-[11px] uppercase tracking-[0.22em] text-slate-400">
                 {TEMPLATE_OPTIONS.find((template) => template.id === formData.template)?.name ||
                   TEMPLATE_OPTIONS.find((template) => template.id === normalizedTemplate)?.name ||
                   "Contemporary"}

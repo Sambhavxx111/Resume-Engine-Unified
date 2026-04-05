@@ -110,18 +110,18 @@ function ATSAnalysis() {
       <div className="ambient-orb right-[-4rem] top-56 h-60 w-60 bg-blue-500/20 [animation-delay:1s]" />
 
       <section className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
-        <div className="hero-panel panel-grid p-6 sm:p-8">
+        <div className="hero-panel panel-grid reveal-soft p-6 sm:p-8">
           <div className="chrome-line" />
-          <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">ATS Analyzer</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
+          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">ATS Analyzer</p>
+          <h1 className="mt-3 max-w-2xl text-4xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-5xl">
             Upload your resume for a compatibility check
           </h1>
-          <p className="mt-4 text-base leading-7 text-slate-300">
+          <p className="mt-4 max-w-2xl text-[17px] leading-8 text-slate-500">
             Review how your resume reads in an ATS-style scan, then download an optimized version if you want a stronger draft to work from.
           </p>
           <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <label className="glass-card block p-5">
-              <span className="block text-sm text-slate-300">Select PDF or DOC file</span>
+              <span className="block text-sm font-medium text-slate-600">Select PDF or DOC file</span>
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
@@ -136,13 +136,17 @@ function ATSAnalysis() {
               </div>
             ) : null}
 
-            <button type="submit" className="button-primary w-full" disabled={loading}>
+            <button
+              type="submit"
+              className="inline-flex w-full items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={loading}
+            >
               {loading ? <Loader label="Analyzing resume..." /> : "Run ATS Analysis"}
             </button>
 
             <button
               type="button"
-              className="button-secondary w-full"
+              className="inline-flex w-full items-center justify-center rounded-[20px] border border-cyan-300/80 bg-[linear-gradient(135deg,rgba(8,47,73,0.98),rgba(14,116,144,0.96)_52%,rgba(34,211,238,0.88))] px-5 py-3.5 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_20px_40px_rgba(8,47,73,0.24)] transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-[0_24px_48px_rgba(8,47,73,0.28)] hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!file || optimizing || loading}
               onClick={handleOptimizeUploadedResume}
             >
@@ -151,7 +155,7 @@ function ATSAnalysis() {
           </form>
         </div>
 
-        <div className="hero-panel panel-grid p-6 sm:p-8">
+        <div className="hero-panel panel-grid reveal-soft delay-2 p-6 sm:p-8">
           <div className="chrome-line" />
           <h2 className="section-title">Analysis Result</h2>
 
@@ -170,14 +174,14 @@ function ATSAnalysis() {
           {result ? (
             <div className="mt-6 space-y-6">
               <div className="glass-card p-6">
-                <p className="text-sm uppercase tracking-[0.24em] text-emerald-300">ATS Score</p>
-                <p className="mt-3 text-5xl font-bold text-white">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">ATS Score</p>
+                <p className="mt-3 text-5xl font-bold text-slate-900">
                   {result.totalScore ?? result.score ?? "--"}
                 </p>
               </div>
 
               <div className="glass-card p-6">
-                <h3 className="text-lg font-semibold text-white">Suggestions</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Suggestions</h3>
                 <div className="mt-4 space-y-3">
                   {Array.isArray(result.suggestions) && result.suggestions.length ? (
                     result.suggestions.map((suggestion, index) => (
@@ -215,20 +219,20 @@ function ATSAnalysis() {
                 <div className="glass-card p-6">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-white">Optimized Resume Downloaded</h3>
-                      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                      <h3 className="text-lg font-semibold text-slate-900">Optimized Resume Downloaded</h3>
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
                         {optimizedUpload.headline ||
                           "Your ATS-optimized resume draft has been generated and downloaded."}
                       </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="metric-tile px-4 py-3 text-center">
-                        <p className="text-xs uppercase tracking-[0.2em] text-emerald-300">Before</p>
-                        <p className="mt-1 text-3xl font-bold text-white">{optimizedUpload.originalScore ?? "--"}</p>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Before</p>
+                        <p className="mt-1 text-3xl font-bold text-slate-900">{optimizedUpload.originalScore ?? "--"}</p>
                       </div>
                       <div className="metric-tile px-4 py-3 text-center">
-                        <p className="text-xs uppercase tracking-[0.2em] text-emerald-300">After</p>
-                        <p className="mt-1 text-3xl font-bold text-white">{optimizedUpload.optimizedScore ?? "--"}</p>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">After</p>
+                        <p className="mt-1 text-3xl font-bold text-slate-900">{optimizedUpload.optimizedScore ?? "--"}</p>
                       </div>
                     </div>
                   </div>

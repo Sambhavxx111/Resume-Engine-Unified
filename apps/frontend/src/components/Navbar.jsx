@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const navLinks = [
@@ -12,6 +14,23 @@ const navLinks = [
 function Navbar() {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [isScrolled, setIsScrolled] = useState(false);
+  const isCareerGuidance = location.pathname === "/career-guidance";
+  const useDarkCareerNavbar = isCareerGuidance && isScrolled;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 72);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -19,10 +38,16 @@ function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/65 backdrop-blur-2xl">
-      <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
+    <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
+      <div
+        className={`nav-shell mx-auto grid w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[26px] px-4 py-3 backdrop-blur-2xl sm:px-6 ${
+          useDarkCareerNavbar
+            ? "border border-slate-600/70 bg-slate-900/82 shadow-[0_20px_60px_rgba(2,6,23,0.42)]"
+            : "border border-slate-200/90 bg-white/82 shadow-[0_20px_60px_rgba(148,163,184,0.15)]"
+        }`}
+      >
         <Link to="/" className="flex flex-shrink-0 items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/25 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/95 shadow-glow">
+          <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-slate-900 shadow-sm transition duration-200 hover:scale-[1.03]">
             <svg viewBox="0 0 64 64" className="h-8 w-8 drop-shadow-[0_6px_16px_rgba(34,211,238,0.18)]" aria-hidden="true">
               <defs>
                 <linearGradient id="resume-engine-gear" x1="12%" y1="12%" x2="88%" y2="88%">
@@ -52,8 +77,8 @@ function Navbar() {
             </svg>
           </div>
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.32em] text-cyan-300">Resume Engine</p>
-            <p className="text-sm text-slate-300">Resume Builder + ATS + Career Guidance</p>
+            <p className={`text-[11px] font-semibold uppercase tracking-[0.28em] ${useDarkCareerNavbar ? "text-slate-400" : "text-slate-500"}`}>Resume Engine</p>
+            <p className={`text-sm font-bold ${useDarkCareerNavbar ? "text-white" : "text-slate-900"}`}>Resume Builder + ATS + Career Guidance</p>
           </div>
         </Link>
 
@@ -63,10 +88,12 @@ function Navbar() {
                 key={link.to}
                 to={link.to}
                 className={({ isActive }) =>
-                  `rounded-full px-4 py-2 text-sm font-medium transition ${
+                  `rounded-full px-4 py-2 text-[14px] font-semibold transition ${
                     isActive
-                      ? 'bg-gradient-to-r from-cyan-400/20 to-blue-500/20 text-white shadow-[0_12px_24px_rgba(34,211,238,0.14)]'
-                      : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : useDarkCareerNavbar
+                        ? 'text-slate-300 hover:bg-white/10 hover:text-white'
+                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'
                   }`
                 }
               >
@@ -82,10 +109,14 @@ function Navbar() {
             </button>
           ) : (
             <>
-              <span className="hidden rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-2 text-xs font-medium uppercase tracking-[0.2em] text-cyan-200 sm:inline-flex">
+              <span className={`hidden rounded-full px-3 py-2 text-xs font-medium uppercase tracking-[0.2em] sm:inline-flex ${
+                useDarkCareerNavbar
+                  ? "border border-slate-600 bg-slate-800/90 text-slate-300"
+                  : "border border-slate-200 bg-slate-50 text-slate-500"
+              }`}>
                 Guest Mode
               </span>
-              <Link to="/login" className="button-secondary">Login</Link>
+              <Link to="/login" className={useDarkCareerNavbar ? "button-secondary border-white/15 bg-white/10 text-white hover:bg-white/15" : "button-secondary"}>Login</Link>
               <Link to="/signup" className="button-primary hidden sm:inline-flex">Get Started</Link>
             </>
           )}

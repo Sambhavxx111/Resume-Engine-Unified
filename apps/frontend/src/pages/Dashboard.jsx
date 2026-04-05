@@ -55,39 +55,39 @@ function Dashboard() {
       <div className="ambient-orb left-[-5rem] top-24 h-60 w-60 bg-cyan-400/20" />
       <div className="ambient-orb right-[-4rem] top-56 h-64 w-64 bg-blue-500/20 [animation-delay:1.5s]" />
 
-      <section className="hero-panel panel-grid overflow-hidden p-8 sm:p-10">
+      <section className="hero-panel panel-grid reveal-soft overflow-hidden p-8 sm:p-10">
         <div className="chrome-line" />
         <div className="spotlight-ring" />
         <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Dashboard</p>
-            <h1 className="mt-3 max-w-2xl text-4xl font-semibold tracking-tight text-white">
-              Everything you need to go from resume draft to application-ready and career-guided.
+            <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Dashboard</p>
+            <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-5xl">
+              Everything you need to move from resume draft to application-ready.
             </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
+            <p className="mt-4 max-w-2xl text-[17px] leading-8 text-slate-500">
               Use the builder to shape your experience, run ATS scans for compatibility, and continue straight into job discovery and career coaching.
             </p>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 shadow-[0_26px_65px_rgba(8,47,73,0.34)]">
-            <p className="text-sm text-slate-300">Workflow readiness</p>
+          <div className="rounded-[28px] border border-slate-200 bg-white/92 p-6 shadow-[0_22px_60px_rgba(148,163,184,0.12)]">
+            <p className="text-sm font-medium text-slate-700">Workflow readiness</p>
             <div className="mt-4 space-y-4">
               <div className="metric-tile">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-300">Resume completeness</span>
-                  <span className="text-lg font-semibold text-white">High</span>
+                  <span className="text-sm font-medium text-slate-700">Resume completeness</span>
+                  <span className="text-lg font-semibold text-slate-900">High</span>
                 </div>
               </div>
               <div className="metric-tile">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-300">ATS insights</span>
-                  <span className="text-lg font-semibold text-white">Ready</span>
+                  <span className="text-sm font-medium text-slate-700">ATS insights</span>
+                  <span className="text-lg font-semibold text-slate-900">Ready</span>
                 </div>
               </div>
               <div className="metric-tile">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-300">Career guidance</span>
-                  <span className="text-lg font-semibold text-white">Connected</span>
+                  <span className="text-sm font-medium text-slate-700">Career guidance</span>
+                  <span className="text-lg font-semibold text-slate-900">Connected</span>
                 </div>
               </div>
             </div>
@@ -95,14 +95,16 @@ function Dashboard() {
         </div>
       </section>
 
-      <section className="mt-10 grid gap-6 lg:grid-cols-3">
+      <section className="reveal-up delay-2 mt-10 grid gap-6 lg:grid-cols-3">
         {cards.map((card) => (
           <article key={card.title} className="feature-card">
-            <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 shadow-glow">
-              <card.icon />
+            <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-[18px] border border-slate-200 bg-slate-900 shadow-sm">
+              <div className="text-white">
+                <card.icon />
+              </div>
             </div>
-            <h2 className="text-2xl font-semibold text-white">{card.title}</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">{card.description}</p>
+            <h2 className="text-2xl font-semibold text-slate-900">{card.title}</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{card.description}</p>
             <Link to={card.to} className="button-primary mt-6">
               {card.cta}
             </Link>

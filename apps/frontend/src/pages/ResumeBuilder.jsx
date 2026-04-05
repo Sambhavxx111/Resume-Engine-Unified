@@ -335,26 +335,28 @@ function ResumeBuilder() {
   return (
     <main className="page-shell">
       {loadingResume ? (
-        <div className="glass-card flex min-h-[300px] items-center justify-center p-8">
+        <div className="glass-card reveal-soft flex min-h-[300px] items-center justify-center p-8">
           <Loader label="Fetching your resume..." />
         </div>
       ) : (
-        <ResumeForm
-          formData={formData}
-          setFormData={setFormData}
-          onSave={handleSave}
-          onAIAction={handleAIAction}
-          onImportResume={handleImportResume}
-          onImportFileChange={setResumeImportFile}
-          importFile={resumeImportFile}
-          importLoading={importingResume}
-          loading={saving}
-          aiLoading={aiLoading}
-          error={error}
-          successMessage={successMessage}
-          aiInsights={aiInsights}
-          previewRef={previewRef}
-        />
+        <div className="reveal-up delay-1">
+          <ResumeForm
+            formData={formData}
+            setFormData={setFormData}
+            onSave={handleSave}
+            onAIAction={handleAIAction}
+            onImportResume={handleImportResume}
+            onImportFileChange={setResumeImportFile}
+            importFile={resumeImportFile}
+            importLoading={importingResume}
+            loading={saving}
+            aiLoading={aiLoading}
+            error={error}
+            successMessage={successMessage}
+            aiInsights={aiInsights}
+            previewRef={previewRef}
+          />
+        </div>
       )}
     </main>
   );
