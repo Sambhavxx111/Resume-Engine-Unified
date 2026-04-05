@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import axiosInstance from "../api/axios";
 import { API } from "../api/services";
 import Loader from "../components/Loader";
+import { useAuth } from "../context/AuthContext";
 
 const formatMatchPercentage = (value, fallbackScore) => {
   if (typeof value === "string" && value.trim()) {
@@ -20,6 +22,9 @@ const formatMatchPercentage = (value, fallbackScore) => {
 };
 
 function JDMatcher() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
   const [jobDescription, setJobDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -36,6 +41,16 @@ function JDMatcher() {
 
     if (!jobDescription.trim()) {
       setError("Please paste a job description before running the matcher.");
+      return;
+    }
+
+    if (!isAuthenticated) {
+      navigate("/login", {
+        state: {
+          from: location,
+          authPrompt: "Please log in with your personal email to analyze your resume against a job description.",
+        },
+      });
       return;
     }
 
@@ -83,7 +98,6 @@ function JDMatcher() {
           <p className="mt-4 text-base leading-7 text-slate-300">
             Upload your resume, paste the target job description, and get a direct read on keyword overlap, missing requirements, and fit.
           </p>
-
           <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <label className="glass-card block p-5">
               <span className="block text-sm uppercase tracking-[0.24em] text-cyan-300">Resume Upload</span>

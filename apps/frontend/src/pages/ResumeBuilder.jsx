@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import axiosInstance from "../api/axios";
 import { API } from "../api/services";
 import Loader from "../components/Loader";
 import ResumeForm from "../components/ResumeForm";
 import { exportResumePdf } from "../utils/pdf";
+import { useAuth } from "../context/AuthContext";
 
 const TEMPLATE_ID_ALIASES = {
   "executive-edge": "contemporary",
@@ -71,6 +73,9 @@ const defaultResumeState = {
 };
 
 function ResumeBuilder() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
   const [formData, setFormData] = useState(defaultResumeState);
   const [loadingResume, setLoadingResume] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -84,6 +89,11 @@ function ResumeBuilder() {
 
   useEffect(() => {
     const fetchResume = async () => {
+      if (!isAuthenticated) {
+        setLoadingResume(false);
+        return;
+      }
+
       setLoadingResume(true);
       setError("");
 
@@ -123,9 +133,23 @@ function ResumeBuilder() {
     };
 
     fetchResume();
-  }, []);
+  }, [isAuthenticated]);
+
+  const redirectToLogin = (authPrompt) => {
+    navigate("/login", {
+      state: {
+        from: location,
+        authPrompt,
+      },
+    });
+  };
 
   const handleSave = async () => {
+    if (!isAuthenticated) {
+      redirectToLogin("Please log in with your personal email to save your resume.");
+      return;
+    }
+
     setSaving(true);
     setError("");
     setSuccessMessage("");

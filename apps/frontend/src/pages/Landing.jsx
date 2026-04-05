@@ -86,11 +86,14 @@ function Landing() {
             </div>
           </div>
           <div className="flex flex-wrap gap-4">
-            <Link to="/signup" className="button-primary">
-              Start Free
+            <Link to="/dashboard" className="button-primary">
+              Continue as Guest
+            </Link>
+            <Link to="/signup" className="button-secondary">
+              Create Account
             </Link>
             <Link to="/login" className="button-secondary">
-              Sign In
+              Login
             </Link>
           </div>
         </div>

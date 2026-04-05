@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import axios from "axios";
+import { useLocation, useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
 import { CAREER_API, getCareerServiceBaseUrl } from "../api/careerService";
+import { useAuth } from "../context/AuthContext";
 
 const promptOptions = [
   "Which roles should I target with this resume?",
@@ -36,6 +38,9 @@ function buildCoachContext({ chatContext, resumeResult, jobsResult, jobLocation 
 }
 
 function CareerGuidance() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
   const baseURL = useMemo(() => getCareerServiceBaseUrl(), []);
   const [resumeFile, setResumeFile] = useState(null);
   const [resumeResult, setResumeResult] = useState(null);
@@ -88,6 +93,16 @@ function CareerGuidance() {
   const findJobs = async () => {
     if (!resumeResult?.skills?.length) {
       setJobsError("Upload a resume first so we can match you with the right roles.");
+      return;
+    }
+
+    if (!isAuthenticated) {
+      navigate("/login", {
+        state: {
+          from: location,
+          authPrompt: "Please log in with your personal email to find matching roles in Career Guidance.",
+        },
+      });
       return;
     }
 
@@ -159,7 +174,6 @@ function CareerGuidance() {
             <p className="mt-5 max-w-2xl text-base leading-8 text-slate-300">
               Upload your resume, uncover the skills it signals, discover relevant opportunities, and get focused guidance in one place.
             </p>
-
             <div className="mt-8 flex flex-wrap gap-3">
               <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-200">Resume insights</span>
               <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-200">Job discovery</span>

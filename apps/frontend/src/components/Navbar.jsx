@@ -1,7 +1,7 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const protectedLinks = [
+const navLinks = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/resume', label: 'Resume Builder' },
   { to: '/ats', label: 'ATS Analyzer' },
@@ -15,7 +15,7 @@ function Navbar() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/dashboard');
   };
 
   return (
@@ -58,8 +58,7 @@ function Navbar() {
         </Link>
 
         <nav className="hidden items-center justify-center gap-2 px-6 md:flex">
-          {isAuthenticated &&
-            protectedLinks.map((link) => (
+          {navLinks.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}
@@ -83,6 +82,9 @@ function Navbar() {
             </button>
           ) : (
             <>
+              <span className="hidden rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-2 text-xs font-medium uppercase tracking-[0.2em] text-cyan-200 sm:inline-flex">
+                Guest Mode
+              </span>
               <Link to="/login" className="button-secondary">Login</Link>
               <Link to="/signup" className="button-primary hidden sm:inline-flex">Get Started</Link>
             </>

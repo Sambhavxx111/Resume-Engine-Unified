@@ -2,7 +2,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Loader from './components/Loader';
 import Navbar from './components/Navbar';
-import ProtectedRoute from './components/ProtectedRoute';
 
 const ATSAnalysis = lazy(() => import('./pages/ATSAnalysis'));
 const CareerGuidance = lazy(() => import('./pages/CareerGuidance'));
@@ -33,11 +32,11 @@ function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/resume" element={<ProtectedRoute><ResumeBuilder /></ProtectedRoute>} />
-            <Route path="/ats" element={<ProtectedRoute><ATSAnalysis /></ProtectedRoute>} />
-            <Route path="/jd-match" element={<ProtectedRoute><JDMatcher /></ProtectedRoute>} />
-            <Route path="/career-guidance" element={<ProtectedRoute><CareerGuidance /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/resume" element={<ResumeBuilder />} />
+            <Route path="/ats" element={<ATSAnalysis />} />
+            <Route path="/jd-match" element={<JDMatcher />} />
+            <Route path="/career-guidance" element={<CareerGuidance />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

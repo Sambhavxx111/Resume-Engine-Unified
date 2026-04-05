@@ -1,10 +1,15 @@
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import axiosInstance from "../api/axios";
 import { API } from "../api/services";
 import Loader from "../components/Loader";
 import { exportOptimizedUploadPdf } from "../utils/pdf";
+import { useAuth } from "../context/AuthContext";
 
 function ATSAnalysis() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
@@ -49,6 +54,16 @@ function ATSAnalysis() {
   const handleOptimizeUploadedResume = async () => {
     if (!file) {
       setError("Upload a resume file first so it can be optimized.");
+      return;
+    }
+
+    if (!isAuthenticated) {
+      navigate("/login", {
+        state: {
+          from: location,
+          authPrompt: "Please log in with your personal email to optimize and download your uploaded resume.",
+        },
+      });
       return;
     }
 
@@ -104,7 +119,6 @@ function ATSAnalysis() {
           <p className="mt-4 text-base leading-7 text-slate-300">
             Review how your resume reads in an ATS-style scan, then download an optimized version if you want a stronger draft to work from.
           </p>
-
           <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <label className="glass-card block p-5">
               <span className="block text-sm text-slate-300">Select PDF or DOC file</span>
