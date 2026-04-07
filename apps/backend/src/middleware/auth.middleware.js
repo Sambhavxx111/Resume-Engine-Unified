@@ -57,4 +57,40 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
+const optionalAuthMiddleware = (req, res, next) => {
+  try {
+    if (!process.env.JWT_SECRET) {
+      req.user = null;
+      return next();
+    }
+
+    const authHeader = req.headers.authorization;
+    const cookieToken = readCookie(req.headers.cookie, 'authToken');
+
+    if (!authHeader && !cookieToken) {
+      req.user = null;
+      return next();
+    }
+
+    const token = authHeader
+      ? (authHeader.startsWith('Bearer ')
+          ? authHeader.slice(7)
+          : authHeader)
+      : cookieToken;
+
+    if (!token) {
+      req.user = null;
+      return next();
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = { userId: decoded.userId };
+    return next();
+  } catch (error) {
+    req.user = null;
+    return next();
+  }
+};
+
 module.exports = authMiddleware;
+module.exports.optionalAuthMiddleware = optionalAuthMiddleware;

@@ -52,6 +52,13 @@ const resolveSectionName = (line = '') =>
       .replace(/\s+/g, '_')
   ] || null;
 
+const normalizeSectionCandidate = (line = '') =>
+  String(line || '')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '_');
+
 const filterFilled = (items = []) => items.filter(Boolean);
 const normalizeCustomSectionKey = (line = '') =>
   String(line || '')
@@ -95,17 +102,79 @@ const cleanField = (value = '') =>
     .replace(/\s+/g, ' ')
     .trim();
 
-const isLikelyNameLine = (line = '') =>
-  /^[A-Z][A-Z\s.]{3,40}$/.test(String(line).trim()) &&
-  !resolveSectionName(line) &&
-  !/@|\d{4}|\+?\d/.test(String(line));
+const SKILL_REJECTION_PATTERN =
+  /@|\d{4}|^\d+(?:\.\d+)?$|%|university|college|school|academy|certificate|certification|bachelor|master|dehradun|alwar|pilani|june|july|august|september|october|november|december|january|february|march|april|may|intern|managed|maintaining|created|published|content updates|brand voice|online presence|curriculum vitae|resume/i;
+
+const isLikelySkillValue = (value = '') => {
+  const cleaned = cleanField(value);
+  if (!cleaned) return false;
+  if (cleaned.length > 40) return false;
+  if (SKILL_REJECTION_PATTERN.test(cleaned)) return false;
+  if (/[.!?]/.test(cleaned) && cleaned.split(/\s+/).length > 4) return false;
+
+  const tokens = cleaned.split(/\s+/).filter(Boolean);
+  if (tokens.length > 5) return false;
+
+  return /[A-Za-z]/.test(cleaned);
+};
+
+const isLikelyNameLine = (line = '') => {
+  const cleaned = cleanField(line);
+  if (!cleaned || resolveSectionName(cleaned)) return false;
+  if (/@|\d{4}|\+?\d|linkedin|github|portfolio|resume|curriculum vitae/i.test(cleaned)) return false;
+  if (cleaned.length < 4 || cleaned.length > 40) return false;
+  if (cleaned.split(/\s+/).length > 4) return false;
+
+  return (
+    /^[A-Z][A-Z\s.]{3,40}$/.test(cleaned) ||
+    /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}$/.test(cleaned)
+  );
+};
+
+const isSectionHeadingLine = (line = '') => {
+  const cleaned = cleanField(line);
+  if (!cleaned) return false;
+
+  const resolved = resolveSectionName(cleaned);
+  if (resolved) {
+    return cleaned.split(/\s+/).length <= 4;
+  }
+
+  if (cleaned.length > 36) return false;
+  if (/@|\d/.test(cleaned)) return false;
+
+  return /^[A-Z][A-Z\s&/-]{2,}$/.test(cleaned);
+};
+
+const deriveNameFromOriginalName = (originalName = '') =>
+  String(originalName || 'uploaded resume')
+    .replace(/\.[^/.]+$/, '')
+    .replace(/_enhancv-replica$/i, '')
+    .replace(/_enhancv-columns$/i, '')
+    .replace(/_resume$/i, '')
+    .replace(/\s+resume$/i, '')
+    .replace(/^(resume|cv|curriculum vitae|my resume|final resume|updated resume)\b[\s_-]*/i, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (match) => match.toUpperCase())
+    .trim();
+
+const normalizeImportedName = (value = '') => {
+  const cleaned = cleanField(value);
+  if (!cleaned) return '';
+
+  return cleaned
+    .toLowerCase()
+    .replace(/\b\w/g, (match) => match.toUpperCase())
+    .replace(/\b([A-Za-z])'([A-Za-z])/g, (_, first, second) => `${first.toUpperCase()}'${second.toUpperCase()}`)
+    .trim();
+};
 
 const isLikelyTitleLine = (line = '') => {
   const cleaned = cleanField(line);
   if (!cleaned || cleaned.length > 70) return false;
   if (/@|https?:\/\/|www\.|\+?\d[\d\s()-]{7,}/i.test(cleaned)) return false;
   if (/[|]/.test(cleaned)) return false;
-  if (looksLikeDateOrMeta(cleaned)) return false;
+  if (looksLikeDateRangeOrLocationMeta(cleaned)) return false;
   return /(engineer|developer|analyst|intern|manager|designer|specialist|consultant|architect|student|associate|undergraduate|software|frontend|backend|full stack|data scientist)/i.test(
     cleaned,
   );
@@ -135,6 +204,7 @@ const extractContactDetails = (lines = []) => {
       )
       .find((line) => {
         if (!line) return false;
+        if (/linkedin|github|portfolio|www\.|https?:\/\//i.test(line)) return false;
         if (isLikelyNameLine(line)) return false;
         if (line.length > 48) return false;
         if (line.split(/\s+/).length > 5) return false;
@@ -165,6 +235,196 @@ const inferProfessionalTitle = (lines = [], summaryLines = []) => {
   );
 };
 
+const EDUCATION_NOISE_PATTERN =
+  /(developed|wrote|used|managed|created|published|assisted|documented|volunteered|tools\s*&\s*technologies|project|internship|intern|analysis|dashboard|reports?|query|queries|model|tracking|performance|presence|awareness)/i;
+
+const hasEducationAnchorLine = (line = '') =>
+  isInstitutionLine(line) || isDegreeLine(line) || isEducationScoreLine(line);
+
+const isUsefulEducationContextLine = (line = '') => {
+  const cleaned = cleanField(line);
+  if (!cleaned || EDUCATION_NOISE_PATTERN.test(cleaned)) return false;
+  return (
+    hasEducationAnchorLine(cleaned) ||
+    ((isEducationDateLine(cleaned) || extractEducationLocation(cleaned)) && !/linkedin|github|remote/i.test(cleaned))
+  );
+};
+
+const collectEducationLinesFromDocument = (lines = []) =>
+  lines.filter((line, index, source) => {
+    const cleaned = cleanField(line);
+    if (!isUsefulEducationContextLine(cleaned)) return false;
+
+    if (hasEducationAnchorLine(cleaned)) {
+      return true;
+    }
+
+    return source
+      .slice(Math.max(0, index - 2), Math.min(source.length, index + 3))
+      .some((candidate) => hasEducationAnchorLine(candidate) && !EDUCATION_NOISE_PATTERN.test(candidate));
+  });
+
+const buildEducationItemsFromLooseSignals = (lines = []) => {
+  const institutions = [];
+  const degrees = [];
+  const scores = [];
+  const dates = [];
+
+  lines.forEach((line, index) => {
+    const cleaned = cleanField(line);
+    if (!cleaned || EDUCATION_NOISE_PATTERN.test(cleaned)) return;
+
+    if (isInstitutionLine(cleaned)) {
+      institutions.push({
+        index,
+        text: stripEducationLineArtifacts(cleaned, { removeLocation: true }),
+        location: extractEducationLocation(cleaned),
+      });
+      return;
+    }
+
+    if (isDegreeLine(cleaned)) {
+      degrees.push({
+        index,
+        text: stripEducationLineArtifacts(cleaned),
+      });
+    }
+
+    if (isEducationScoreLine(cleaned)) {
+      scores.push({
+        index,
+        text: extractEducationScore(cleaned),
+      });
+    }
+
+    if (isEducationDateLine(cleaned)) {
+      const range = extractEducationDateRange(cleaned);
+      dates.push({
+        index,
+        startDate: range.startDate,
+        endDate: range.endDate || stripEducationLineArtifacts(cleaned),
+      });
+    }
+  });
+
+  const count = Math.max(institutions.length, degrees.length);
+  if (!count) return [];
+
+  const usedScores = new Set();
+  const usedDates = new Set();
+  const findNearestUnused = (items, anchorIndex, usedSet) => {
+    let best = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    items.forEach((item, itemIndex) => {
+      if (usedSet.has(itemIndex)) return;
+      const distance = Math.abs(item.index - anchorIndex);
+      if (distance < bestDistance) {
+        best = { item, itemIndex };
+        bestDistance = distance;
+      }
+    });
+
+    if (best) {
+      usedSet.add(best.itemIndex);
+      return best.item;
+    }
+
+    return null;
+  };
+
+  return Array.from({ length: count }, (_, index) => {
+    const institution = institutions[index] || null;
+    const degree = degrees[index] || null;
+    const anchorIndex = Math.max(institution?.index ?? -1, degree?.index ?? -1, 0);
+    const score = findNearestUnused(scores, anchorIndex, usedScores);
+    const date = findNearestUnused(dates, anchorIndex, usedDates);
+
+    return {
+      institution: institution?.text || '',
+      degree: degree?.text || '',
+      fieldOfStudy: '',
+      startDate: date?.startDate || '',
+      endDate: date?.endDate || '',
+      location: institution?.location || '',
+      score: score?.text || '',
+    };
+  }).filter((item) => item.institution || item.degree);
+};
+
+const getEducationLevel = (item = {}) => {
+  const text = cleanField([item.degree, item.institution].filter(Boolean).join(' '));
+  if (/(master|mca|mtech|msc|phd)/i.test(text)) return 4;
+  if (/(bachelor|btech|bca|bsc|engineering)/i.test(text)) return 3;
+  if (/higher secondary/i.test(text)) return 2;
+  if (/secondary|school certificate/i.test(text)) return 1;
+  return 0;
+};
+
+const extractComparableYear = (value = '') => Number(String(value).match(/\b(19|20)\d{2}\b/)?.[0] || 0);
+
+const postProcessEducationItems = (items = []) => {
+  const merged = [];
+
+  items.forEach((item) => {
+    const previous = merged[merged.length - 1];
+    const currentInstitution = cleanField(item.institution);
+    const isDanglingCertificate =
+      currentInstitution &&
+      /certificate|secondary|diploma/i.test(currentInstitution) &&
+      !item.degree &&
+      !item.location &&
+      !item.score &&
+      !item.startDate &&
+      !item.endDate;
+
+    if (previous && isDanglingCertificate && previous.institution && !previous.degree) {
+      previous.degree = currentInstitution;
+      return;
+    }
+
+    merged.push({ ...item });
+  });
+
+  const singleDateItems = merged
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => !item.startDate && item.endDate && getEducationLevel(item) > 0);
+
+  const sortedDates = singleDateItems
+    .map(({ item }) => item.endDate)
+    .sort((a, b) => extractComparableYear(b) - extractComparableYear(a));
+  const sortedTargets = [...singleDateItems].sort(
+    (a, b) => getEducationLevel(b.item) - getEducationLevel(a.item) || a.index - b.index,
+  );
+
+  sortedTargets.forEach(({ item }, index) => {
+    item.endDate = sortedDates[index] || item.endDate;
+  });
+
+  return merged;
+};
+
+const isLowConfidenceEducationItem = (item = {}) => {
+  const institution = cleanField(item.institution);
+  const degree = cleanField(item.degree);
+  const looksSentenceLike = (value = '') =>
+    value.length > 70 || /[.]/.test(value) || /\b(developed|wrote|used|managed|created|assisted|documented)\b/i.test(value);
+
+  return (
+    (!institution && !degree) ||
+    looksSentenceLike(institution) ||
+    looksSentenceLike(degree) ||
+    (institution && institution.split(/\s+/).length > 9 && !isInstitutionLine(institution))
+  );
+};
+
+const collectExplicitSkillLines = (lines = []) =>
+  lines.filter((line) =>
+    /^(programming languages|data visualization|data analysis|data analysis & manipulation|machine learning|statistics|reporting & tools|reporting|technical skills|tools\s*&\s*technologies)\s*:/i.test(
+      cleanField(line),
+    ),
+  );
+
 const splitSkillTokens = (lines = []) =>
   Array.from(
     new Set(
@@ -186,6 +446,10 @@ const splitSkillTokens = (lines = []) =>
           const spaceTokens = normalized.split(' ').filter(Boolean);
           const averageLength =
             spaceTokens.reduce((sum, token) => sum + token.length, 0) / Math.max(spaceTokens.length, 1);
+
+          if (!isLikelySkillValue(normalized)) {
+            return [];
+          }
 
           if (
             spaceTokens.length >= 2 &&
@@ -222,10 +486,188 @@ const inferSummary = (lines = [], title = '') => {
   return '';
 };
 
-const looksLikeDateOrMeta = (line = '') =>
-  /\b(19|20)\d{2}\b|present|current|intern|remote|hybrid|onsite|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(
+const looksLikeDateRangeOrLocationMeta = (line = '') =>
+  /\b(19|20)\d{2}\b|present|current|remote|hybrid|onsite|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(
     line,
   );
+
+const isInstitutionLine = (line = '') =>
+  /(university|college|school|academy|institute|vidyapeeth|polytechnic)/i.test(cleanField(line));
+
+const isDegreeLine = (line = '') =>
+  /(bachelor|master|b\.?\s?tech|m\.?\s?tech|bca|mca|bsc|msc|phd|secondary|certificate|diploma|cse|computer science|data science|engineering)/i.test(
+    cleanField(line),
+  );
+
+const isEducationMetaLine = (line = '') =>
+  /\b(19|20)\d{2}\b|present|current|cgpa|gpa|percentage|marks|score|grade|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(
+    cleanField(line),
+  );
+
+const isEducationScoreLine = (line = '') =>
+  /\b(cgpa|gpa|grade|percentage|marks|score)\b/i.test(cleanField(line)) ||
+  /\b\d{1,2}(?:\.\d+)?\s*\/\s*10\b/i.test(cleanField(line)) ||
+  /\b\d{1,3}(?:\.\d+)?%\b/.test(cleanField(line));
+
+const isEducationDateLine = (line = '') =>
+  /\b(19|20)\d{2}\b|present|current|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(cleanField(line));
+
+const extractEducationScore = (line = '') => {
+  const cleaned = cleanField(line);
+  if (!cleaned) return '';
+
+  const labeled =
+    cleaned.match(/\b(?:sgpa|cgpa|gpa|grade|percentage|marks|score)\s*[:\-]?\s*[A-Za-z0-9./%]+(?:\s*\/\s*[A-Za-z0-9.]+)?/i)?.[0] || '';
+  if (labeled) return cleanField(labeled);
+
+  return (
+    cleaned.match(/\b\d{1,2}(?:\.\d+)?\s*\/\s*10\b/i)?.[0] ||
+    cleaned.match(/\b\d{1,3}(?:\.\d+)?%\b/)?.[0] ||
+    cleaned.match(/\b\d{1,2}(?:\.\d+)?\b/)?.[0] ||
+    ''
+  );
+};
+
+const extractEducationDateRange = (line = '') => {
+  const cleaned = cleanField(line);
+  if (!cleaned) return { startDate: '', endDate: '' };
+
+  const match = cleaned.match(
+    /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\d{4})\s*(?:to|-|–|—)\s*((?:present|current)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\d{4})/i,
+  );
+
+  if (match) {
+    return {
+      startDate: cleanField(match[1]),
+      endDate: cleanField(match[2]),
+    };
+  }
+
+  const yearMatches = cleaned.match(/\b(19|20)\d{2}\b/g) || [];
+  if (yearMatches.length >= 2) {
+    return {
+      startDate: yearMatches[0],
+      endDate: yearMatches[1],
+    };
+  }
+
+  if (yearMatches.length === 1) {
+    const monthYearMatch = cleaned.match(
+      /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}\b/i,
+    );
+    return { startDate: '', endDate: cleanField(monthYearMatch?.[0] || yearMatches[0]) };
+  }
+
+  return { startDate: '', endDate: '' };
+};
+
+const isEducationScoreOnlyLine = (line = '') => {
+  const cleaned = stripEducationLineArtifacts(line);
+  if (!cleaned) return false;
+  return (
+    isEducationScoreLine(line) &&
+    !isDegreeLine(cleaned) &&
+    !isInstitutionLine(cleaned) &&
+    !isEducationDateLine(cleaned)
+  );
+};
+
+const hasEducationAnchor = (entry = {}) =>
+  entry.rawLines.some((line) => isInstitutionLine(line) || isEducationDateLine(line) || extractEducationLocation(line));
+
+const extractEducationLocation = (line = '') => {
+  const cleaned = cleanField(line);
+  if (!cleaned) return '';
+
+  const withoutDates = cleanField(
+    cleaned.replace(
+      /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\b(?:19|20)\d{2}\b)\s*(?:to|-|â€“|â€”)\s*((?:present|current)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\b(?:19|20)\d{2}\b)/gi,
+      '',
+    ).replace(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{2,4}\b/gi, '').replace(/\b(?:19|20)\d{2}\b/g, ''),
+  );
+  const withoutScore = cleanField(
+    withoutDates.replace(/\b(?:sgpa|cgpa|gpa|grade|percentage|marks|score)\s*[:\-]?\s*[A-Za-z0-9./%]+(?:\s*\/\s*[A-Za-z0-9.]+)?/gi, ''),
+  );
+
+  const institutionSuffixMatch = withoutScore.match(
+    /(?:university|college|school|academy|institute|vidyapeeth|polytechnic)\b(.*)$/i,
+  );
+  if (institutionSuffixMatch) {
+    const suffix = cleanField(institutionSuffixMatch[1]);
+    if (
+      suffix &&
+      /[A-Za-z]/.test(suffix) &&
+      !/^of\b/i.test(suffix) &&
+      !isDegreeLine(suffix) &&
+      !isInstitutionLine(suffix) &&
+      (suffix.includes(',') || /\bindia\b/i.test(suffix) || isLocationOnlyLine(suffix))
+    ) {
+      return suffix.replace(/^[-,]\s*/, '');
+    }
+  }
+
+  const commaParts = withoutScore.split(',').map((part) => cleanField(part)).filter(Boolean);
+  if (commaParts.length >= 2) {
+    const trailing = commaParts.slice(1).join(', ');
+    if (trailing && /[A-Za-z]/.test(trailing)) {
+      return trailing;
+    }
+  }
+
+  if (isLocationOnlyLine(withoutScore) && !isDegreeLine(withoutScore) && !isInstitutionLine(withoutScore)) {
+    return withoutScore;
+  }
+
+  return '';
+};
+
+const stripEducationLineArtifacts = (line = '', { removeLocation = false } = {}) => {
+  let cleaned = cleanField(line);
+  if (!cleaned) return '';
+
+  cleaned = cleanField(
+    cleaned
+      .replace(
+        /\b(?:sgpa|cgpa|gpa|grade|percentage|marks|score)\s*[:\-]?\s*[A-Za-z0-9./%]+(?:\s*\/\s*[A-Za-z0-9.]+)?/gi,
+        '',
+      )
+      .replace(
+        /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\b(?:19|20)\d{2}\b)\s*(?:to|-|â€“|â€”)\s*((?:present|current)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\b(?:19|20)\d{2}\b)/gi,
+        '',
+      )
+      .replace(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{2,4}\b/gi, '')
+      .replace(/\b(?:19|20)\d{2}\b/g, ''),
+  );
+
+  if (removeLocation) {
+    const location = extractEducationLocation(cleaned);
+    if (location) {
+      cleaned = cleanField(cleaned.replace(location, '').replace(/\s+,/g, ','));
+    }
+  }
+
+  return cleaned.replace(/[,-]\s*$/, '').trim();
+};
+
+const isLocationOnlyLine = (line = '') => {
+  const cleaned = cleanField(line);
+  if (!cleaned || cleaned.split(/\s+/).length > 3) return false;
+  return /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}$/.test(cleaned);
+};
+
+const isExperienceHeadingLine = (line = '') => {
+  const cleaned = cleanField(line);
+  if (!cleaned || cleaned.length > 90) return false;
+  if (cleaned.endsWith('.')) return false;
+  if (/@|\d{4}/.test(cleaned)) return false;
+
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length > 8) return false;
+
+  return /(engineer|developer|analyst|intern|manager|designer|specialist|consultant|architect|associate|executive|scientist|lead|trainee|coordinator)/i.test(
+    cleaned,
+  );
+};
 
 const buildExperienceItems = (lines = []) => {
   if (!lines.length) return [];
@@ -237,11 +679,7 @@ const buildExperienceItems = (lines = []) => {
     const cleaned = line.replace(/^[-*]\s*/, '').trim();
     if (!cleaned) return;
 
-    const looksLikeHeading =
-      !line.startsWith('-') &&
-      !line.startsWith('*') &&
-      cleaned.length < 100 &&
-      /^[A-Z]/.test(cleaned);
+    const looksLikeHeading = !line.startsWith('-') && !line.startsWith('*') && isExperienceHeadingLine(cleaned);
 
     if (!current || looksLikeHeading) {
       if (current) groups.push(current);
@@ -255,9 +693,9 @@ const buildExperienceItems = (lines = []) => {
   if (current) groups.push(current);
 
   return groups.map((group) => {
-    const metaLine = group.details.find((item) => looksLikeDateOrMeta(item)) || '';
+    const metaLine = group.details.find((item) => looksLikeDateRangeOrLocationMeta(item)) || '';
     const companyLine =
-      group.details.find((item) => !looksLikeDateOrMeta(item) && item.length < 80) || '';
+      group.details.find((item) => !looksLikeDateRangeOrLocationMeta(item) && item.length < 80 && !item.endsWith('.')) || '';
     const detailLines = group.details.filter((item) => item !== metaLine && item !== companyLine);
 
     return {
@@ -273,36 +711,155 @@ const buildExperienceItems = (lines = []) => {
 const buildEducationItems = (lines = []) => {
   if (!lines.length) return [];
 
-  const chunks = [];
-  let current = [];
+  const entries = [];
+  let current = { rawLines: [], degreeLine: '', institutionLine: '', extraLines: [] };
+
+  const pushCurrent = () => {
+    if (!current.rawLines.length) return;
+    entries.push(current);
+    current = { rawLines: [], degreeLine: '', institutionLine: '', extraLines: [] };
+  };
 
   lines.forEach((line) => {
-    if (/^[A-Z]/.test(line) && current.length >= 2) {
-      chunks.push(current);
-      current = [line];
-      return;
+    const cleaned = cleanField(line);
+    if (!cleaned) return;
+
+    const currentHasAnchor = hasEducationAnchor(current);
+    const startsNewEntry =
+      current.rawLines.length > 0 &&
+      ((isDegreeLine(cleaned) &&
+        !isEducationScoreOnlyLine(cleaned) &&
+        currentHasAnchor &&
+        (current.degreeLine || current.institutionLine)) ||
+        (isInstitutionLine(cleaned) && current.institutionLine));
+
+    if (startsNewEntry) {
+      pushCurrent();
     }
 
-    current.push(line);
+    current.rawLines.push(cleaned);
+    if (isDegreeLine(cleaned) && !current.degreeLine) {
+      current.degreeLine = cleaned;
+      return;
+    }
+    if (isInstitutionLine(cleaned) && !current.institutionLine) {
+      current.institutionLine = cleaned;
+      return;
+    }
+    current.extraLines.push(cleaned);
   });
 
-  if (current.length) {
-    chunks.push(current);
-  }
+  pushCurrent();
 
-  return chunks.map((chunk) => ({
-    institution: chunk[1] || '',
-    degree: chunk[0] || '',
-    fieldOfStudy: chunk[2] || '',
-    startDate: '',
-    endDate:
-      chunk.find(
+  return entries.map((entry) => {
+    const dateLine = entry.rawLines.find((line) => line !== entry.degreeLine && isEducationDateLine(line)) || '';
+    const fallbackInstitutionLine =
+      entry.rawLines.find((line) => line !== entry.degreeLine && !isDegreeLine(line) && !isEducationScoreOnlyLine(line)) || '';
+    const institutionCandidate =
+      entry.rawLines.find((line) => isInstitutionLine(line) && line !== entry.degreeLine) ||
+      entry.institutionLine ||
+      entry.rawLines.find((line) => extractEducationLocation(line) && !isEducationScoreOnlyLine(line)) ||
+      fallbackInstitutionLine ||
+      (entry.rawLines.length === 1 ? entry.rawLines[0] : '') ||
+      '';
+    const scoredDegreeLine =
+      entry.rawLines.find((line) => isDegreeLine(line) && isEducationScoreLine(line) && line !== institutionCandidate) || '';
+    const degreeCandidate =
+      scoredDegreeLine ||
+      entry.rawLines.find((line) => isDegreeLine(line) && line !== institutionCandidate && !isEducationScoreOnlyLine(line)) ||
+      entry.degreeLine ||
+      entry.rawLines.find((line) => line !== institutionCandidate && !isInstitutionLine(line)) ||
+      entry.rawLines[0] ||
+      '';
+    const institutionLine =
+      institutionCandidate;
+    const degreeLine = degreeCandidate;
+    const metaLine =
+      entry.rawLines.find((line) => line !== institutionLine && line !== degreeLine && isEducationMetaLine(line)) || '';
+    const dateSource =
+      dateLine ||
+      institutionLine ||
+      degreeLine ||
+      metaLine;
+    const { startDate, endDate } = extractEducationDateRange(dateSource);
+    const scoreLine =
+      entry.rawLines.find((line) => line !== institutionLine && line !== degreeLine && isEducationScoreLine(line)) ||
+      (isEducationScoreLine(institutionLine) ? institutionLine : '') ||
+      degreeLine ||
+      institutionLine ||
+      '';
+    const locationLine =
+      entry.rawLines.find((line) => line !== institutionLine && line !== degreeLine && extractEducationLocation(line)) ||
+      institutionLine ||
+      '';
+    const degree = stripEducationLineArtifacts(degreeLine || entry.rawLines[0] || '', {
+      removeLocation: false,
+    });
+    const alternateInstitutionLine =
+      entry.rawLines.find((line) => line !== degreeLine && isInstitutionLine(line)) || institutionLine;
+    const institution = stripEducationLineArtifacts(
+      institutionLine === degree && alternateInstitutionLine ? alternateInstitutionLine : institutionLine,
+      { removeLocation: true },
+    );
+    const fieldOfStudy =
+      entry.rawLines.find(
         (line) =>
-          line !== chunk[0] &&
-          line !== chunk[1] &&
-          /\b(19|20)\d{2}\b|present|current/i.test(line),
-      ) || '',
-  }));
+          line !== institutionLine &&
+          line !== degreeLine &&
+          line !== metaLine &&
+          line !== scoreLine &&
+          line !== locationLine &&
+          !isLocationOnlyLine(line),
+      ) || '';
+
+    return {
+      institution,
+      degree,
+      fieldOfStudy: stripEducationLineArtifacts(fieldOfStudy),
+      startDate,
+      endDate: endDate || stripEducationLineArtifacts(dateLine || metaLine),
+      location: extractEducationLocation(locationLine),
+      score: extractEducationScore(scoreLine),
+    };
+  })
+    .filter((item) => item.institution || item.degree || item.fieldOfStudy || item.location || item.score || item.startDate || item.endDate)
+    .reduce((acc, item) => {
+      const previous = acc[acc.length - 1];
+      const itemHasNoInstitution = !item.institution || item.institution === item.degree;
+      const previousCanAbsorb = previous && previous.institution && (!previous.score || !previous.endDate);
+      const derivedCarryDegree = stripEducationLineArtifacts(
+        /certificate|secondary|diploma|bachelor|master/i.test(item.institution) ? item.institution : item.degree,
+      );
+      const derivedCarryScore = item.score || extractEducationScore(item.institution) || extractEducationScore(item.degree);
+
+      if (
+        previous &&
+        !item.location &&
+        !item.startDate &&
+        !item.endDate &&
+        (derivedCarryScore || /certificate|secondary|diploma/i.test(derivedCarryDegree))
+      ) {
+        if (
+          derivedCarryDegree &&
+          /certificate|secondary|diploma/i.test(derivedCarryDegree) &&
+          !/certificate|secondary|diploma/i.test(previous.degree)
+        ) {
+          previous.degree = derivedCarryDegree;
+        }
+        previous.score = previous.score || derivedCarryScore;
+        return acc;
+      }
+
+      if (previousCanAbsorb && itemHasNoInstitution && (item.score || item.endDate) && !item.location) {
+        previous.score = previous.score || item.score;
+        previous.startDate = previous.startDate || item.startDate;
+        previous.endDate = previous.endDate || item.endDate;
+        return acc;
+      }
+
+      acc.push(item);
+      return acc;
+    }, []);
 };
 
 const toTitleCase = (value = '') => value.replace(/_/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());
@@ -315,9 +872,8 @@ const buildResumeSections = (resumeText = '') => {
 
   lines.forEach((line) => {
     const resolvedSection = resolveSectionName(line);
-    const isAllCapsHeading = /^[A-Z][A-Z\s&/-]{2,}$/.test(line);
 
-    if (isAllCapsHeading && (resolvedSection || currentSection)) {
+    if (isSectionHeadingLine(line)) {
       currentSection = resolvedSection || normalizeCustomSectionKey(line);
       if (!sectionMap[currentSection]) {
         sectionMap[currentSection] = [];
@@ -339,15 +895,7 @@ const buildResumeSections = (resumeText = '') => {
 const buildImportedResumeData = (resumeText = '', originalName = '', template = 'contemporary') => {
   const { lines, introLines, sectionMap } = buildResumeSections(resumeText);
 
-  const derivedName = String(originalName || 'uploaded resume')
-    .replace(/\.[^/.]+$/, '')
-    .replace(/_enhancv-replica$/i, '')
-    .replace(/_enhancv-columns$/i, '')
-    .replace(/_resume$/i, '')
-    .replace(/\s+resume$/i, '')
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (match) => match.toUpperCase())
-    .trim();
+  const derivedName = deriveNameFromOriginalName(originalName);
 
   const introName = introLines.find((line) => isLikelyNameLine(line)) || '';
   const contactDetails = extractContactDetails([
@@ -357,14 +905,26 @@ const buildImportedResumeData = (resumeText = '', originalName = '', template = 
   const summarySectionLines = filterFilled(sectionMap.summary || []);
   const title = inferProfessionalTitle(introLines, summarySectionLines);
   const summaryLines = summarySectionLines.filter((line) => line.length > 25);
-  const skills = splitSkillTokens(sectionMap.skills || []);
+  const explicitSkillLines = collectExplicitSkillLines(lines);
+  const skills = splitSkillTokens(explicitSkillLines.length ? explicitSkillLines : sectionMap.skills || []);
   const experience = buildExperienceItems(sectionMap.experience || []);
-  const education = buildEducationItems(sectionMap.education || []);
+  const sectionEducation = buildEducationItems(sectionMap.education || []);
+  const fallbackEducation = buildEducationItems(collectEducationLinesFromDocument(lines));
+  const looseSignalEducation = buildEducationItemsFromLooseSignals(collectEducationLinesFromDocument(lines));
+  const education = postProcessEducationItems(
+    sectionEducation.length && !sectionEducation.every((item) => isLowConfidenceEducationItem(item))
+      ? sectionEducation
+      : looseSignalEducation.length && !looseSignalEducation.every((item) => isLowConfidenceEducationItem(item))
+        ? looseSignalEducation
+        : fallbackEducation.length && !fallbackEducation.every((item) => isLowConfidenceEducationItem(item))
+          ? fallbackEducation
+          : looseSignalEducation,
+  );
 
   return {
     template,
     personalInfo: {
-      fullName: introName || derivedName,
+      fullName: normalizeImportedName(introName || derivedName),
       title,
       email: contactDetails.email,
       phone: contactDetails.phone,
@@ -373,7 +933,7 @@ const buildImportedResumeData = (resumeText = '', originalName = '', template = 
     },
     education: education.length
       ? education
-      : [{ institution: '', degree: '', fieldOfStudy: '', startDate: '', endDate: '' }],
+      : [{ institution: '', degree: '', fieldOfStudy: '', startDate: '', endDate: '', location: '', score: '' }],
     experience: experience.length
       ? experience
       : [{ company: '', role: '', startDate: '', endDate: '', description: '' }],
@@ -450,7 +1010,7 @@ const groundImportedResumeData = (resumeData = {}, resumeText = '', originalName
     personalInfo: {
       fullName:
         sanitizeGroundedText(personalInfo.fullName, '').match(/[A-Za-z]/)
-          ? sanitizeGroundedText(personalInfo.fullName, fallback.personalInfo.fullName)
+          ? normalizeImportedName(sanitizeGroundedText(personalInfo.fullName, fallback.personalInfo.fullName))
           : fallback.personalInfo.fullName,
       title: strictTitle,
       email: strictEmail,
@@ -461,7 +1021,7 @@ const groundImportedResumeData = (resumeData = {}, resumeText = '', originalName
     education: sanitizeCollection(
       resumeData?.education,
       fallback.education,
-      ['institution', 'degree', 'fieldOfStudy', 'startDate', 'endDate'],
+      ['institution', 'degree', 'fieldOfStudy', 'startDate', 'endDate', 'location', 'score'],
     ),
     experience: sanitizeCollection(
       resumeData?.experience,
@@ -471,7 +1031,7 @@ const groundImportedResumeData = (resumeData = {}, resumeText = '', originalName
     skills: Array.from(
       new Set(
         normalizeList(resumeData?.skills)
-          .filter((skill) => hasEnoughGrounding(skill, sourceText))
+          .filter((skill) => isLikelySkillValue(skill) && hasEnoughGrounding(skill, sourceText))
           .concat(fallback.skills),
       ),
     ).slice(0, 24),
@@ -534,8 +1094,10 @@ const buildResumeTextFromData = (resumeData = {}) => {
       const heading = filterFilled([item.degree, item.fieldOfStudy]).join(' - ');
       if (heading) lines.push(heading);
       if (item.institution) lines.push(item.institution);
+      if (item.location) lines.push(item.location);
       const meta = filterFilled([item.startDate, item.endDate]).join(' to ');
       if (meta) lines.push(meta);
+      if (item.score) lines.push(`Score: ${item.score}`);
       lines.push('');
     });
   }
@@ -554,14 +1116,27 @@ const buildResumeTextFromData = (resumeData = {}) => {
 
 const collectResumeSignals = (resumeData = {}) =>
   [
+    resumeData.personalInfo?.fullName,
     resumeData.personalInfo?.title,
     resumeData.summary,
     ...(resumeData.skills || []),
     ...(resumeData.experience || []).flatMap((item) => [item.role, item.company, item.description]),
-    ...(resumeData.education || []).flatMap((item) => [item.degree, item.fieldOfStudy]),
+    ...(resumeData.education || []).flatMap((item) => [item.institution, item.degree, item.fieldOfStudy, item.location, item.score]),
+    ...(resumeData.customSections || []).flatMap((section) => [section.title, ...(section.items || [])]),
   ]
     .filter(Boolean)
     .join(' ');
+
+const extractResumeKeywords = (resumeData = {}, limit = 12) =>
+  Array.from(
+    new Set(
+      (collectResumeSignals(resumeData).match(/\b[a-zA-Z][a-zA-Z+#.-]{2,}\b/g) || [])
+        .map((token) => token.trim())
+        .filter((token) => token.length > 2)
+        .filter((token) => !SKILL_REJECTION_PATTERN.test(token))
+        .filter((token) => !/^(with|from|that|this|have|using|built|worked|project|projects|experience|education|summary)$/i.test(token)),
+    ),
+  ).slice(0, limit);
 
 const generateSummaryFallback = (resumeData = {}) => {
   const personalInfo = resumeData.personalInfo || {};
@@ -579,8 +1154,12 @@ const generateSummaryFallback = (resumeData = {}) => {
   return `${firstSentence} ${secondSentence}`.trim();
 };
 
-const suggestSkillsFallback = (existingSkills = []) => {
-  const normalized = existingSkills
+const suggestSkillsFallback = (resumeData = {}, existingSkills = []) => {
+  const normalized = [
+    ...existingSkills,
+    ...(Array.isArray(resumeData.skills) ? resumeData.skills : []),
+    ...extractResumeKeywords(resumeData, 8),
+  ]
     .map((skill) => String(skill || '').trim())
     .filter(Boolean);
   const lower = normalized.map((skill) => skill.toLowerCase());
@@ -603,7 +1182,7 @@ const suggestSkillsFallback = (existingSkills = []) => {
 
   return {
     suggestedSkills: suggestions.slice(0, 5),
-    reasoning: 'Fallback suggestions were generated from the skills already present in the resume.',
+    reasoning: 'Fallback suggestions were generated from the full resume context, including existing skills, experience, and education signals.',
   };
 };
 
@@ -717,6 +1296,8 @@ const optimizeUploadedResumeTextFallback = (resumeText = '', atsInsights = {}, o
 module.exports = {
   buildImportedResumeData,
   buildResumeTextFromData,
+  collectResumeSignals,
+  extractResumeKeywords,
   generateSummaryFallback,
   groundImportedResumeData,
   suggestSkillsFallback,

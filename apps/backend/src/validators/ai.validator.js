@@ -3,7 +3,8 @@ const Joi = require('joi');
 const resumeDataSchema = Joi.object().required(); // allow flexible resume JSON but must be object
 
 const suggestSkillsSchema = Joi.object({
-  existingSkills: Joi.array().items(Joi.string()).min(1).required()
+  resumeData: Joi.object().required(),
+  existingSkills: Joi.array().items(Joi.string()).optional().default([])
 });
 
 const optimizeSchema = Joi.object({

@@ -7,8 +7,8 @@ const { resumeDataSchema, suggestSkillsSchema, optimizeSchema } = require('../va
 
 const router = express.Router();
 
-// Protect all routes with auth middleware
-router.use(authMiddleware);
+// Allow guests to use AI tools while still attaching auth when available.
+router.use(authMiddleware.optionalAuthMiddleware);
 
 // Apply strict rate limiting to AI routes only
 const aiLimiter = rateLimit({

@@ -8,7 +8,7 @@ const resumeModel = require('../models/resume.model');
 
 const generateSummaryController = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user?.userId || null;
     const { resumeData } = req.body;
 
     // Validate input
@@ -32,18 +32,18 @@ const generateSummaryController = async (req, res) => {
 
 const suggestSkillsController = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const { existingSkills } = req.body;
+    const userId = req.user?.userId || null;
+    const { existingSkills = [], resumeData } = req.body;
 
     // Validate input
-    if (!existingSkills || !Array.isArray(existingSkills) || existingSkills.length === 0) {
+    if (!resumeData || typeof resumeData !== 'object') {
       return res.status(400).json({
-        error: 'Existing skills array is required and must not be empty'
+        error: 'Valid resume data is required'
       });
     }
 
     // Call Gemini service
-    const result = await suggestSkills(existingSkills);
+    const result = await suggestSkills(resumeData, existingSkills);
 
     return res.status(200).json({
       message: 'Skills suggested successfully',
@@ -60,7 +60,7 @@ const suggestSkillsController = async (req, res) => {
 
 const optimizeResumeController = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user?.userId || null;
     const { resumeData, jobDescription } = req.body;
 
     console.log('Optimize request:', { resumeData, jobDescription });
@@ -92,7 +92,7 @@ const optimizeResumeController = async (req, res) => {
 
 const diagnoseResumeController = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user?.userId || null;
     const { resumeData } = req.body;
 
     // Validate input

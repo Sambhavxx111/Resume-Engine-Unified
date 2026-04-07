@@ -1,6 +1,9 @@
 const { callGeminiWithTimeout, getResumeParsingGeminiOptions } = require('../config/gemini');
 const {
   buildImportedResumeData,
+  buildResumeTextFromData,
+  collectResumeSignals,
+  extractResumeKeywords,
   generateSummaryFallback,
   groundImportedResumeData,
   suggestSkillsFallback,
@@ -10,9 +13,17 @@ const {
 
 // Prompt Templates
 const PROMPTS = {
-  SUMMARY: (data) => `
-    Analyze the following resume data and generate a professional summary (2-3 sentences).
-    Resume Data: ${JSON.stringify(data)}
+  SUMMARY: (resumeData, resumeText) => `
+    Review the full resume and generate a strong, truthful professional summary in 2-3 sentences.
+    Base it on the candidate's actual experience, projects, education, and skills.
+    Do not invent achievements, tools, or metrics.
+    Keep it concise, recruiter-friendly, and suitable for the top of the resume.
+
+    Structured Resume Data:
+    ${JSON.stringify(resumeData)}
+
+    Resume Context Text:
+    ${resumeText}
     
     Return ONLY a valid JSON object with this structure:
     {
@@ -20,9 +31,20 @@ const PROMPTS = {
     }
   `,
 
-  SUGGEST_SKILLS: (existingSkills) => `
-    Based on the following existing skills, suggest 5 additional relevant skills that would enhance a tech resume.
-    Existing Skills: ${existingSkills.join(', ')}
+  SUGGEST_SKILLS: (resumeData, resumeText, existingSkills) => `
+    Review the full resume and suggest 5 additional skills that are genuinely supported by the candidate's experience, projects, education, or current skills.
+    Do not invent unrelated skills.
+    Prefer concrete tools, technologies, and concise competencies that strengthen ATS matching.
+    Do not return school names, cities, degrees, certificates, or vague filler phrases.
+
+    Existing Skills:
+    ${existingSkills.join(', ')}
+
+    Structured Resume Data:
+    ${JSON.stringify(resumeData)}
+
+    Resume Context Text:
+    ${resumeText}
     
     Return ONLY a valid JSON object with this structure:
     {
@@ -45,7 +67,11 @@ const PROMPTS = {
   `,
 
   OPTIMIZE_RESUME: (resumeJson, jobDescription) => `
-    Optimize the resume to better match the job description. Suggest improvements to content and phrasing.
+    Review the full resume and suggest high-value improvements to wording, clarity, ATS alignment, and skill coverage.
+    Ground every suggestion in the actual resume content.
+    Do not invent achievements, technologies, or metrics.
+    If no job description is provided, optimize for a stronger general professional resume.
+
     Resume: ${JSON.stringify(resumeJson)}
     ${jobDescription ? `Job Description: ${JSON.stringify(jobDescription)}` : ''}
     
@@ -109,7 +135,9 @@ const PROMPTS = {
             "degree": "string",
             "fieldOfStudy": "string",
             "startDate": "YYYY-MM or empty string",
-            "endDate": "YYYY-MM or empty string"
+            "endDate": "YYYY-MM or empty string",
+            "location": "string",
+            "score": "string"
           }
         ],
         "customSections": []
@@ -122,6 +150,9 @@ const PROMPTS = {
     Parse this resume into the exact structured JSON needed by a resume builder form.
     Keep everything truthful to the source resume.
     Do NOT invent facts, achievements, dates, companies, institutions, or links.
+    Do NOT use generic filename words such as "resume", "cv", or "final" as part of the person's name.
+    The skills array must contain only actual skills, tools, technologies, or concise competencies.
+    Never put college names, school names, cities, dates, grades, certifications, job titles, or full bullet sentences into the skills array.
     If something is missing, return an empty string or empty array instead.
     Convert bullet points into plain text strings joined naturally inside description fields.
     Use only these top-level keys and no markdown.
@@ -148,7 +179,9 @@ const PROMPTS = {
           "degree": "string",
           "fieldOfStudy": "string",
           "startDate": "YYYY-MM or empty string",
-          "endDate": "YYYY-MM or empty string"
+          "endDate": "YYYY-MM or empty string",
+          "location": "string",
+          "score": "string"
         }
       ],
       "experience": [
@@ -214,14 +247,8 @@ const parseGeminiJSON = (text) => {
 // Generate professional summary
 const generateSummary = async (data) => {
   try {
-    // Handle text-only resume data
-    let resumeContent = data;
-    if (typeof data === 'string') {
-      resumeContent = { rawContent: data };
-    } else if (data.text && !data.experience) {
-      resumeContent = { rawContent: data.text };
-    }
-    const prompt = PROMPTS.SUMMARY(resumeContent);
+    const { resumeData, resumeText } = normalizeResumeContext(data);
+    const prompt = PROMPTS.SUMMARY(resumeData, resumeText);
 
     if (process.env.GEMINI_DEBUG === 'true') {
       console.warn('SUMMARY prompt length:', prompt.length);
@@ -246,7 +273,7 @@ const generateSummary = async (data) => {
       console.warn('Gemini summary unavailable, returning local fallback summary');
       return {
         success: true,
-        summary: generateSummaryFallback(resumeContent),
+        summary: generateSummaryFallback(resumeData),
       };
     }
   } catch (error) {
@@ -256,13 +283,22 @@ const generateSummary = async (data) => {
 };
 
 // Suggest relevant skills
-const suggestSkills = async (existingSkills) => {
+const suggestSkills = async (resumeData, existingSkills = []) => {
   try {
-    if (!Array.isArray(existingSkills) || existingSkills.length === 0) {
-      throw new Error('Existing skills must be a non-empty array');
+    if (!resumeData || typeof resumeData !== 'object') {
+      throw new Error('Resume data must be a valid object');
     }
 
-    const prompt = PROMPTS.SUGGEST_SKILLS(existingSkills);
+    const { resumeData: normalizedResumeData, resumeText } = normalizeResumeContext(resumeData);
+    const normalizedExistingSkills = Array.isArray(existingSkills) ? existingSkills.filter(Boolean) : [];
+    const derivedExistingSkills =
+      normalizedExistingSkills.length
+        ? normalizedExistingSkills
+        : [
+            ...(Array.isArray(normalizedResumeData.skills) ? normalizedResumeData.skills : []),
+            ...extractResumeKeywords(normalizedResumeData, 8),
+          ].slice(0, 8);
+    const prompt = PROMPTS.SUGGEST_SKILLS(normalizedResumeData, resumeText, derivedExistingSkills);
 
     if (process.env.GEMINI_DEBUG === 'true') console.warn('SUGGEST_SKILLS prompt length:', prompt.length);
 
@@ -279,14 +315,16 @@ const suggestSkills = async (existingSkills) => {
 
       return {
         success: true,
-        suggestedSkills: parsed.suggestedSkills,
+        suggestedSkills: parsed.suggestedSkills
+          .filter((skill) => typeof skill === 'string' && skill.trim())
+          .slice(0, 5),
         reasoning: parsed.reasoning || 'Skills suggested based on current profile'
       };
     } catch (apiError) {
       console.warn('Gemini skill suggestion unavailable, returning local fallback skills');
       return {
         success: true,
-        ...suggestSkillsFallback(existingSkills),
+        ...suggestSkillsFallback(normalizedResumeData, derivedExistingSkills),
       };
     }
   } catch (error) {
@@ -449,6 +487,30 @@ const optimizeUploadedResumeText = async (resumeText, atsInsights = {}) => {
   }
 };
 
+const normalizeResumeContext = (data) => {
+  if (typeof data === 'string') {
+    return {
+      resumeData: { rawContent: data },
+      resumeText: String(data),
+    };
+  }
+
+  if (data?.text && !data?.experience) {
+    return {
+      resumeData: { rawContent: data.text },
+      resumeText: String(data.text),
+    };
+  }
+
+  const resumeData = data && typeof data === 'object' ? data : {};
+  const resumeText =
+    buildResumeTextFromData(resumeData) ||
+    collectResumeSignals(resumeData) ||
+    JSON.stringify(resumeData);
+
+  return { resumeData, resumeText };
+};
+
 const parseResumeForBuilder = async (resumeText, originalName = '') => {
   try {
     if (!resumeText || typeof resumeText !== 'string') {
@@ -480,7 +542,17 @@ const parseResumeForBuilder = async (resumeText, originalName = '') => {
             location: parsed.personalInfo?.location || '',
             portfolio: parsed.personalInfo?.portfolio || '',
           },
-          education: Array.isArray(parsed.education) ? parsed.education : [],
+          education: Array.isArray(parsed.education)
+            ? parsed.education.map((item) => ({
+                institution: item?.institution || '',
+                degree: item?.degree || '',
+                fieldOfStudy: item?.fieldOfStudy || '',
+                startDate: item?.startDate || '',
+                endDate: item?.endDate || '',
+                location: item?.location || '',
+                score: item?.score || '',
+              }))
+            : [],
           experience: Array.isArray(parsed.experience) ? parsed.experience : [],
           skills: Array.isArray(parsed.skills) ? parsed.skills : [],
           summary: parsed.summary || '',

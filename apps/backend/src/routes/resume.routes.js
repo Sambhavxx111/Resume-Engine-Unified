@@ -10,7 +10,6 @@ const MAX_UPLOAD_SIZE_BYTES = parseInt(process.env.MAX_RESUME_UPLOAD_BYTES || `$
 const allowedMimeTypes = new Set([
   'application/pdf',
   'text/plain',
-  'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
 const upload = multer({

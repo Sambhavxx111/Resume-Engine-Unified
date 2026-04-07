@@ -7,6 +7,8 @@ const blankEducation = {
   fieldOfStudy: "",
   startDate: "",
   endDate: "",
+  location: "",
+  score: "",
 };
 
 const blankExperience = {
@@ -86,7 +88,7 @@ const formatDateRange = (startDate, endDate) => {
   const start = formatMonthYear(startDate);
   const end = formatMonthYear(endDate);
   if (start && end) return `${start} - ${end}`;
-  return start || end || "Date period";
+  return start || end || "";
 };
 
 const splitLines = (value = "") =>
@@ -120,6 +122,23 @@ const splitCustomSectionItems = (items = []) =>
       return [raw];
     })
     .filter(Boolean);
+
+const RENDER_SKILL_REJECTION_PATTERN =
+  /@|\d{4}|^\d+(?:\.\d+)?$|%|university|college|school|academy|institute|vidyapeeth|certificate|certification|bachelor|master|dehradun|alwar|pilani|india|june|july|august|september|october|november|december|january|february|march|april|may|intern|manager|services private limited|ngo|linkedin|github/i;
+
+const sanitizeRenderedSkills = (skills = []) =>
+  Array.from(
+    new Set(
+      (Array.isArray(skills) ? skills : [])
+        .map((skill) => String(skill || "").replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .filter((skill) => skill.length <= 40)
+        .filter((skill) => /[A-Za-z]/.test(skill))
+        .filter((skill) => !RENDER_SKILL_REJECTION_PATTERN.test(skill))
+        .filter((skill) => skill.split(/\s+/).length <= 5)
+        .filter((skill) => !(/[.!?]/.test(skill) && skill.split(/\s+/).length > 3)),
+    ),
+  );
 
 const TemplateThumbnail = ({ templateId }) => {
   const normalizedTemplateId = normalizeTemplateId(templateId);
@@ -390,7 +409,10 @@ const getCustomSectionSortKey = (title = "") => {
   return "custom";
 };
 
-const getPreviewSections = (formData) => [
+const getPreviewSections = (formData) => {
+  const renderedSkills = sanitizeRenderedSkills(formData.skills);
+
+  return [
   {
     key: "summary",
     title: "Summary",
@@ -405,8 +427,8 @@ const getPreviewSections = (formData) => [
     title: "Skills",
     render: (templateStyle) => (
       <div className="mt-2 flex flex-wrap gap-2">
-        {formData.skills.length ? (
-          formData.skills.map((skill, index) => (
+        {renderedSkills.length ? (
+          renderedSkills.map((skill, index) => (
             <span
               key={`${skill}-preview-${index}`}
               className={`${templateStyle.skill} max-w-full break-words whitespace-normal`}
@@ -435,14 +457,20 @@ const getPreviewSections = (formData) => [
                     <p className="font-semibold text-slate-900">
                       {item.role || "Role"} {item.company ? `at ${item.company}` : ""}
                     </p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                      {[item.startDate, item.endDate].filter(Boolean).join(" - ") || "Dates"}
-                    </p>
+                    {([item.startDate, item.endDate].filter(Boolean).length ? (
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        {[item.startDate, item.endDate].filter(Boolean).join(" - ")}
+                      </p>
+                    ) : null)}
                   </div>
                 </div>
-                <p className="mt-2 text-slate-700">
-                  {item.description || "Impact and achievements will appear here."}
-                </p>
+                <div className="mt-2 space-y-1.5">
+                  {(splitLines(item.description).length ? splitLines(item.description) : [item.description || "Impact and achievements will appear here."]).map((line, lineIndex) => (
+                    <p key={`experience-line-${index}-${lineIndex}`} className="text-slate-700">
+                      - {line}
+                    </p>
+                  ))}
+                </div>
               </div>
             ))
         ) : (
@@ -466,9 +494,11 @@ const getPreviewSections = (formData) => [
                   {item.fieldOfStudy ? `, ${item.fieldOfStudy}` : ""}
                 </p>
                 <p className="text-slate-700">{item.institution || "Institution"}</p>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                  {[item.startDate, item.endDate].filter(Boolean).join(" - ") || "Dates"}
-                </p>
+                {([item.startDate, item.endDate].filter(Boolean).length ? (
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                    {[item.startDate, item.endDate].filter(Boolean).join(" - ")}
+                  </p>
+                ) : null)}
               </div>
             ))
         ) : (
@@ -500,6 +530,7 @@ const getPreviewSections = (formData) => [
       ),
     })) || []),
 ];
+};
 
 function ResumeForm({
   formData,
@@ -645,6 +676,7 @@ function ResumeForm({
 
   const previewName = formData.personalInfo.fullName || "Your Name";
   const previewTitle = formData.personalInfo.title || "Professional Title";
+  const renderedSkills = useMemo(() => sanitizeRenderedSkills(formData.skills), [formData.skills]);
   const normalizedTemplate = normalizeTemplateId(formData.template);
   const templateStyle =
     templatePreviewClasses[normalizedTemplate] || templatePreviewClasses.contemporary;
@@ -664,13 +696,13 @@ function ResumeForm({
   const previewSections = useMemo(() => {
     const allSections = getPreviewSections(formData);
     const orderMap = {
-      contemporary: ["summary", "skills", "experience", "projects", "education", "certifications", "achievements", "languages", "interests", "custom"],
-      "single-column": ["summary", "experience", "projects", "education", "certifications", "skills", "achievements", "languages", "interests", "custom"],
-      compact: ["summary", "experience", "projects", "skills", "education", "certifications", "achievements", "languages", "interests", "custom"],
-      creative: ["skills", "summary", "experience", "projects", "education", "certifications", "achievements", "languages", "interests", "custom"],
-      timeline: ["summary", "experience", "projects", "education", "certifications", "skills", "achievements", "languages", "interests", "custom"],
-      "enhancv-replica": ["summary", "experience", "projects", "education", "certifications", "achievements", "skills", "languages", "interests", "custom"],
-      "enhancv-columns": ["summary", "experience", "projects", "education", "certifications", "achievements", "skills", "languages", "interests", "custom"],
+      contemporary: ["summary", "education", "skills", "experience", "projects", "certifications", "achievements", "languages", "interests", "custom"],
+      "single-column": ["summary", "education", "skills", "experience", "projects", "certifications", "achievements", "languages", "interests", "custom"],
+      compact: ["summary", "education", "skills", "experience", "projects", "certifications", "achievements", "languages", "interests", "custom"],
+      creative: ["summary", "education", "skills", "experience", "projects", "certifications", "achievements", "languages", "interests", "custom"],
+      timeline: ["summary", "education", "skills", "experience", "projects", "certifications", "achievements", "languages", "interests", "custom"],
+      "enhancv-replica": ["summary", "education", "skills", "experience", "projects", "certifications", "achievements", "languages", "interests", "custom"],
+      "enhancv-columns": ["summary", "education", "skills", "experience", "projects", "certifications", "achievements", "languages", "interests", "custom"],
     };
 
     const desiredOrder = orderMap[normalizedTemplate] || orderMap.contemporary;
@@ -693,10 +725,10 @@ function ResumeForm({
   const skillsPreviewSection = previewSections.find((section) => section.key === "skills");
   const mainPreviewSections = previewSections.filter((section) => section.key !== "skills");
   const creativeLeftSections = previewSections.filter((section) =>
-    ["experience", "education"].includes(section.key) || section.key.startsWith("custom-"),
+    ["education", "skills"].includes(section.key),
   );
   const creativeRightSections = previewSections.filter((section) =>
-    ["summary", "skills"].includes(section.key),
+    !["education", "skills"].includes(section.key),
   );
 
   return (
@@ -861,13 +893,13 @@ function ResumeForm({
                       </button>
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
-                      <input className="field" placeholder="Institution" value={item.institution} onChange={(event) => updateCollectionItem("education", index, "institution", event.target.value)} />
-                      <input className="field" placeholder="Degree" value={item.degree} onChange={(event) => updateCollectionItem("education", index, "degree", event.target.value)} />
-                      <input className="field" placeholder="Field of study" value={item.fieldOfStudy} onChange={(event) => updateCollectionItem("education", index, "fieldOfStudy", event.target.value)} />
-                      <div className="grid grid-cols-2 gap-4">
-                        <input className="field" placeholder="Start date" value={item.startDate} onChange={(event) => updateCollectionItem("education", index, "startDate", event.target.value)} />
-                        <input className="field" placeholder="End date" value={item.endDate} onChange={(event) => updateCollectionItem("education", index, "endDate", event.target.value)} />
-                      </div>
+                      <input className="field md:col-span-2" placeholder="Institution / School / University" value={item.institution} onChange={(event) => updateCollectionItem("education", index, "institution", event.target.value)} />
+                      <input className="field md:col-span-2" placeholder="Degree / Certificate" value={item.degree} onChange={(event) => updateCollectionItem("education", index, "degree", event.target.value)} />
+                      <input className="field md:col-span-2" placeholder="Field of study / Branch / Stream" value={item.fieldOfStudy} onChange={(event) => updateCollectionItem("education", index, "fieldOfStudy", event.target.value)} />
+                      <input className="field" placeholder="Institution location" value={item.location || ""} onChange={(event) => updateCollectionItem("education", index, "location", event.target.value)} />
+                      <input className="field" placeholder="GPA / CGPA / Percentage" value={item.score || ""} onChange={(event) => updateCollectionItem("education", index, "score", event.target.value)} />
+                      <input className="field" placeholder="Start date" value={item.startDate} onChange={(event) => updateCollectionItem("education", index, "startDate", event.target.value)} />
+                      <input className="field" placeholder="End date" value={item.endDate} onChange={(event) => updateCollectionItem("education", index, "endDate", event.target.value)} />
                     </div>
                   </div>
                 ))}
@@ -1125,42 +1157,6 @@ function ResumeForm({
                       </div>
 
                       <div className="space-y-5">
-                        {filledExperience.length ? (
-                        <section>
-                          <div className="border-b border-emerald-900 pb-1">
-                            <h3 className={templateStyle.sectionTitle}>EXPERIENCE</h3>
-                          </div>
-                          <div className="mt-3 space-y-4">
-                            {filledExperience.map((item, index) => {
-                                const bullets = splitLines(item.description);
-                                return (
-                                  <div key={`columns-exp-${index}`} className="min-w-0">
-                                    <p className="break-words text-[13px] font-semibold leading-5 text-slate-700">
-                                      {item.role || "Title"}
-                                    </p>
-                                    <p className="break-words text-[16px] font-bold leading-5 text-emerald-700">
-                                      {item.company || "Company Name"}
-                                    </p>
-                                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
-                                      <span>{formatDateRange(item.startDate, item.endDate)}</span>
-                                      <span className="break-words">{formData.personalInfo.location || "Location"}</span>
-                                    </div>
-                                    <ul className="mt-2 list-disc pl-4 text-[11px] leading-[1.55] text-slate-700">
-                                      {(bullets.length ? bullets : ["Highlight your accomplishments, using numbers if possible."]).slice(0, 4).map((bullet, bulletIndex) => (
-                                        <li key={`columns-exp-bullet-${index}-${bulletIndex}`} className="break-words">
-                                          {bullet}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        </section>
-                        ) : null}
-                      </div>
-
-                      <div className="space-y-5">
                         {filledEducation.length ? (
                         <section>
                           <div className="border-b border-emerald-900 pb-1">
@@ -1208,6 +1204,42 @@ function ResumeForm({
                           </div>
                         </section>
                       </div>
+
+                      <div className="space-y-5">
+                        {filledExperience.length ? (
+                        <section>
+                          <div className="border-b border-emerald-900 pb-1">
+                            <h3 className={templateStyle.sectionTitle}>EXPERIENCE</h3>
+                          </div>
+                          <div className="mt-3 space-y-4">
+                            {filledExperience.map((item, index) => {
+                                const bullets = splitLines(item.description);
+                                return (
+                                  <div key={`columns-exp-${index}`} className="min-w-0">
+                                    <p className="break-words text-[13px] font-semibold leading-5 text-slate-700">
+                                      {item.role || "Title"}
+                                    </p>
+                                    <p className="break-words text-[16px] font-bold leading-5 text-emerald-700">
+                                      {item.company || "Company Name"}
+                                    </p>
+                                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
+                                      <span>{formatDateRange(item.startDate, item.endDate)}</span>
+                                      <span className="break-words">{formData.personalInfo.location || "Location"}</span>
+                                    </div>
+                                    <ul className="mt-2 list-disc pl-4 text-[11px] leading-[1.55] text-slate-700">
+                                      {(bullets.length ? bullets : ["Highlight your accomplishments, using numbers if possible."]).slice(0, 4).map((bullet, bulletIndex) => (
+                                        <li key={`columns-exp-bullet-${index}-${bulletIndex}`} className="break-words">
+                                          {bullet}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </section>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 ) : templateStyle.layout === "enhancv-replica" ? (
@@ -1231,6 +1263,51 @@ function ResumeForm({
                             "Your professional summary will appear here once you add it."}
                         </p>
                       </section>
+
+                      {filledEducation.length ? (
+                      <section>
+                        <h3 className={templateStyle.sectionTitle}>EDUCATION</h3>
+                        <div className="mt-3 space-y-3">
+                          {filledEducation.map((item, index) => (
+                                <div key={`enhancv-edu-${index}`} className="grid grid-cols-[96px_18px_minmax(0,1fr)] gap-3">
+                                  <div className="text-[11px] leading-[1.5] text-slate-600">
+                                    <p className="font-bold text-blue-700">{formatDateRange(item.startDate, item.endDate)}</p>
+                                    <p>{formData.personalInfo.location || "Location"}</p>
+                                  </div>
+                                  <div className="relative">
+                                    <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
+                                    <span className="absolute left-1/2 top-3 bottom-0 w-px -translate-x-1/2 bg-slate-500" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-[14px] font-semibold leading-5 text-blue-700">
+                                      {item.degree || "Bachelor of Technology"}
+                                      {item.fieldOfStudy ? `, ${item.fieldOfStudy}` : ""}
+                                    </p>
+                                    <p className="text-[14px] font-bold leading-5 text-orange-600">
+                                      {item.institution || "University / Institute"}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                        </div>
+                      </section>
+                      ) : null}
+
+                      {renderedSkills.length ? (
+                      <section>
+                        <h3 className={templateStyle.sectionTitle}>SKILLS</h3>
+                        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-3">
+                          {renderedSkills.map((skill, index) => (
+                            <span
+                              key={`${skill}-enhancv-${index}`}
+                              className={`${templateStyle.skill} max-w-full break-words whitespace-normal leading-4`}
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </section>
+                      ) : null}
 
                       {filledExperience.length ? (
                       <section>
@@ -1270,35 +1347,6 @@ function ResumeForm({
                       </section>
                       ) : null}
 
-                      {filledEducation.length ? (
-                      <section>
-                        <h3 className={templateStyle.sectionTitle}>EDUCATION</h3>
-                        <div className="mt-3 space-y-3">
-                          {filledEducation.map((item, index) => (
-                                <div key={`enhancv-edu-${index}`} className="grid grid-cols-[96px_18px_minmax(0,1fr)] gap-3">
-                                  <div className="text-[11px] leading-[1.5] text-slate-600">
-                                    <p className="font-bold text-blue-700">{formatDateRange(item.startDate, item.endDate)}</p>
-                                    <p>{formData.personalInfo.location || "Location"}</p>
-                                  </div>
-                                  <div className="relative">
-                                    <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
-                                    <span className="absolute left-1/2 top-3 bottom-0 w-px -translate-x-1/2 bg-slate-500" />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="text-[14px] font-semibold leading-5 text-blue-700">
-                                      {item.degree || "Bachelor of Technology"}
-                                      {item.fieldOfStudy ? `, ${item.fieldOfStudy}` : ""}
-                                    </p>
-                                    <p className="text-[14px] font-bold leading-5 text-orange-600">
-                                      {item.institution || "University / Institute"}
-                                    </p>
-                                  </div>
-                                </div>
-                              ))}
-                        </div>
-                      </section>
-                      ) : null}
-
                       {filledCustomSections.map((section, index) => (
                         <section key={`enhancv-custom-${index}`}>
                           <h3 className={templateStyle.sectionTitle}>
@@ -1322,22 +1370,6 @@ function ResumeForm({
                           </div>
                         </section>
                       ))}
-
-                      {formData.skills.length ? (
-                      <section>
-                        <h3 className={templateStyle.sectionTitle}>SKILLS</h3>
-                        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-3">
-                          {formData.skills.map((skill, index) => (
-                            <span
-                              key={`${skill}-enhancv-${index}`}
-                              className={`${templateStyle.skill} max-w-full break-words whitespace-normal leading-4`}
-                            >
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      </section>
-                      ) : null}
                     </div>
                   </div>
                 ) : templateStyle.layout === "creative" ? (
@@ -1387,8 +1419,8 @@ function ResumeForm({
                             </div>
                             {section.key === "skills" ? (
                               <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm font-semibold text-slate-800">
-                                {formData.skills.length ? (
-                                  formData.skills.map((skill, index) => (
+                                {renderedSkills.length ? (
+                                  renderedSkills.map((skill, index) => (
                                     <span
                                       key={`${skill}-creative-${index}`}
                                       className="min-w-0 break-words border-b border-slate-300 pb-1 whitespace-normal"

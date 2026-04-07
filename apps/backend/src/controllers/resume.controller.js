@@ -2,6 +2,7 @@ const resumeModel = require('../models/resume.model');
 const { sanitizeResumePayload } = require('../utils/sanitizeResume');
 const { parseResumeForBuilder } = require('../services/gemini.service');
 const { PDFParse } = require('pdf-parse');
+const mammoth = require('mammoth');
 
 const sanitizeExtractedResumeText = (text = '', originalName = '') => {
   const normalized = String(text || '')
@@ -51,8 +52,18 @@ const extractUploadedText = async (file) => {
         await parser.destroy().catch(() => {});
       }
     }
-  } else {
+  } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    try {
+      const result = await mammoth.extractRawText({ buffer: file.buffer });
+      text = result?.value || '';
+    } catch (docxError) {
+      console.error('DOCX parsing warning:', docxError.message);
+      throw new Error('Unable to extract text from this DOCX file. Please try PDF, TXT, or a simpler DOCX export.');
+    }
+  } else if (file.mimetype === 'text/plain') {
     text = file.buffer.toString('utf-8');
+  } else {
+    throw new Error('Unsupported resume file type. Please upload PDF, DOCX, or TXT.');
   }
 
   if (!text.trim()) {

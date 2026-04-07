@@ -17,6 +17,17 @@ const TEMPLATE_ID_ALIASES = {
 
 const normalizeTemplateId = (templateId) => TEMPLATE_ID_ALIASES[templateId] || templateId || "contemporary";
 
+const normalizeImportedName = (value = "") => {
+  const cleaned = String(value || "").replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+
+  return cleaned
+    .toLowerCase()
+    .replace(/\b\w/g, (match) => match.toUpperCase())
+    .replace(/\b([A-Za-z])'([A-Za-z])/g, (_, first, second) => `${first.toUpperCase()}'${second.toUpperCase()}`)
+    .trim();
+};
+
 const toConciseInsight = (value) => {
   const raw = String(value || "").replace(/\s+/g, " ").trim();
   if (!raw) {
@@ -56,6 +67,8 @@ const defaultResumeState = {
       fieldOfStudy: "",
       startDate: "",
       endDate: "",
+      location: "",
+      score: "",
     },
   ],
   experience: [
@@ -106,10 +119,14 @@ function ResumeBuilder() {
             personalInfo: {
               ...defaultResumeState.personalInfo,
               ...(data.resume.personalInfo || {}),
+              fullName: normalizeImportedName(data.resume.personalInfo?.fullName || ""),
             },
             education:
               Array.isArray(data.resume.education) && data.resume.education.length
-                ? data.resume.education
+                ? data.resume.education.map((item) => ({
+                    ...defaultResumeState.education[0],
+                    ...(item || {}),
+                  }))
                 : defaultResumeState.education,
             experience:
               Array.isArray(data.resume.experience) && data.resume.experience.length
@@ -194,10 +211,14 @@ function ResumeBuilder() {
         personalInfo: {
           ...defaultResumeState.personalInfo,
           ...(data.resume?.personalInfo || {}),
+          fullName: normalizeImportedName(data.resume?.personalInfo?.fullName || ""),
         },
         education:
           Array.isArray(data.resume?.education) && data.resume.education.length
-            ? data.resume.education
+            ? data.resume.education.map((item) => ({
+                ...defaultResumeState.education[0],
+                ...(item || {}),
+              }))
             : defaultResumeState.education,
         experience:
           Array.isArray(data.resume?.experience) && data.resume.experience.length
@@ -278,6 +299,7 @@ function ResumeBuilder() {
         }
 
         const { data } = await axiosInstance.post(API.aiSkills, {
+          resumeData: formData,
           existingSkills: skillSeed,
         });
 
