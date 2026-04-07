@@ -16,6 +16,8 @@ function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
+  const [showGuestNotice, setShowGuestNotice] = useState(false);
+  const [guestModeActive, setGuestModeActive] = useState(false);
   const isCareerGuidance = location.pathname === "/career-guidance";
   const useDarkCareerNavbar = isCareerGuidance && isScrolled;
 
@@ -32,9 +34,24 @@ function Navbar() {
     };
   }, [location.pathname]);
 
+  useEffect(() => {
+    setShowGuestNotice(Boolean(location.state?.guestModeNotice));
+    setGuestModeActive(Boolean(location.state?.guestModeNotice));
+  }, [location.pathname, location.state]);
+
   const handleLogout = () => {
     logout();
     navigate('/dashboard');
+  };
+
+  const handleGuestAccess = () => {
+    if (location.pathname === '/dashboard') {
+      setShowGuestNotice((current) => !current);
+      setGuestModeActive(true);
+      return;
+    }
+
+    navigate('/dashboard', { state: { guestModeNotice: true } });
   };
 
   return (
@@ -102,22 +119,76 @@ function Navbar() {
             ))}
         </nav>
 
-        <div className="flex flex-shrink-0 items-center justify-end gap-3 justify-self-end">
+        <div className="relative flex flex-shrink-0 items-center justify-end gap-3 justify-self-end">
           {isAuthenticated ? (
             <button type="button" className="button-secondary" onClick={handleLogout}>
               Logout
             </button>
           ) : (
             <>
-              <span className={`hidden rounded-full px-3 py-2 text-xs font-medium uppercase tracking-[0.2em] sm:inline-flex ${
-                useDarkCareerNavbar
-                  ? "border border-slate-600 bg-slate-800/90 text-slate-300"
-                  : "border border-slate-200 bg-slate-50 text-slate-500"
-              }`}>
-                Guest Mode
-              </span>
+              <button
+                type="button"
+                onClick={handleGuestAccess}
+                aria-expanded={showGuestNotice}
+                aria-controls="guest-mode-notice"
+                className={`rounded-full px-3 py-2 text-xs font-medium uppercase tracking-[0.2em] transition ${
+                  guestModeActive
+                    ? useDarkCareerNavbar
+                      ? "border border-cyan-400/70 bg-cyan-400/20 text-cyan-100 shadow-[0_0_0_1px_rgba(34,211,238,0.18)]"
+                      : "border border-cyan-200 bg-cyan-50 text-cyan-700 shadow-[0_10px_25px_rgba(34,211,238,0.16)]"
+                    : useDarkCareerNavbar
+                      ? "border border-slate-600 bg-slate-800/90 text-slate-300 hover:bg-slate-800"
+                      : "border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                }`}
+              >
+                Continue as Guest
+              </button>
               <Link to="/login" className={useDarkCareerNavbar ? "button-secondary border-white/15 bg-white/10 text-white hover:bg-white/15" : "button-secondary"}>Login</Link>
               <Link to="/signup" className="button-primary hidden sm:inline-flex">Get Started</Link>
+              {showGuestNotice ? (
+                <div
+                  id="guest-mode-notice"
+                  className={`absolute right-0 top-[calc(100%+0.75rem)] w-[min(22rem,calc(100vw-2rem))] rounded-[24px] border p-4 shadow-[0_24px_60px_rgba(15,23,42,0.18)] ${
+                    useDarkCareerNavbar
+                      ? "border-slate-700 bg-slate-900/95 text-slate-100"
+                      : "border-slate-200 bg-white/95 text-slate-900"
+                  }`}
+                >
+                  <p className={`text-[11px] font-semibold uppercase tracking-[0.24em] ${
+                    useDarkCareerNavbar ? "text-slate-400" : "text-slate-500"
+                  }`}>
+                    Guest Access
+                  </p>
+                  <button
+                    type="button"
+                    aria-label="Close guest access notice"
+                    onClick={() => setShowGuestNotice(false)}
+                    className={`absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                      useDarkCareerNavbar
+                        ? "border-slate-700 text-slate-300 hover:bg-slate-800"
+                        : "border-slate-200 text-slate-500 hover:bg-slate-100"
+                    }`}
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                      <path d="M6 6l12 12" />
+                      <path d="M18 6 6 18" />
+                    </svg>
+                  </button>
+                  <p className={`mt-2 text-sm leading-6 ${
+                    useDarkCareerNavbar ? "text-slate-200" : "text-slate-600"
+                  }`}>
+                    You are in guest mode right now. To use all features, please login or register with your email ID.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Link to="/login" className="button-primary">
+                      Login
+                    </Link>
+                    <Link to="/signup" className="button-secondary">
+                      Register
+                    </Link>
+                  </div>
+                </div>
+              ) : null}
             </>
           )}
         </div>

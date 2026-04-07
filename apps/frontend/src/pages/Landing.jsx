@@ -102,10 +102,7 @@ function Landing() {
             </div>
           </div>
           <div className="reveal-up delay-3 flex flex-wrap gap-4">
-            <Link to="/dashboard" className="button-primary">
-              Continue as Guest
-            </Link>
-            <Link to="/signup" className="button-secondary">
+            <Link to="/signup" className="button-primary">
               Create Account
             </Link>
             <Link to="/login" className="button-secondary">
