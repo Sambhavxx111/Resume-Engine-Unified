@@ -25,6 +25,17 @@ const CareerGuidanceIcon = () => (
   </svg>
 );
 
+const JdMatcherIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-7 w-7 text-cyan-200" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5.75 6.75h6.5a1.75 1.75 0 0 1 1.75 1.75V15a1.75 1.75 0 0 1-1.75 1.75h-6.5A1.75 1.75 0 0 1 4 15V8.5a1.75 1.75 0 0 1 1.75-1.75Z" />
+    <path d="M9 9.75h3" />
+    <path d="M9 12.5h2" />
+    <path d="M15.5 8.25h4.75" />
+    <path d="M17.875 5.875v4.75" />
+    <path d="M16.25 14.75l1.25 1.25 2.5-2.75" />
+  </svg>
+);
+
 const cards = [
   {
     title: 'Resume Builder',
@@ -46,6 +57,13 @@ const cards = [
     cta: 'Open Career Module',
     to: '/career-guidance',
     icon: CareerGuidanceIcon,
+  },
+  {
+    title: 'JD Matcher',
+    description: 'Check resume-to-job alignment quickly and identify what each application still needs.',
+    cta: 'Open JD Matcher',
+    to: '/jd-match',
+    icon: JdMatcherIcon,
   },
 ];
 
@@ -95,7 +113,7 @@ function Dashboard() {
         </div>
       </section>
 
-      <section className="reveal-up delay-2 mt-10 grid gap-6 lg:grid-cols-3">
+      <section className="reveal-up delay-2 mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
           <article key={card.title} className="feature-card">
             <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-[18px] border border-slate-200 bg-slate-900 shadow-sm">

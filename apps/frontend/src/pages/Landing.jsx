@@ -17,13 +17,22 @@ const AtsAnalyzerIcon = () => (
   </svg>
 );
 
-const AiOptimizationIcon = () => (
+const JdMatcherIcon = () => (
   <svg viewBox="0 0 24 24" className="h-6 w-6 text-cyan-200" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 3.75 14 8l4.75 1-3.25 3.25.5 4.75L12 14.75 7.75 17l.5-4.75L5 9l4.75-1L12 3.75Z" />
-    <path d="M18.25 3.75v3.5" />
-    <path d="M20 5.5h-3.5" />
-    <path d="M5.75 17.5V21" />
-    <path d="M7.5 19.25H4" />
+    <path d="M5.75 6.75h6.5a1.75 1.75 0 0 1 1.75 1.75V15a1.75 1.75 0 0 1-1.75 1.75h-6.5A1.75 1.75 0 0 1 4 15V8.5a1.75 1.75 0 0 1 1.75-1.75Z" />
+    <path d="M9 9.75h3" />
+    <path d="M9 12.5h2" />
+    <path d="M15.5 8.25h4.75" />
+    <path d="M17.875 5.875v4.75" />
+    <path d="M16.25 14.75l1.25 1.25 2.5-2.75" />
+  </svg>
+);
+
+const CareerGuidanceIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-6 w-6 text-cyan-200" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 4.75c4 0 7.25 3.25 7.25 7.25S16 19.25 12 19.25 4.75 16 4.75 12 8 4.75 12 4.75Z" />
+    <path d="M12 8.5v3.5l2.5 1.75" />
+    <path d="M8 19.25h8" />
   </svg>
 );
 
@@ -43,11 +52,18 @@ const features = [
     icon: AtsAnalyzerIcon,
   },
   {
-    title: "AI Optimization",
-    description: "Generate summaries, surface missing skills, and polish your resume for stronger outcomes.",
-    to: "/resume",
-    cta: "Use AI Tools",
-    icon: AiOptimizationIcon,
+    title: "JD Matcher",
+    description: "Compare your resume against job descriptions and spot alignment gaps before you apply.",
+    to: "/jd-match",
+    cta: "Match Against JD",
+    icon: JdMatcherIcon,
+  },
+  {
+    title: "Career Guidance",
+    description: "Explore skill insights, live job matches, and guided next steps tailored to your resume.",
+    to: "/career-guidance",
+    cta: "Open Career Module",
+    icon: CareerGuidanceIcon,
   },
 ];
 
@@ -137,7 +153,7 @@ function Landing() {
         </div>
       </section>
 
-      <section className="reveal-up delay-4 mt-12 grid gap-6 md:grid-cols-3">
+      <section className="reveal-up delay-4 mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         {features.map((feature) => (
           <Link
             key={feature.title}
