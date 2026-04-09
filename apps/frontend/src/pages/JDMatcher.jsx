@@ -119,7 +119,7 @@ function JDMatcher() {
             />
 
             {error ? (
-              <div className="rounded-2xl border border-rose-300/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
+              <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-[0_10px_24px_rgba(244,63,94,0.08)]">
                 {error}
               </div>
             ) : null}
@@ -196,16 +196,16 @@ function JDMatcher() {
                 <div className="glass-card p-6">
                   <h3 className="text-lg font-semibold text-slate-900">Analysis Summary</h3>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="metric-tile text-sm text-slate-200">
+                    <div className="metric-tile border-slate-300/80 bg-white/95 text-sm font-medium text-slate-700">
                       Matched requirements: {result.summary.matched ?? "--"} / {result.summary.total ?? "--"}
                     </div>
-                    <div className="metric-tile text-sm text-slate-200">
+                    <div className="metric-tile border-slate-300/80 bg-white/95 text-sm font-medium text-slate-700">
                       Resume skills detected: {result.summary.resumeSkillsCount ?? "--"}
                     </div>
-                    <div className="metric-tile text-sm text-slate-200">
+                    <div className="metric-tile border-slate-300/80 bg-white/95 text-sm font-medium text-slate-700">
                       JD requirements detected: {result.summary.jdRequiredCount ?? "--"}
                     </div>
-                    <div className="metric-tile text-sm text-slate-200">
+                    <div className="metric-tile border-slate-300/80 bg-white/95 text-sm font-medium text-slate-700">
                       {result.isStrongMatch ? "Strong fit for this role" : "Needs improvement for this role"}
                     </div>
                   </div>

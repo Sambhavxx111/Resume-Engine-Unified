@@ -12,10 +12,19 @@ const sendGeminiAwareError = (res, error, fallbackMessage) => {
   const isQuotaOrRateLimit =
     error?.status === 429 ||
     /429|Too Many Requests|quota exceeded|rate limit/i.test(message);
+  const isGeminiConfigError =
+    /GEMINI_API_KEY is missing|api key/i.test(message);
 
   if (isQuotaOrRateLimit) {
     return res.status(429).json({
       error: 'Gemini quota or rate limit reached. Please wait and try again, or update your Gemini plan/key.',
+      details: message,
+    });
+  }
+
+  if (isGeminiConfigError) {
+    return res.status(503).json({
+      error: 'Gemini is not configured correctly on the server. Please add a valid Gemini API key and try again.',
       details: message,
     });
   }
@@ -321,6 +330,148 @@ const buildUploadedResumeJson = (text, originalName) => {
   };
 };
 
+const normalizeComparable = (value = '') =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const isWeakOptimizedTitle = (value = '') => {
+  const normalized = normalizeComparable(value);
+  return (
+    !normalized ||
+    normalized === 'professional title' ||
+    /^(internship|projects|publications|certificates|certifications|experience|education|skills|summary)$/.test(normalized)
+  );
+};
+
+const mergeUniqueStrings = (preferred = [], fallback = [], limit = 24) => {
+  const seen = new Set();
+  return [...preferred, ...fallback]
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .filter((item) => {
+      const key = normalizeComparable(item);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
+};
+
+const mergeEntriesByIdentity = (preferred = [], fallback = [], identityFields = []) => {
+  const buildKey = (item = {}) => {
+    const composite = identityFields
+      .map((field) => String(item?.[field] || '').trim())
+      .filter(Boolean)
+      .join('|');
+
+    if (composite) {
+      return normalizeComparable(composite);
+    }
+
+    return normalizeComparable(JSON.stringify(item || {}));
+  };
+
+  const merged = [];
+  const seen = new Set();
+
+  [...preferred, ...fallback].forEach((item) => {
+    if (!item || typeof item !== 'object') return;
+    const key = buildKey(item);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    merged.push(item);
+  });
+
+  return merged;
+};
+
+const mergeCustomSections = (preferred = [], fallback = []) => {
+  const mergedByTitle = new Map();
+
+  fallback.forEach((section) => {
+    const title = String(section?.title || '').trim();
+    if (!title) return;
+    mergedByTitle.set(normalizeComparable(title), {
+      title,
+      items: Array.isArray(section?.items) ? section.items.filter(Boolean) : [],
+    });
+  });
+
+  preferred.forEach((section) => {
+    const title = String(section?.title || '').trim();
+    if (!title) return;
+    const key = normalizeComparable(title);
+    const existing = mergedByTitle.get(key);
+    mergedByTitle.set(key, {
+      title,
+      items: mergeUniqueStrings(
+        Array.isArray(section?.items) ? section.items : [],
+        existing?.items || [],
+        10,
+      ),
+    });
+  });
+
+  return Array.from(mergedByTitle.values()).filter((section) => section.title && section.items.length);
+};
+
+const mergeOptimizedWithOriginalResume = (optimizedResume = {}, originalResume = {}) => {
+  const optimizedPersonalInfo = optimizedResume.personalInfo || {};
+  const originalPersonalInfo = originalResume.personalInfo || {};
+  const optimizedSummary = String(optimizedResume.summary || '').trim();
+  const originalSummary = String(originalResume.summary || '').trim();
+
+  return {
+    ...originalResume,
+    ...optimizedResume,
+    personalInfo: {
+      ...originalPersonalInfo,
+      ...optimizedPersonalInfo,
+      fullName:
+        optimizedPersonalInfo.fullName ||
+        optimizedPersonalInfo.name ||
+        originalPersonalInfo.fullName ||
+        originalPersonalInfo.name ||
+        '',
+      name:
+        optimizedPersonalInfo.name ||
+        optimizedPersonalInfo.fullName ||
+        originalPersonalInfo.name ||
+        originalPersonalInfo.fullName ||
+        '',
+      title: isWeakOptimizedTitle(optimizedPersonalInfo.title)
+        ? (originalPersonalInfo.title || optimizedPersonalInfo.title || '')
+        : optimizedPersonalInfo.title,
+      email: optimizedPersonalInfo.email || originalPersonalInfo.email || '',
+      phone: optimizedPersonalInfo.phone || originalPersonalInfo.phone || '',
+      location: optimizedPersonalInfo.location || originalPersonalInfo.location || '',
+      portfolio: optimizedPersonalInfo.portfolio || originalPersonalInfo.portfolio || '',
+    },
+    summary: optimizedSummary || originalSummary,
+    skills: mergeUniqueStrings(
+      Array.isArray(optimizedResume.skills) ? optimizedResume.skills : [],
+      Array.isArray(originalResume.skills) ? originalResume.skills : [],
+      24,
+    ),
+    experience: mergeEntriesByIdentity(
+      Array.isArray(optimizedResume.experience) ? optimizedResume.experience : [],
+      Array.isArray(originalResume.experience) ? originalResume.experience : [],
+      ['role', 'company', 'description'],
+    ),
+    education: mergeEntriesByIdentity(
+      Array.isArray(optimizedResume.education) ? optimizedResume.education : [],
+      Array.isArray(originalResume.education) ? originalResume.education : [],
+      ['degree', 'institution', 'fieldOfStudy'],
+    ),
+    customSections: mergeCustomSections(
+      Array.isArray(optimizedResume.customSections) ? optimizedResume.customSections : [],
+      Array.isArray(originalResume.customSections) ? originalResume.customSections : [],
+    ),
+  };
+};
+
 const stripScoreLanguage = (text = '') =>
   text
     .split('\n')
@@ -512,12 +663,12 @@ const optimizeUploadedResume = async (req, res) => {
       missingKeywords: originalScoreData.missingKeywords,
       missingSections: originalScoreData.missingSections,
       targetScore: 90,
-    });
+    }, req.file.originalname);
 
     const bestOptimizedText = stripScoreLanguage(optimized.optimizedResumeText);
     const optimizedResumeJson =
       optimized.optimizedResumeData && typeof optimized.optimizedResumeData === 'object'
-        ? {
+        ? mergeOptimizedWithOriginalResume({
             ...optimized.optimizedResumeData,
             raw_text: bestOptimizedText,
             personalInfo: {
@@ -539,7 +690,7 @@ const optimizeUploadedResume = async (req, res) => {
             customSections: Array.isArray(optimized.optimizedResumeData.customSections)
               ? optimized.optimizedResumeData.customSections
               : [],
-          }
+          }, uploadedResumeJson)
         : buildUploadedResumeJson(bestOptimizedText, req.file.originalname);
     const optimizedScoreData = await scoreResumeSafely(optimizedResumeJson, null);
 

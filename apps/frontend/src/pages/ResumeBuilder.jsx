@@ -40,11 +40,7 @@ const toConciseInsight = (value) => {
     .replace(/^overall assessment:\s*/i, "")
     .trim();
 
-  if (cleaned.length <= 115) {
-    return cleaned;
-  }
-
-  return `${cleaned.slice(0, 112).trimEnd()}...`;
+  return cleaned;
 };
 
 const buildConciseInsights = (items = []) =>
@@ -85,6 +81,11 @@ const defaultResumeState = {
   customSections: [],
 };
 
+const defaultResumePhotoPlacement = {
+  x: 0.72,
+  y: 0.06,
+};
+
 function ResumeBuilder() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -98,6 +99,7 @@ function ResumeBuilder() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [aiInsights, setAiInsights] = useState(null);
+  const [resumePhoto, setResumePhoto] = useState(null);
   const previewRef = useRef(null);
 
   useEffect(() => {
@@ -173,7 +175,7 @@ function ResumeBuilder() {
 
     try {
       const { data } = await axiosInstance.post(API.saveResume, formData);
-      await exportResumePdf(formData, previewRef.current);
+      await exportResumePdf(formData, { resumePhoto });
       setSuccessMessage(data.message || "Resume saved successfully.");
     } catch (requestError) {
       setError(
@@ -184,6 +186,89 @@ function ResumeBuilder() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handlePhotoUpload = async (file) => {
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please upload a valid image file for the resume photo.");
+      setSuccessMessage("");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Resume photo must be 2 MB or smaller.");
+      setSuccessMessage("");
+      return;
+    }
+
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      const src = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Unable to read the selected image."));
+        reader.readAsDataURL(file);
+      });
+
+      const image = await new Promise((resolve, reject) => {
+        const nextImage = new Image();
+        nextImage.onload = () => resolve(nextImage);
+        nextImage.onerror = () => reject(new Error("Unable to load the selected image."));
+        nextImage.src = src;
+      });
+
+      const normalizedSrc = await new Promise((resolve, reject) => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = image.naturalWidth || image.width || 1;
+          canvas.height = image.naturalHeight || image.height || 1;
+          const context = canvas.getContext("2d");
+
+          if (!context) {
+            reject(new Error("Unable to prepare the selected image."));
+            return;
+          }
+
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/png"));
+        } catch (canvasError) {
+          reject(new Error("Unable to prepare the selected image."));
+        }
+      });
+
+      const dimensions = {
+        width: image.naturalWidth || image.width || 0,
+        height: image.naturalHeight || image.height || 0,
+      };
+
+      setResumePhoto({
+        src: normalizedSrc,
+        name: file.name,
+        size: file.size,
+        width: dimensions.width,
+        height: dimensions.height,
+        placement: defaultResumePhotoPlacement,
+      });
+      setSuccessMessage("Resume photo uploaded. Drag it inside the preview or use a photo-ready template.");
+    } catch (photoError) {
+      setError(photoError.message || "Unable to upload the selected image.");
+      setSuccessMessage("");
+    }
+  };
+
+  const handlePhotoRemove = () => {
+    setResumePhoto(null);
+    setSuccessMessage("Resume photo removed.");
+  };
+
+  const handlePhotoPlacementChange = (placement) => {
+    setResumePhoto((prev) => (prev ? { ...prev, placement } : prev));
   };
 
   const handleImportResume = async () => {
@@ -303,13 +388,6 @@ function ResumeBuilder() {
           existingSkills: skillSeed,
         });
 
-        if (Array.isArray(data.suggestedSkills)) {
-          setFormData((prev) => ({
-            ...prev,
-            skills: Array.from(new Set([...prev.skills, ...data.suggestedSkills])),
-          }));
-        }
-
         setAiInsights({
           title: "Suggested Skills",
           lines: buildConciseInsights([
@@ -376,6 +454,10 @@ function ResumeBuilder() {
             error={error}
             successMessage={successMessage}
             aiInsights={aiInsights}
+            resumePhoto={resumePhoto}
+            onPhotoUpload={handlePhotoUpload}
+            onPhotoRemove={handlePhotoRemove}
+            onPhotoPlacementChange={handlePhotoPlacementChange}
             previewRef={previewRef}
           />
         </div>

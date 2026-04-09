@@ -148,7 +148,27 @@ const TEMPLATE_CONFIG = {
 };
 
 const filterFilled = (items = []) => items.filter(Boolean);
-const safeText = (value = "") => String(value || "").trim();
+const cleanResumeText = (value = "") =>
+  String(value || "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .replace(/â€¢|â—|â–ª|ð·/g, "•")
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[‐‑‒–—]/g, "-")
+    .replace(/^[ðþÿ]+\s*/g, "")
+    .replace(/\s*[ðþÿ]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+const toPdfSafeText = (value = "") =>
+  cleanResumeText(value)
+    .normalize("NFKD")
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+const safeText = (value = "") => toPdfSafeText(value);
+const stripBulletPrefix = (value = "") =>
+  cleanResumeText(value).replace(/^(?:[•●▪◦·*-]\s*)+/, "").trim();
 const getCustomSectionSortKey = (title = "") => {
   const normalized = String(title || "").trim().toLowerCase();
   if (/project/.test(normalized)) return "projects";
@@ -221,6 +241,57 @@ const sanitizeRenderedSkills = (skills = []) =>
         .filter((skill) => !(/[.!?]/.test(skill) && skill.split(/\s+/).length > 3)),
     ),
   );
+
+const getPhotoImageFormat = (src = "") => {
+  const match = String(src || "").match(/^data:image\/(png|jpeg|jpg|webp);/i);
+  if (!match) return "PNG";
+  return /jpe?g/i.test(match[1]) ? "JPEG" : "PNG";
+};
+
+const drawResumePhoto = (doc, template, resumePhoto = null) => {
+  if (!resumePhoto?.src) {
+    return;
+  }
+
+  const format = getPhotoImageFormat(resumePhoto.src);
+  let x = 12;
+  let y = 12;
+  let width = 32;
+  let height = 40;
+
+  if (template === "creative") {
+    x = 168;
+    y = 14;
+    width = 28;
+    height = 28;
+  } else if (template === "enhancv-columns") {
+    x = 172;
+    y = 9;
+    width = 22;
+    height = 22;
+  } else {
+    const usableWidth = PAGE_WIDTH - 24 - width;
+    const usableHeight = PAGE_HEIGHT - 24 - height;
+    x = 12 + Math.max(0, Math.min(usableWidth, (resumePhoto.placement?.x ?? 0.72) * usableWidth));
+    y = 12 + Math.max(0, Math.min(usableHeight, (resumePhoto.placement?.y ?? 0.06) * usableHeight));
+  }
+
+  doc.addImage(resumePhoto.src, format, x, y, width, height, undefined, "FAST");
+
+  if (template === "creative") {
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.9);
+    doc.circle(182, 28, 14);
+  } else if (template === "enhancv-columns") {
+    doc.setDrawColor(148, 163, 184);
+    doc.setLineWidth(0.8);
+    doc.circle(183, 20, 11);
+  } else {
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.8);
+    doc.roundedRect(x, y, width, height, 2, 2);
+  }
+};
 
 const getResumeSections = (formData) => {
   const sections = [];
@@ -460,7 +531,7 @@ const drawSectionBody = (doc, section, x, y, width, config) => {
       doc.setFontSize(10.9);
       y = drawWrappedText(doc, item.heading, x, y, width, 5.5);
 
-      if (item.subheading) {
+      if (item.subheading && safeText(item.subheading) !== safeText(item.heading)) {
         doc.setTextColor(51, 65, 85);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10);
@@ -1220,7 +1291,7 @@ const inferProfessionalTitle = (lines = [], headline = "") => {
     return headline;
   }
 
-  return titleLike || "Professional Title";
+  return titleLike || "";
 };
 
 const splitSkillTokens = (lines = []) =>
@@ -1448,6 +1519,19 @@ const isLikelyName = (value = "") =>
     String(value),
   );
 
+const looksLikeContactLine = (value = "") =>
+  /@|linkedin\.com|github\.com|https?:\/\/|\+?\d[\d\s\-()]{7,}/i.test(cleanResumeText(value));
+
+const looksLikeContactSummary = (value = "") => {
+  const text = cleanResumeText(value);
+  if (!text) return false;
+
+  const fragments = text.split(/\s*\|\s*|,\s*/).map((part) => part.trim()).filter(Boolean);
+  const contactCount = fragments.filter((fragment) => looksLikeContactLine(fragment)).length;
+
+  return contactCount >= 2 || (looksLikeContactLine(text) && !/[.!?]/.test(text));
+};
+
 const sanitizeSkillItems = (skills = [], personalInfo = {}) => {
   const forbiddenTokens = new Set(
     [
@@ -1488,7 +1572,7 @@ const sanitizeOptimizedResumeData = (optimizedResume = {}, fileName = "") => {
 
   const normalizeEntry = (item = {}, fields = []) =>
     fields.reduce((acc, field) => {
-      acc[field] = String(item?.[field] || "").trim();
+      acc[field] = cleanResumeText(item?.[field] || "");
       return acc;
     }, {});
 
@@ -1502,9 +1586,9 @@ const sanitizeOptimizedResumeData = (optimizedResume = {}, fileName = "") => {
 
   const customSections = Array.isArray(optimizedResume.customSections)
     ? optimizedResume.customSections.map((section) => ({
-        title: String(section?.title || "").trim(),
+        title: cleanResumeText(section?.title || ""),
         items: Array.isArray(section?.items)
-          ? section.items.map((item) => String(item || "").trim()).filter(Boolean)
+          ? section.items.map((item) => stripBulletPrefix(item)).filter(Boolean)
           : [],
       }))
     : [];
@@ -1563,18 +1647,41 @@ const sanitizeOptimizedResumeData = (optimizedResume = {}, fileName = "") => {
     return true;
   });
 
+  const cleanedTitle = cleanResumeText(personalInfo.title || "");
+  const inferredTitle =
+    cleanedTitle ||
+    inferProfessionalTitle(
+      [
+        ...normalizedExperience.flatMap((item) => [item.role, item.company, item.description]),
+      ],
+      "",
+    );
+
+  const cleanedSummary = cleanResumeText(optimizedResume.summary || "");
+  const fallbackSummary = inferSummary(
+    [
+      ...normalizedExperience.flatMap((item) => [item.role, item.description]),
+      ...filteredCustomSections.flatMap((section) => [section.title, ...(section.items || []).slice(0, 2)]),
+      ...mergedSkills,
+    ],
+    inferredTitle,
+  );
+  const resolvedSummary =
+    cleanedSummary && !looksLikeContactSummary(cleanedSummary) ? cleanedSummary : fallbackSummary;
+
   return {
     ...optimizedResume,
     personalInfo: {
       ...personalInfo,
       fullName: cleanedFullName || "Optimized Resume",
       name: cleanedFullName || "Optimized Resume",
-      title: String(personalInfo.title || "").trim(),
-      email: String(personalInfo.email || "").trim(),
-      phone: String(personalInfo.phone || "").trim(),
-      location: String(personalInfo.location || "").trim(),
-      portfolio: String(personalInfo.portfolio || "").trim(),
+      title: inferredTitle,
+      email: cleanResumeText(personalInfo.email || ""),
+      phone: cleanResumeText(personalInfo.phone || ""),
+      location: cleanResumeText(personalInfo.location || ""),
+      portfolio: cleanResumeText(personalInfo.portfolio || ""),
     },
+    summary: resolvedSummary,
     skills: mergedSkills,
     experience: normalizedExperience,
     education: normalizedEducation,
@@ -1582,12 +1689,61 @@ const sanitizeOptimizedResumeData = (optimizedResume = {}, fileName = "") => {
   };
 };
 
-export async function exportResumePdf(formData) {
+const compactOptimizedResumeToSinglePage = (resume = {}) => {
+  const compactSummary = safeText(resume.summary || "").slice(0, 320).trim();
+
+  const compactExperience = (Array.isArray(resume.experience) ? resume.experience : [])
+    .slice(0, 2)
+    .map((item) => ({
+      ...item,
+      role: safeText(item.role || ""),
+      company: safeText(item.company || ""),
+      startDate: safeText(item.startDate || ""),
+      endDate: safeText(item.endDate || ""),
+      description: splitBulletLines(item.description || "")
+        .slice(0, 2)
+        .join(" "),
+    }))
+    .filter((item) => item.role || item.company || item.description);
+
+  const compactEducation = (Array.isArray(resume.education) ? resume.education : [])
+    .slice(0, 2)
+    .map((item) => ({
+      ...item,
+      degree: safeText(item.degree || ""),
+      institution: safeText(item.institution || ""),
+      fieldOfStudy: safeText(item.fieldOfStudy || ""),
+      startDate: safeText(item.startDate || ""),
+      endDate: safeText(item.endDate || ""),
+    }))
+    .filter((item) => item.degree || item.institution || item.fieldOfStudy);
+
+  const compactCustomSections = (Array.isArray(resume.customSections) ? resume.customSections : [])
+    .filter((section) => /project|certification|achievement|publication|internship/i.test(String(section?.title || "")))
+    .slice(0, 5)
+    .map((section) => ({
+      title: safeText(section.title || ""),
+      items: splitCustomSectionItems(Array.isArray(section.items) ? section.items : []).slice(0, 2),
+    }))
+    .filter((section) => section.title && section.items.length);
+
+  return {
+    ...resume,
+    summary: compactSummary,
+    skills: (Array.isArray(resume.skills) ? resume.skills : []).map((skill) => safeText(skill)).filter(Boolean).slice(0, 14),
+    experience: compactExperience,
+    education: compactEducation,
+    customSections: compactCustomSections,
+  };
+};
+
+export async function exportResumePdf(formData, options = {}) {
   const doc = new jsPDF();
   const template = normalizeTemplateId(formData.template);
   const config = TEMPLATE_CONFIG[template] || TEMPLATE_CONFIG.contemporary;
 
   renderTemplatePdf(doc, formData, config);
+  drawResumePhoto(doc, template, options.resumePhoto || null);
   doc.save(getResumeFileName(formData, template));
 }
 
@@ -1598,9 +1754,9 @@ export function exportOptimizedUploadPdf(
   optimizedResumeData = null,
 ) {
   const safeName = (fileName || "optimized_resume").replace(/\.[^/.]+$/, "").replace(/\s+/g, "_");
-  const chosenTemplate = "single-column";
+  const chosenTemplate = "compact";
   const doc = new jsPDF();
-  const optimizedResume = sanitizeOptimizedResumeData(
+  const optimizedResume = compactOptimizedResumeToSinglePage(sanitizeOptimizedResumeData(
     optimizedResumeData && typeof optimizedResumeData === "object"
       ? {
           ...optimizedResumeData,
@@ -1624,7 +1780,7 @@ export function exportOptimizedUploadPdf(
         }
       : parseOptimizedResumeText(optimizedResumeText, fileName, headline),
     fileName,
-  );
+  ));
   const config = TEMPLATE_CONFIG[chosenTemplate];
 
   renderTemplatePdf(doc, { ...optimizedResume, template: chosenTemplate }, config);

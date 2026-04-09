@@ -90,18 +90,23 @@ const PROMPTS = {
     }
   `,
 
-  OPTIMIZE_UPLOADED_RESUME: (resumeText, atsInsights = {}) => `
+  OPTIMIZE_UPLOADED_RESUME: (resumeText, atsInsights = {}, originalResumeData = {}) => `
     Rewrite this resume into a stronger ATS-friendly version.
     Keep it truthful, concise, and directly usable as resume content.
     Improve section headings, action verbs, measurable impact, and keyword coverage.
     Aim for a 90+ ATS outcome if the content allows it.
     Do NOT invent achievements, companies, degrees, dates, or certifications that are not supported by the original text.
     Do NOT include ATS score numbers, explanations, before/after text, markdown, or commentary inside the resume itself.
+    Preserve the candidate's real sections and content coverage. If the original resume contains projects, certifications, publications, achievements, internships, or other custom sections, keep them in the output unless the source truly lacks usable content.
+    Prefer improving phrasing and structure over deleting content.
     Return a structured resume JSON that can be rendered directly into a resume layout.
     Use empty strings or empty arrays when a detail is missing instead of hallucinating content.
 
     Original Resume Text:
     ${resumeText}
+
+    Original Structured Resume Data:
+    ${JSON.stringify(originalResumeData)}
 
     ATS Insights:
     ${JSON.stringify(atsInsights)}
@@ -227,6 +232,131 @@ const PROMPTS = {
     }
   `
 };
+
+const normalizeComparable = (value = '') =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const mergeUniqueStrings = (preferred = [], fallback = [], limit = 24) => {
+  const seen = new Set();
+  return [...preferred, ...fallback]
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .filter((item) => {
+      const key = normalizeComparable(item);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
+};
+
+const mergeEntriesByIdentity = (preferred = [], fallback = [], identityFields = []) => {
+  const buildKey = (item = {}) => {
+    const composite = identityFields
+      .map((field) => String(item?.[field] || '').trim())
+      .filter(Boolean)
+      .join('|');
+
+    return normalizeComparable(composite || JSON.stringify(item || {}));
+  };
+
+  const merged = [];
+  const seen = new Set();
+
+  [...preferred, ...fallback].forEach((item) => {
+    if (!item || typeof item !== 'object') return;
+    const key = buildKey(item);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    merged.push(item);
+  });
+
+  return merged;
+};
+
+const mergeCustomSections = (preferred = [], fallback = []) => {
+  const mergedByTitle = new Map();
+
+  fallback.forEach((section) => {
+    const title = String(section?.title || '').trim();
+    if (!title) return;
+    mergedByTitle.set(normalizeComparable(title), {
+      title,
+      items: Array.isArray(section?.items) ? section.items.filter(Boolean) : [],
+    });
+  });
+
+  preferred.forEach((section) => {
+    const title = String(section?.title || '').trim();
+    if (!title) return;
+    const key = normalizeComparable(title);
+    const existing = mergedByTitle.get(key);
+    mergedByTitle.set(key, {
+      title,
+      items: mergeUniqueStrings(
+        Array.isArray(section?.items) ? section.items : [],
+        existing?.items || [],
+        12,
+      ),
+    });
+  });
+
+  return Array.from(mergedByTitle.values()).filter((section) => section.title && section.items.length);
+};
+
+const mergeOptimizedUploadedResumeData = (optimizedResumeData = {}, originalResumeData = {}) => ({
+  ...originalResumeData,
+  ...optimizedResumeData,
+  personalInfo: {
+    ...(originalResumeData.personalInfo || {}),
+    ...(optimizedResumeData.personalInfo || {}),
+    fullName:
+      optimizedResumeData.personalInfo?.fullName ||
+      optimizedResumeData.personalInfo?.name ||
+      originalResumeData.personalInfo?.fullName ||
+      originalResumeData.personalInfo?.name ||
+      '',
+    title:
+      optimizedResumeData.personalInfo?.title ||
+      originalResumeData.personalInfo?.title ||
+      '',
+    email:
+      optimizedResumeData.personalInfo?.email ||
+      originalResumeData.personalInfo?.email ||
+      '',
+    phone:
+      optimizedResumeData.personalInfo?.phone ||
+      originalResumeData.personalInfo?.phone ||
+      '',
+    location:
+      optimizedResumeData.personalInfo?.location ||
+      originalResumeData.personalInfo?.location ||
+      '',
+    portfolio:
+      optimizedResumeData.personalInfo?.portfolio ||
+      originalResumeData.personalInfo?.portfolio ||
+      '',
+  },
+  summary: optimizedResumeData.summary || originalResumeData.summary || '',
+  skills: mergeUniqueStrings(optimizedResumeData.skills || [], originalResumeData.skills || [], 24),
+  experience: mergeEntriesByIdentity(
+    optimizedResumeData.experience || [],
+    originalResumeData.experience || [],
+    ['role', 'company', 'description'],
+  ),
+  education: mergeEntriesByIdentity(
+    optimizedResumeData.education || [],
+    originalResumeData.education || [],
+    ['degree', 'institution', 'fieldOfStudy'],
+  ),
+  customSections: mergeCustomSections(
+    optimizedResumeData.customSections || [],
+    originalResumeData.customSections || [],
+  ),
+});
 
 // Safe JSON parsing
 const parseGeminiJSON = (text) => {
@@ -443,13 +573,18 @@ const optimizeResume = async (resumeJson, jobDescription = null) => {
   }
 };
 
-const optimizeUploadedResumeText = async (resumeText, atsInsights = {}) => {
+const optimizeUploadedResumeText = async (resumeText, atsInsights = {}, originalName = 'uploaded resume') => {
   try {
     if (!resumeText || typeof resumeText !== 'string') {
       throw new Error('Resume text is required');
     }
 
-    const prompt = PROMPTS.OPTIMIZE_UPLOADED_RESUME(resumeText, atsInsights);
+    const originalResumeData = groundImportedResumeData(
+      buildImportedResumeData(resumeText, originalName),
+      resumeText,
+      originalName,
+    );
+    const prompt = PROMPTS.OPTIMIZE_UPLOADED_RESUME(resumeText, atsInsights, originalResumeData);
 
     try {
       const rawText = await callGeminiWithTimeout(prompt, {
@@ -464,7 +599,10 @@ const optimizeUploadedResumeText = async (resumeText, atsInsights = {}) => {
 
       const optimizedResumeData =
         parsed.optimizedResumeData && typeof parsed.optimizedResumeData === 'object'
-          ? parsed.optimizedResumeData
+          ? mergeOptimizedUploadedResumeData(
+              groundImportedResumeData(parsed.optimizedResumeData, resumeText, originalName),
+              originalResumeData,
+            )
           : null;
 
       return {
@@ -475,6 +613,10 @@ const optimizeUploadedResumeText = async (resumeText, atsInsights = {}) => {
         keyChanges: Array.isArray(parsed.keyChanges) ? parsed.keyChanges : []
       };
     } catch (apiError) {
+      if (isGeminiQuotaOrConfigError(apiError)) {
+        throw apiError;
+      }
+
       console.warn('Gemini uploaded optimization unavailable, returning local fallback draft');
       return {
         success: true,
@@ -483,8 +625,18 @@ const optimizeUploadedResumeText = async (resumeText, atsInsights = {}) => {
     }
   } catch (error) {
     console.error('Optimize uploaded resume text error:', error.message);
-    throw new Error(`Error optimizing uploaded resume text: ${error.message}`);
+    const wrappedError = new Error(`Error optimizing uploaded resume text: ${error.message}`);
+    wrappedError.status = error?.status;
+    throw wrappedError;
   }
+};
+
+const isGeminiQuotaOrConfigError = (error) => {
+  const message = String(error?.message || '');
+  return (
+    error?.status === 429 ||
+    /429|Too Many Requests|quota exceeded|rate limit|GEMINI_API_KEY is missing/i.test(message)
+  );
 };
 
 const normalizeResumeContext = (data) => {

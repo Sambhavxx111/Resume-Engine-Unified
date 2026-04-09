@@ -240,7 +240,7 @@ function CareerGuidance() {
               </label>
 
               {resumeError ? (
-                <div className="rounded-2xl border border-rose-300/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
+                <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-[0_10px_24px_rgba(244,63,94,0.08)]">
                   {resumeError}
                 </div>
               ) : null}
@@ -305,7 +305,7 @@ function CareerGuidance() {
             </div>
 
             {jobsError ? (
-              <div className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
+              <div className="mt-4 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-[0_10px_24px_rgba(244,63,94,0.08)]">
                 {jobsError}
               </div>
             ) : null}
@@ -396,7 +396,7 @@ function CareerGuidance() {
             </div>
 
             {chatError ? (
-              <div className="rounded-2xl border border-rose-300/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
+              <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-[0_10px_24px_rgba(244,63,94,0.08)]">
                 {chatError}
               </div>
             ) : null}

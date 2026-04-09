@@ -131,7 +131,7 @@ function ATSAnalysis() {
             </label>
 
             {error ? (
-              <div className="rounded-2xl border border-rose-300/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
+              <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-[0_10px_24px_rgba(244,63,94,0.08)]">
                 {error}
               </div>
             ) : null}
@@ -185,25 +185,25 @@ function ATSAnalysis() {
                 <div className="mt-4 space-y-3">
                   {Array.isArray(result.suggestions) && result.suggestions.length ? (
                     result.suggestions.map((suggestion, index) => (
-                      <div key={`${suggestion}-${index}`} className="metric-tile text-sm text-slate-200">
+                      <div key={`${suggestion}-${index}`} className="metric-tile text-sm font-medium text-slate-700">
                         {suggestion}
                       </div>
                     ))
                   ) : result.suggestions?.message ? (
                     <>
-                      <div className="metric-tile text-sm text-slate-200">
+                      <div className="metric-tile text-sm font-medium text-slate-700">
                         {result.suggestions.message}
                       </div>
                       {Array.isArray(result.missingSections) && result.missingSections.length
                         ? result.missingSections.map((item) => (
-                            <div key={item} className="metric-tile text-sm text-slate-300">
+                            <div key={item} className="metric-tile text-sm font-medium text-slate-700">
                               Missing section: {item}
                             </div>
                           ))
                         : null}
                       {Array.isArray(result.missingKeywords) && result.missingKeywords.length
                         ? result.missingKeywords.slice(0, 6).map((item) => (
-                            <div key={item} className="metric-tile text-sm text-slate-300">
+                            <div key={item} className="metric-tile text-sm font-medium text-slate-700">
                               Missing keyword: {item}
                             </div>
                           ))
@@ -237,11 +237,11 @@ function ATSAnalysis() {
                     </div>
                   </div>
 
-                  <div className="mt-5 metric-tile text-sm text-slate-200">
+                  <div className="mt-5 metric-tile text-sm font-medium text-slate-700">
                     Score gain: {optimizedUpload.scoreGain ?? 0}
                   </div>
 
-                  <div className="mt-4 metric-tile text-sm text-slate-200">
+                  <div className="mt-4 metric-tile text-sm font-medium text-slate-700">
                     {optimizedUpload.targetScoreReached
                       ? "The optimized draft reached the 90+ ATS target."
                       : "The optimizer pushed the draft upward, but the current content still needs stronger raw material to cross 90 honestly."}
@@ -250,7 +250,7 @@ function ATSAnalysis() {
                   {Array.isArray(optimizedUpload.keyChanges) && optimizedUpload.keyChanges.length ? (
                     <div className="mt-5 space-y-3">
                       {optimizedUpload.keyChanges.map((item, index) => (
-                        <div key={`${item}-${index}`} className="metric-tile text-sm text-slate-200">
+                        <div key={`${item}-${index}`} className="metric-tile text-sm font-medium text-slate-700">
                           {item}
                         </div>
                       ))}

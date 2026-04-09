@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Loader from "./Loader";
 
 const blankEducation = {
@@ -546,9 +546,70 @@ function ResumeForm({
   error,
   successMessage,
   aiInsights,
+  resumePhoto,
+  onPhotoUpload,
+  onPhotoRemove,
+  onPhotoPlacementChange,
   previewRef,
 }) {
   const [skillInput, setSkillInput] = useState("");
+  const aiInsightsRef = useRef(null);
+  const aiScrollPendingActionRef = useRef("");
+  const previewCanvasRef = useRef(null);
+  const photoDragRef = useRef(null);
+  const photoImageRef = useRef(null);
+
+  const shouldShowAiLoadingCard = aiLoading === "optimize" || aiLoading === "skills";
+  const showAiInsightsPanel = Boolean(aiInsights) || shouldShowAiLoadingCard;
+  const aiInsightsTitle = shouldShowAiLoadingCard
+    ? aiLoading === "optimize"
+      ? "Optimization Suggestions"
+      : "Suggested Skills"
+    : aiInsights?.title;
+
+  const scrollAiInsightsIntoView = () => {
+    if (!aiInsightsRef.current || typeof window === "undefined") {
+      return;
+    }
+
+    const headerOffset = 132;
+    const elementTop = aiInsightsRef.current.getBoundingClientRect().top + window.scrollY;
+    const targetTop = Math.max(elementTop - headerOffset, 0);
+
+    window.scrollTo({
+      top: targetTop,
+      behavior: "smooth",
+    });
+  };
+
+  useEffect(() => {
+    if (!shouldShowAiLoadingCard) {
+      return;
+    }
+
+    aiScrollPendingActionRef.current = aiLoading;
+    scrollAiInsightsIntoView();
+  }, [aiLoading, shouldShowAiLoadingCard]);
+
+  useEffect(() => {
+    if (!aiScrollPendingActionRef.current || aiLoading) {
+      return;
+    }
+
+    const expectedTitle =
+      aiScrollPendingActionRef.current === "optimize"
+        ? "Optimization Suggestions"
+        : aiScrollPendingActionRef.current === "skills"
+          ? "Suggested Skills"
+          : "";
+
+    if (!expectedTitle || aiInsights?.title !== expectedTitle) {
+      return;
+    }
+
+    scrollAiInsightsIntoView();
+    aiScrollPendingActionRef.current = "";
+  }, [aiInsights, aiLoading]);
 
   const updatePersonalInfo = (event) => {
     const { name, value } = event.target;
@@ -678,6 +739,7 @@ function ResumeForm({
   const previewTitle = formData.personalInfo.title || "Professional Title";
   const renderedSkills = useMemo(() => sanitizeRenderedSkills(formData.skills), [formData.skills]);
   const normalizedTemplate = normalizeTemplateId(formData.template);
+  const templateUsesBuiltInPhoto = ["creative", "enhancv-columns"].includes(normalizedTemplate);
   const templateStyle =
     templatePreviewClasses[normalizedTemplate] || templatePreviewClasses.contemporary;
   const filledExperience = (formData.experience || []).filter(
@@ -730,6 +792,83 @@ function ResumeForm({
   const creativeRightSections = previewSections.filter((section) =>
     !["education", "skills"].includes(section.key),
   );
+
+  useEffect(() => {
+    const handlePointerMove = (event) => {
+      if (!photoDragRef.current || !previewCanvasRef.current || !photoImageRef.current) {
+        return;
+      }
+
+      const previewRect = previewCanvasRef.current.getBoundingClientRect();
+      const photoRect = photoImageRef.current.getBoundingClientRect();
+      const maxLeft = Math.max(previewRect.width - photoRect.width, 0);
+      const maxTop = Math.max(previewRect.height - photoRect.height, 0);
+      const nextLeft = Math.min(
+        Math.max(event.clientX - previewRect.left - photoDragRef.current.offsetX, 0),
+        maxLeft,
+      );
+      const nextTop = Math.min(
+        Math.max(event.clientY - previewRect.top - photoDragRef.current.offsetY, 0),
+        maxTop,
+      );
+
+      onPhotoPlacementChange?.({
+        x: maxLeft ? nextLeft / maxLeft : 0,
+        y: maxTop ? nextTop / maxTop : 0,
+      });
+    };
+
+    const handlePointerUp = () => {
+      photoDragRef.current = null;
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [onPhotoPlacementChange]);
+
+  const handlePhotoPointerDown = (event) => {
+    if (!resumePhoto || templateUsesBuiltInPhoto || !photoImageRef.current) {
+      return;
+    }
+
+    const photoRect = photoImageRef.current.getBoundingClientRect();
+    photoDragRef.current = {
+      offsetX: event.clientX - photoRect.left,
+      offsetY: event.clientY - photoRect.top,
+    };
+  };
+
+  const syncPreviewRef = (node) => {
+    previewCanvasRef.current = node;
+    if (previewRef && typeof previewRef === "object") {
+      previewRef.current = node;
+    }
+  };
+
+  const renderFloatingResumePhoto = () =>
+    resumePhoto && !templateUsesBuiltInPhoto ? (
+      <div
+        ref={photoImageRef}
+        className="absolute z-20 w-[18%] min-w-[72px] max-w-[118px] cursor-grab overflow-hidden rounded-2xl border-2 border-white bg-white shadow-[0_18px_35px_rgba(15,23,42,0.2)] active:cursor-grabbing"
+        style={{
+          left: `${(resumePhoto.placement?.x ?? 0.72) * 100}%`,
+          top: `${(resumePhoto.placement?.y ?? 0.06) * 100}%`,
+        }}
+        onPointerDown={handlePhotoPointerDown}
+      >
+        <img
+          src={resumePhoto.src}
+          alt="Resume profile"
+          className="aspect-[4/5] h-auto w-full object-cover"
+          draggable={false}
+        />
+      </div>
+    ) : null;
 
   return (
     <div className="space-y-8">
@@ -873,6 +1012,54 @@ function ResumeForm({
                 <input className="field" name="phone" placeholder="Phone" value={formData.personalInfo.phone} onChange={updatePersonalInfo} />
                 <input className="field" name="portfolio" placeholder="LinkedIn / Portfolio URL" value={formData.personalInfo.portfolio || ""} onChange={updatePersonalInfo} />
                 <input className="field md:col-span-2" name="location" placeholder="Location" value={formData.personalInfo.location} onChange={updatePersonalInfo} />
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Resume Photo</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Upload an image up to 2 MB. Drag it anywhere in the preview, or let photo-ready templates place it automatically.
+                  </p>
+                </div>
+                {resumePhoto ? (
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
+                    onClick={onPhotoRemove}
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+              <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="block w-full text-sm text-slate-400 file:mr-4 file:rounded-full file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-medium file:text-slate-950"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    onPhotoUpload?.(file);
+                    event.target.value = "";
+                  }}
+                />
+                {resumePhoto ? (
+                  <div className="mt-4 flex items-center gap-4 rounded-[18px] bg-white p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                    <img src={resumePhoto.src} alt="Resume profile preview" className="h-16 w-16 rounded-2xl object-cover" />
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{resumePhoto.name}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {(resumePhoto.size / (1024 * 1024)).toFixed(2)} MB
+                        {templateUsesBuiltInPhoto
+                          ? " • Auto-fitted into this template"
+                          : " • Drag it inside the preview to place it"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-400">No photo uploaded yet.</p>
+                )}
               </div>
             </div>
 
@@ -1068,19 +1255,34 @@ function ResumeForm({
               </button>
             </div>
 
-            {aiInsights ? (
-              <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
-                <h3 className="mb-4 text-lg font-semibold text-slate-900">{aiInsights.title}</h3>
-                <div className="grid max-h-[24rem] gap-3 overflow-y-auto pr-1">
-                  {aiInsights.lines.map((line, index) => (
-                    <div
-                      key={`${aiInsights.title}-${index}`}
-                      className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
-                    >
-                      {line}
-                    </div>
-                  ))}
-                </div>
+            {showAiInsightsPanel ? (
+              <div
+                ref={aiInsightsRef}
+                className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]"
+              >
+                <h3 className="mb-4 text-lg font-semibold text-slate-900">{aiInsightsTitle}</h3>
+                {shouldShowAiLoadingCard ? (
+                  <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                    <Loader
+                      label={
+                        aiLoading === "optimize"
+                          ? "Optimizing your resume. Your suggestions will appear here in a moment..."
+                          : "Suggesting new skills. Your recommendations will appear here in a moment..."
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div className="grid max-h-[24rem] gap-3 overflow-y-auto pr-1">
+                    {aiInsights?.lines.map((line, index) => (
+                      <div
+                        key={`${aiInsightsTitle}-${index}`}
+                        className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
+                      >
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : null}
           </aside>
@@ -1094,9 +1296,10 @@ function ResumeForm({
                   "Contemporary"}
               </p>
               <div
-                ref={previewRef}
-                className={`mt-4 min-h-[720px] rounded-[1.75rem] border p-6 text-slate-900 shadow-2xl ${templateStyle.shell}`}
+                ref={syncPreviewRef}
+                className={`relative mt-4 min-h-[720px] rounded-[1.75rem] border p-6 text-slate-900 shadow-2xl ${templateStyle.shell}`}
               >
+                {renderFloatingResumePhoto()}
                 {templateStyle.layout === "enhancv-columns" ? (
                   <div className="min-h-[672px] bg-white px-5 py-5 text-slate-900">
                     <div className="flex items-start justify-between gap-5 border-b border-slate-300 pb-3.5">
@@ -1110,11 +1313,20 @@ function ResumeForm({
                           <span className="break-words">{formData.personalInfo.location || "[Location]"}</span>
                         </div>
                       </div>
-                      <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-slate-100">
-                        <div className="relative h-14 w-14 rounded-full border-[3px] border-slate-500">
-                          <div className="absolute left-1/2 top-2 h-5 w-5 -translate-x-1/2 rounded-full border-[3px] border-slate-500" />
-                          <div className="absolute left-1/2 bottom-1 h-6 w-9 -translate-x-1/2 rounded-t-full border-[3px] border-b-0 border-slate-500" />
-                        </div>
+                      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100">
+                        {resumePhoto ? (
+                          <img
+                            src={resumePhoto.src}
+                            alt="Resume profile"
+                            className="h-full w-full object-cover"
+                            draggable={false}
+                          />
+                        ) : (
+                          <div className="relative h-14 w-14 rounded-full border-[3px] border-slate-500">
+                            <div className="absolute left-1/2 top-2 h-5 w-5 -translate-x-1/2 rounded-full border-[3px] border-slate-500" />
+                            <div className="absolute left-1/2 bottom-1 h-6 w-9 -translate-x-1/2 rounded-t-full border-[3px] border-b-0 border-slate-500" />
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1385,11 +1597,20 @@ function ResumeForm({
                           <p>LinkedIn / Portfolio</p>
                         </div>
                       </div>
-                      <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full border border-white/15 bg-white/10">
-                        <div className="h-24 w-24 rounded-full border-[6px] border-slate-300/60">
-                          <div className="mx-auto mt-4 h-9 w-9 rounded-full border-[5px] border-slate-300/60" />
-                          <div className="mx-auto mt-3 h-10 w-16 rounded-t-full border-[5px] border-b-0 border-slate-300/60" />
-                        </div>
+                      <div className="mx-auto flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-white/10">
+                        {resumePhoto ? (
+                          <img
+                            src={resumePhoto.src}
+                            alt="Resume profile"
+                            className="h-full w-full object-cover"
+                            draggable={false}
+                          />
+                        ) : (
+                          <div className="h-24 w-24 rounded-full border-[6px] border-slate-300/60">
+                            <div className="mx-auto mt-4 h-9 w-9 rounded-full border-[5px] border-slate-300/60" />
+                            <div className="mx-auto mt-3 h-10 w-16 rounded-t-full border-[5px] border-b-0 border-slate-300/60" />
+                          </div>
+                        )}
                       </div>
                     </div>
 
