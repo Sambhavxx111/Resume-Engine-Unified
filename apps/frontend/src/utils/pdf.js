@@ -199,6 +199,15 @@ const splitBulletLines = (value = "") =>
     .map((line) => line.replace(/^\s*[-*•]\s*/, "").trim())
     .filter(Boolean);
 
+const getProjectBullets = (project = {}) =>
+  (Array.isArray(project.bullets) ? project.bullets : splitBulletLines(project.description || ""))
+    .flatMap((item) => splitBulletLines(item))
+    .map((item) => safeText(item))
+    .filter(Boolean);
+
+const hasProjectContent = (project = {}) =>
+  Boolean(safeText(project.name) || getProjectBullets(project).length);
+
 const splitCustomSectionItems = (items = []) =>
   items
     .flatMap((item) => {
@@ -326,6 +335,18 @@ const getResumeSections = (formData) => {
           .join(" "),
         meta: formatDateRange(item.startDate, item.endDate),
         body: safeText(item.description),
+      })),
+    });
+  }
+
+  const projectItems = (formData.projects || []).filter(hasProjectContent);
+  if (projectItems.length) {
+    sections.push({
+      key: "projects",
+      title: "Projects",
+      items: projectItems.map((project, index) => ({
+        heading: safeText(project.name) || `Project ${index + 1}`,
+        bullets: getProjectBullets(project),
       })),
     });
   }
@@ -550,7 +571,18 @@ const drawSectionBody = (doc, section, x, y, width, config) => {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10.2);
         y = drawWrappedText(doc, item.body, x, y, width, 5.4) + 2.2;
-      } else {
+      }
+
+      if (Array.isArray(item.bullets) && item.bullets.length) {
+        doc.setTextColor(30, 41, 59);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10.2);
+        item.bullets.forEach((bullet) => {
+          doc.text("-", x, y);
+          y = drawWrappedText(doc, bullet, x + 4, y, width - 4, 5.1) + 0.7;
+        });
+        y += 1.5;
+      } else if (!item.body) {
         y += 1.5;
       }
     });
@@ -790,6 +822,7 @@ const renderEnhancvReplicaTemplate = (doc, formData, config) => {
       items: (section?.items || []).map((item) => String(item || "").trim()).filter(Boolean),
     }))
     .filter((section) => section.title || section.items.length);
+  const projectItems = (formData.projects || []).filter(hasProjectContent);
 
   doc.setTextColor(...config.nameColor);
   doc.setFont("helvetica", "bold");
@@ -892,6 +925,24 @@ const renderEnhancvReplicaTemplate = (doc, formData, config) => {
     y += 2;
   });
 
+  if (projectItems.length) {
+    drawTitle("PROJECTS");
+    projectItems.forEach((project, index) => {
+      doc.setTextColor(30, 41, 59);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      y = drawWrappedText(doc, safeText(project.name) || `Project ${index + 1}`, 12, y, 180, 4.8) + 1;
+      doc.setTextColor(55, 65, 81);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.2);
+      getProjectBullets(project).forEach((bullet) => {
+        doc.text("-", 12, y);
+        y = drawWrappedText(doc, bullet, 15, y, 180, 4.8) + 1.2;
+      });
+      y += 2;
+    });
+  }
+
   if (filterFilled(formData.skills).length) {
     drawTitle("SKILLS");
     y = drawSkills(doc, filterFilled(formData.skills), 12, y, 180, config);
@@ -967,6 +1018,7 @@ const renderEnhancvColumnsTemplate = (doc, formData, config) => {
       items: (section?.items || []).map((item) => String(item || "").trim()).filter(Boolean),
     }))
     .filter((section) => section.title || section.items.length);
+  const projectItems = (formData.projects || []).filter(hasProjectContent);
 
   doc.setTextColor(...config.nameColor);
   doc.setFont("helvetica", "bold");
@@ -1050,6 +1102,24 @@ const renderEnhancvColumnsTemplate = (doc, formData, config) => {
     });
     leftY += 3;
   });
+
+  if (projectItems.length) {
+    leftY = drawColumnTitle("PROJECTS", leftX, leftY, leftWidth);
+    projectItems.forEach((project, index) => {
+      doc.setTextColor(40, 54, 68);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.2);
+      leftY = drawWrappedText(doc, safeText(project.name) || `Project ${index + 1}`, leftX, leftY, leftWidth, 4.3) + 1.2;
+      doc.setTextColor(55, 65, 81);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.4);
+      getProjectBullets(project).forEach((bullet) => {
+        doc.text("-", leftX, leftY);
+        leftY = drawWrappedText(doc, bullet, leftX + 3, leftY, leftWidth - 3, 4.2) + 1.2;
+      });
+      leftY += 3;
+    });
+  }
 
   centerY = drawColumnTitle("EDUCATION", centerX, centerY, centerWidth);
   const renderedEducation = educationItems.length

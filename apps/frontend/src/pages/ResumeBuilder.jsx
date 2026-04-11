@@ -28,6 +28,92 @@ const normalizeImportedName = (value = "") => {
     .trim();
 };
 
+const deriveNameFromFileName = (fileName = "") => {
+  const cleaned = String(fileName || "")
+    .replace(/\.[^/.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b(resume|cv|curriculum vitae|final|updated|latest|copy)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return /[A-Za-z]/.test(cleaned) ? normalizeImportedName(cleaned) : "";
+};
+
+const isLikelyResumeNameLine = (line = "") => {
+  const cleaned = String(line || "").replace(/\s+/g, " ").trim();
+  if (!cleaned) return false;
+  if (cleaned.length < 4 || cleaned.length > 48) return false;
+  if (cleaned.split(/\s+/).length > 5) return false;
+  if (/@|\+?\d|linkedin|github|portfolio|resume|curriculum vitae|email|phone/i.test(cleaned)) {
+    return false;
+  }
+  if (/^(summary|profile|education|experience|skills|projects|certifications|achievements)$/i.test(cleaned)) {
+    return false;
+  }
+
+  return /^[A-Za-z][A-Za-z\s.'-]+$/.test(cleaned);
+};
+
+const deriveNameFromResumeText = (resumeText = "") => {
+  const lines = String(resumeText || "")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 12);
+
+  return normalizeImportedName(lines.find(isLikelyResumeNameLine) || "");
+};
+
+const resolveResumeFullName = (personalInfo = {}, resumeText = "", fileName = "") =>
+  normalizeImportedName(personalInfo.fullName || personalInfo.name || "") ||
+  deriveNameFromResumeText(resumeText) ||
+  deriveNameFromFileName(fileName);
+
+const isProjectSectionTitle = (title = "") => /project/i.test(String(title || "").trim());
+
+const normalizeProjectItems = (projects = [], customSections = []) => {
+  const directProjects = (Array.isArray(projects) ? projects : []).map((item, index) => ({
+    name: String(item?.name || item?.title || "").trim(),
+    bullets: Array.isArray(item?.bullets) && item.bullets.length
+      ? item.bullets
+      : String(item?.description || "")
+          .split(/\r?\n+/)
+          .map((line) => line.replace(/^\s*[-*]\s*/, "").trim())
+          .filter(Boolean),
+  }));
+
+  const customProjects = (Array.isArray(customSections) ? customSections : [])
+    .filter((section) => isProjectSectionTitle(section?.title))
+    .flatMap((section) =>
+      (section.items || []).map((item, index) => {
+        const [rawName, ...rawDetails] = String(item || "").split(/\s*[:|-]\s+/);
+        const fallbackName = section.items.length === 1 ? section.title : `Project ${index + 1}`;
+        return {
+          name: String(rawName || fallbackName).trim(),
+          bullets: (rawDetails.length ? rawDetails : [item])
+            .flatMap((detail) => String(detail || "").split(/\r?\n+/))
+            .map((detail) => detail.replace(/^\s*[-*]\s*/, "").trim())
+            .filter(Boolean),
+        };
+      }),
+    );
+
+  const normalized = [...directProjects, ...customProjects]
+    .map((project) => ({
+      name: project.name,
+      bullets: project.bullets?.length ? project.bullets : [""],
+    }))
+    .filter((project) => project.name || project.bullets.some(Boolean));
+
+  return normalized.length ? normalized : defaultResumeState.projects;
+};
+
+const normalizeCustomSections = (customSections = []) =>
+  (Array.isArray(customSections) ? customSections : []).filter(
+    (section) => !isProjectSectionTitle(section?.title),
+  );
+
 const toConciseInsight = (value) => {
   const raw = String(value || "").replace(/\s+/g, " ").trim();
   if (!raw) {
@@ -76,6 +162,12 @@ const defaultResumeState = {
       description: "",
     },
   ],
+  projects: [
+    {
+      name: "",
+      bullets: [""],
+    },
+  ],
   skills: [],
   summary: "",
   customSections: [],
@@ -121,7 +213,11 @@ function ResumeBuilder() {
             personalInfo: {
               ...defaultResumeState.personalInfo,
               ...(data.resume.personalInfo || {}),
-              fullName: normalizeImportedName(data.resume.personalInfo?.fullName || ""),
+              fullName: resolveResumeFullName(
+                data.resume.personalInfo,
+                data.resume.raw_text || data.resume.rawText || "",
+                "",
+              ),
             },
             education:
               Array.isArray(data.resume.education) && data.resume.education.length
@@ -134,10 +230,10 @@ function ResumeBuilder() {
               Array.isArray(data.resume.experience) && data.resume.experience.length
                 ? data.resume.experience
                 : defaultResumeState.experience,
+            projects:
+              normalizeProjectItems(data.resume.projects, data.resume.customSections),
             skills: Array.isArray(data.resume.skills) ? data.resume.skills : [],
-            customSections: Array.isArray(data.resume.customSections)
-              ? data.resume.customSections
-              : [],
+            customSections: normalizeCustomSections(data.resume.customSections),
             template: normalizeTemplateId(data.resume.template) || defaultResumeState.template,
           });
         }
@@ -296,7 +392,11 @@ function ResumeBuilder() {
         personalInfo: {
           ...defaultResumeState.personalInfo,
           ...(data.resume?.personalInfo || {}),
-          fullName: normalizeImportedName(data.resume?.personalInfo?.fullName || ""),
+          fullName: resolveResumeFullName(
+            data.resume?.personalInfo,
+            data.extractedText || data.resume?.raw_text || data.resume?.rawText || "",
+            data.fileName || resumeImportFile.name,
+          ),
         },
         education:
           Array.isArray(data.resume?.education) && data.resume.education.length
@@ -309,10 +409,10 @@ function ResumeBuilder() {
           Array.isArray(data.resume?.experience) && data.resume.experience.length
             ? data.resume.experience
             : defaultResumeState.experience,
+        projects:
+          normalizeProjectItems(data.resume?.projects, data.resume?.customSections),
         skills: Array.isArray(data.resume?.skills) ? data.resume.skills : [],
-        customSections: Array.isArray(data.resume?.customSections)
-          ? data.resume.customSections
-          : [],
+        customSections: normalizeCustomSections(data.resume?.customSections),
         template: formData.template || defaultResumeState.template,
       };
 
@@ -341,6 +441,7 @@ function ResumeBuilder() {
       formData.personalInfo.title,
       formData.summary,
       ...formData.experience.flatMap((item) => [item.role, item.company, item.description]),
+      ...(formData.projects || []).flatMap((item) => [item.name, ...(item.bullets || [])]),
       ...formData.education.flatMap((item) => [item.degree, item.fieldOfStudy]),
     ]
       .filter(Boolean)
@@ -433,7 +534,7 @@ function ResumeBuilder() {
   };
 
   return (
-    <main className="page-shell">
+    <main className="page-shell max-w-[96rem]">
       {loadingResume ? (
         <div className="glass-card reveal-soft flex min-h-[300px] items-center justify-center p-8">
           <Loader label="Fetching your resume..." />

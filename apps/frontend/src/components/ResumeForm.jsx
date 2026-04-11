@@ -19,6 +19,11 @@ const blankExperience = {
   description: "",
 };
 
+const blankProject = {
+  name: "",
+  bullets: [""],
+};
+
 const TEMPLATE_ID_ALIASES = {
   "executive-edge": "contemporary",
   "classic-core": "single-column",
@@ -90,6 +95,30 @@ const formatDateRange = (startDate, endDate) => {
   if (start && end) return `${start} - ${end}`;
   return start || end || "";
 };
+
+const hasEducationContent = (item = {}) =>
+  Boolean(
+    item.institution ||
+      item.degree ||
+      item.fieldOfStudy ||
+      item.location ||
+      item.score ||
+      item.startDate ||
+      item.endDate,
+  );
+
+const getEducationMetaItems = (item = {}) =>
+  [formatDateRange(item.startDate, item.endDate), item.location, item.score]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+const getProjectBullets = (project = {}) =>
+  (Array.isArray(project.bullets) ? project.bullets : splitLines(project.description || ""))
+    .flatMap((item) => splitLines(item))
+    .filter(Boolean);
+
+const hasProjectContent = (project = {}) =>
+  Boolean(String(project.name || "").trim() || getProjectBullets(project).length);
 
 const splitLines = (value = "") =>
   String(value)
@@ -350,7 +379,7 @@ const templatePreviewClasses = {
     name: "text-[2.15rem] font-serif font-bold tracking-tight text-slate-900",
     title: "mt-1.5 text-[15px] font-semibold uppercase tracking-[0.14em] text-slate-700",
     sectionTitle: "text-[15px] font-bold uppercase tracking-[0.18em] text-slate-800",
-    skill: "rounded-md border border-slate-300 px-3 py-1.5 text-[13px] font-medium text-slate-800",
+    skill: "rounded-md px-3 py-1.5 text-[13px] font-medium text-slate-800",
   },
   compact: {
     layout: "compact",
@@ -368,7 +397,7 @@ const templatePreviewClasses = {
     name: "text-[2.1rem] font-bold tracking-tight text-slate-900",
     title: "mt-1.5 text-lg font-semibold text-cyan-900",
     sectionTitle: "text-[13px] font-bold uppercase tracking-[0.24em] text-cyan-900",
-    skill: "rounded-md bg-slate-900 px-3 py-1.5 text-[13px] font-medium text-white",
+    skill: "rounded-md px-3 py-1.5 text-[13px] font-medium text-slate-900",
   },
   timeline: {
     layout: "timeline",
@@ -484,25 +513,65 @@ const getPreviewSections = (formData) => {
     title: "Education",
     render: () => (
       <div className="mt-2 space-y-3">
-        {formData.education.filter((item) => item.institution || item.degree || item.fieldOfStudy).length ? (
+        {formData.education.filter(hasEducationContent).length ? (
           formData.education
-            .filter((item) => item.institution || item.degree || item.fieldOfStudy)
-            .map((item, index) => (
-              <div key={`education-preview-${index}`}>
-                <p className="font-semibold text-slate-900">
-                  {item.degree || "Degree"}
-                  {item.fieldOfStudy ? `, ${item.fieldOfStudy}` : ""}
-                </p>
-                <p className="text-slate-700">{item.institution || "Institution"}</p>
-                {([item.startDate, item.endDate].filter(Boolean).length ? (
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    {[item.startDate, item.endDate].filter(Boolean).join(" - ")}
+            .filter(hasEducationContent)
+            .map((item, index) => {
+              const educationMetaItems = getEducationMetaItems(item);
+
+              return (
+                <div key={`education-preview-${index}`}>
+                  <p className="font-semibold text-slate-900">
+                    {item.degree || "Degree"}
+                    {item.fieldOfStudy ? `, ${item.fieldOfStudy}` : ""}
                   </p>
-                ) : null)}
-              </div>
-            ))
+                  <p className="text-slate-700">{item.institution || "Institution"}</p>
+                  {educationMetaItems.length ? (
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                      {educationMetaItems.join(" | ")}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })
         ) : (
           <p className="text-slate-500">Add education details to complete the preview.</p>
+        )}
+      </div>
+    ),
+  },
+  {
+    key: "projects",
+    title: "Projects",
+    render: () => (
+      <div className="mt-2 space-y-4">
+        {(formData.projects || []).filter(hasProjectContent).length ? (
+          (formData.projects || [])
+            .filter(hasProjectContent)
+            .map((project, index) => {
+              const bullets = getProjectBullets(project);
+
+              return (
+                <div key={`project-preview-${index}`}>
+                  <p className="font-semibold text-slate-900">
+                    {project.name || `Project ${index + 1}`}
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {bullets.length ? (
+                      bullets.map((bullet, bulletIndex) => (
+                        <p key={`project-preview-bullet-${index}-${bulletIndex}`} className="text-slate-700">
+                          - {bullet}
+                        </p>
+                      ))
+                    ) : (
+                      <p className="text-slate-500">Add project details as bullet points.</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+        ) : (
+          <p className="text-slate-500">Add projects to highlight practical work.</p>
         )}
       </div>
     ),
@@ -645,6 +714,70 @@ function ResumeForm({
     }));
   };
 
+  const addProject = () => {
+    setFormData((prev) => ({
+      ...prev,
+      projects: [...(prev.projects || []), blankProject],
+    }));
+  };
+
+  const updateProject = (index, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      projects: (prev.projects?.length ? prev.projects : [blankProject]).map((project, projectIndex) =>
+        projectIndex === index ? { ...project, [field]: value } : project,
+      ),
+    }));
+  };
+
+  const addProjectBullet = (projectIndex) => {
+    setFormData((prev) => ({
+      ...prev,
+      projects: (prev.projects?.length ? prev.projects : [blankProject]).map((project, currentProjectIndex) =>
+        currentProjectIndex === projectIndex
+          ? { ...project, bullets: [...(project.bullets || []), ""] }
+          : project,
+      ),
+    }));
+  };
+
+  const updateProjectBullet = (projectIndex, bulletIndex, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      projects: (prev.projects?.length ? prev.projects : [blankProject]).map((project, currentProjectIndex) =>
+        currentProjectIndex === projectIndex
+          ? {
+              ...project,
+              bullets: (project.bullets || [""]).map((bullet, currentBulletIndex) =>
+                currentBulletIndex === bulletIndex ? value : bullet,
+              ),
+            }
+          : project,
+      ),
+    }));
+  };
+
+  const removeProjectBullet = (projectIndex, bulletIndex) => {
+    setFormData((prev) => ({
+      ...prev,
+      projects: (prev.projects?.length ? prev.projects : [blankProject]).map((project, currentProjectIndex) =>
+        currentProjectIndex === projectIndex
+          ? {
+              ...project,
+              bullets: (project.bullets || [""]).filter((_, currentBulletIndex) => currentBulletIndex !== bulletIndex),
+            }
+          : project,
+      ),
+    }));
+  };
+
+  const removeProject = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      projects: (prev.projects || []).filter((_, projectIndex) => projectIndex !== index),
+    }));
+  };
+
   const addSkill = () => {
     const nextSkill = skillInput.trim();
     if (!nextSkill) {
@@ -735,7 +868,7 @@ function ResumeForm({
     }));
   };
 
-  const previewName = formData.personalInfo.fullName || "Your Name";
+  const previewName = formData.personalInfo.fullName || formData.personalInfo.name || "Your Name";
   const previewTitle = formData.personalInfo.title || "Professional Title";
   const renderedSkills = useMemo(() => sanitizeRenderedSkills(formData.skills), [formData.skills]);
   const normalizedTemplate = normalizeTemplateId(formData.template);
@@ -745,9 +878,8 @@ function ResumeForm({
   const filledExperience = (formData.experience || []).filter(
     (item) => item.company || item.role || item.description,
   );
-  const filledEducation = (formData.education || []).filter(
-    (item) => item.institution || item.degree || item.fieldOfStudy,
-  );
+  const filledEducation = (formData.education || []).filter(hasEducationContent);
+  const filledProjects = (formData.projects || []).filter(hasProjectContent);
   const filledCustomSections = (formData.customSections || [])
     .map((section) => ({
       title: String(section?.title || "").trim(),
@@ -786,12 +918,17 @@ function ResumeForm({
 
   const skillsPreviewSection = previewSections.find((section) => section.key === "skills");
   const mainPreviewSections = previewSections.filter((section) => section.key !== "skills");
+  const creativeSidebarSectionKeys = ["summary", "education", "skills"];
   const creativeLeftSections = previewSections.filter((section) =>
-    ["education", "skills"].includes(section.key),
+    creativeSidebarSectionKeys.includes(section.key),
   );
-  const creativeRightSections = previewSections.filter((section) =>
-    !["education", "skills"].includes(section.key),
+  const creativeRightSections = previewSections.filter(
+    (section) => !creativeSidebarSectionKeys.includes(section.key),
   );
+  const creativeTemplateStyle = {
+    ...templateStyle,
+    skill: "rounded-md px-3 py-1.5 text-[12px] font-semibold text-cyan-950",
+  };
 
   useEffect(() => {
     const handlePointerMove = (event) => {
@@ -1001,7 +1138,7 @@ function ResumeForm({
           </div>
         </div>
 
-        <div className="grid gap-8 xl:grid-cols-[0.7fr_0.95fr_1.35fr]">
+        <div className="grid gap-8 xl:grid-cols-[0.7fr_0.665fr_1.635fr]">
           <div className="space-y-8">
             <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <h3 className="mb-4 text-lg font-semibold text-slate-900">Personal Info</h3>
@@ -1120,6 +1257,70 @@ function ResumeForm({
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Projects</h3>
+                  <p className="mt-1 text-sm text-slate-500">Add a bold project name and supporting details.</p>
+                </div>
+                <button type="button" className="button-secondary" onClick={addProject}>
+                  Add Project
+                </button>
+              </div>
+              <div className="space-y-4">
+                {(formData.projects?.length ? formData.projects : [blankProject]).map((project, projectIndex) => {
+                  const projectBullets = project.bullets?.length ? project.bullets : [""];
+
+                  return (
+                    <div key={`project-${projectIndex}`} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <p className="text-sm font-medium text-slate-600">Project {projectIndex + 1}</p>
+                        <button
+                          type="button"
+                          className="text-sm text-rose-500 transition hover:text-rose-600"
+                          onClick={() => removeProject(projectIndex)}
+                          disabled={!formData.projects?.length}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="space-y-3">
+                        <input
+                          className="field"
+                          placeholder="Project name"
+                          value={project.name || ""}
+                          onChange={(event) => updateProject(projectIndex, "name", event.target.value)}
+                        />
+                        {projectBullets.map((bullet, bulletIndex) => (
+                          <div key={`project-bullet-${projectIndex}-${bulletIndex}`} className="flex gap-3">
+                            <input
+                              className="field"
+                              placeholder="Detail"
+                              value={bullet}
+                              onChange={(event) =>
+                                updateProjectBullet(projectIndex, bulletIndex, event.target.value)
+                              }
+                            />
+                            <button
+                              type="button"
+                              className="button-secondary"
+                              onClick={() => removeProjectBullet(projectIndex, bulletIndex)}
+                              disabled={projectBullets.length === 1}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                        <button type="button" className="button-secondary" onClick={() => addProjectBullet(projectIndex)}>
+                          Add Detail
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -1297,7 +1498,7 @@ function ResumeForm({
               </p>
               <div
                 ref={syncPreviewRef}
-                className={`relative mt-4 min-h-[720px] rounded-[1.75rem] border p-6 text-slate-900 shadow-2xl ${templateStyle.shell}`}
+                className={`relative mt-4 min-h-[720px] overflow-visible rounded-[1.75rem] border p-6 text-slate-900 shadow-2xl ${templateStyle.shell}`}
               >
                 {renderFloatingResumePhoto()}
                 {templateStyle.layout === "enhancv-columns" ? (
@@ -1379,12 +1580,16 @@ function ResumeForm({
                                 <div key={`columns-edu-${index}`} className="min-w-0">
                                   <p className="break-words text-[14px] font-semibold leading-5 text-slate-900">
                                     {item.degree || "Degree / Program"}
+                                    {item.fieldOfStudy ? `, ${item.fieldOfStudy}` : ""}
                                   </p>
                                   <p className="mt-1 break-words text-[14px] font-bold leading-5 text-emerald-700">
                                     {item.institution || "Institution Name"}
                                   </p>
-                                  <p className="mt-1.5 text-[11px] text-slate-600">{formatDateRange(item.startDate, item.endDate)}</p>
-                                  <p className="break-words text-[11px] text-slate-600">{formData.personalInfo.location || "[Location]"}</p>
+                                  {getEducationMetaItems(item).length ? (
+                                    <p className="mt-1.5 break-words text-[11px] text-slate-600">
+                                      {getEducationMetaItems(item).join(" | ")}
+                                    </p>
+                                  ) : null}
                                 </div>
                               ))}
                           </div>
@@ -1451,6 +1656,33 @@ function ResumeForm({
                           </div>
                         </section>
                         ) : null}
+
+                        {filledProjects.length ? (
+                        <section>
+                          <div className="border-b border-emerald-900 pb-1">
+                            <h3 className={templateStyle.sectionTitle}>PROJECTS</h3>
+                          </div>
+                          <div className="mt-3 space-y-4">
+                            {filledProjects.map((project, index) => {
+                                const bullets = getProjectBullets(project);
+                                return (
+                                  <div key={`columns-project-${index}`} className="min-w-0">
+                                    <p className="break-words text-[13px] font-semibold leading-5 text-slate-700">
+                                      {project.name || `Project ${index + 1}`}
+                                    </p>
+                                    <ul className="mt-2 list-disc pl-4 text-[11px] leading-[1.55] text-slate-700">
+                                      {(bullets.length ? bullets : ["Add project details as bullet points."]).slice(0, 4).map((bullet, bulletIndex) => (
+                                        <li key={`columns-project-bullet-${index}-${bulletIndex}`} className="break-words">
+                                          {bullet}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </section>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -1483,8 +1715,14 @@ function ResumeForm({
                           {filledEducation.map((item, index) => (
                                 <div key={`enhancv-edu-${index}`} className="grid grid-cols-[96px_18px_minmax(0,1fr)] gap-3">
                                   <div className="text-[11px] leading-[1.5] text-slate-600">
-                                    <p className="font-bold text-blue-700">{formatDateRange(item.startDate, item.endDate)}</p>
-                                    <p>{formData.personalInfo.location || "Location"}</p>
+                                    {getEducationMetaItems(item).map((metaItem, metaIndex) => (
+                                      <p
+                                        key={`enhancv-edu-meta-${index}-${metaIndex}`}
+                                        className={metaIndex === 0 ? "font-bold text-blue-700" : ""}
+                                      >
+                                        {metaItem}
+                                      </p>
+                                    ))}
                                   </div>
                                   <div className="relative">
                                     <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
@@ -1559,6 +1797,44 @@ function ResumeForm({
                       </section>
                       ) : null}
 
+                      {filledProjects.length ? (
+                      <section>
+                        <h3 className={templateStyle.sectionTitle}>PROJECTS</h3>
+                        <div className="mt-3 space-y-4">
+                          {filledProjects.map((project, index) => {
+                                const bullets = getProjectBullets(project);
+                                return (
+                                  <div key={`enhancv-project-${index}`} className="grid grid-cols-[96px_18px_minmax(0,1fr)] gap-3">
+                                    <div className="text-[11px] leading-[1.5] text-slate-600">
+                                      <p className="font-bold text-blue-700">Project</p>
+                                    </div>
+                                    <div className="relative">
+                                      <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-slate-900" />
+                                      <span className="absolute left-1/2 top-3 bottom-0 w-px -translate-x-1/2 bg-slate-500" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-[13px] font-semibold text-slate-700">
+                                        {project.name || `Project ${index + 1}`}
+                                      </p>
+                                      {bullets.length ? (
+                                        <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-[1.55] text-slate-700">
+                                          {bullets.map((bullet, bulletIndex) => (
+                                            <li key={`enhancv-project-bullet-${index}-${bulletIndex}`}>{bullet}</li>
+                                          ))}
+                                        </ul>
+                                      ) : (
+                                        <ul className="mt-2 list-disc pl-4 text-[11px] leading-[1.55] text-slate-700">
+                                          <li>Add project details as bullet points.</li>
+                                        </ul>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                        </div>
+                      </section>
+                      ) : null}
+
                       {filledCustomSections.map((section, index) => (
                         <section key={`enhancv-custom-${index}`}>
                           <h3 className={templateStyle.sectionTitle}>
@@ -1585,12 +1861,12 @@ function ResumeForm({
                     </div>
                   </div>
                 ) : templateStyle.layout === "creative" ? (
-                  <div className="min-h-[672px] overflow-hidden rounded-[1.5rem] border border-slate-200">
-                    <div className="grid gap-6 bg-slate-900 px-6 py-6 text-white md:grid-cols-[1fr_180px] md:items-center">
+                  <div className="min-h-[672px] rounded-[1.5rem] border border-slate-200">
+                    <div className="grid gap-6 bg-slate-900 px-6 py-6 !text-white [color:#ffffff] md:grid-cols-[1fr_180px] md:items-center">
                       <div>
-                        <h2 className="text-4xl font-bold tracking-tight text-white">{previewName}</h2>
-                        <p className="mt-2 text-xl font-semibold text-white/95">{previewTitle}</p>
-                        <div className="mt-4 grid gap-2 text-sm text-slate-200 md:grid-cols-2">
+                        <h2 className="text-4xl font-bold tracking-tight !text-white [color:#ffffff]">{previewName}</h2>
+                        <p className="mt-2 text-xl font-semibold !text-white [color:#ffffff]">{previewTitle}</p>
+                        <div className="mt-4 grid gap-2 text-sm !text-slate-200 [color:#e2e8f0] md:grid-cols-2">
                           <p>{formData.personalInfo.phone || "[Phone Number]"}</p>
                           <p>{formData.personalInfo.email || "[Email]"}</p>
                           <p>{formData.personalInfo.location || "[Location]"}</p>
@@ -1614,8 +1890,8 @@ function ResumeForm({
                       </div>
                     </div>
 
-                    <div className="grid gap-8 bg-white px-6 py-7 md:grid-cols-[1.35fr_0.9fr]">
-                      <div className="space-y-6">
+                    <div className="grid gap-6 bg-white px-6 py-7 md:grid-cols-[0.88fr_1.32fr]">
+                      <div className="space-y-5">
                         {creativeLeftSections.map((section) => (
                           <section key={section.key}>
                             <div className="border-b-2 border-cyan-800 pb-1">
@@ -1624,13 +1900,13 @@ function ResumeForm({
                               </h3>
                             </div>
                             <div className="mt-3 text-sm leading-6">
-                              {section.render(templateStyle)}
+                              {section.render(creativeTemplateStyle)}
                             </div>
                           </section>
                         ))}
                       </div>
 
-                      <div className="space-y-6">
+                      <div className="space-y-5">
                         {creativeRightSections.map((section) => (
                           <section key={section.key}>
                             <div className="border-b-2 border-cyan-800 pb-1">

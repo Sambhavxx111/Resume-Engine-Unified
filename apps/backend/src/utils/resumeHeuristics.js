@@ -708,6 +708,59 @@ const buildExperienceItems = (lines = []) => {
   });
 };
 
+const buildProjectItems = (lines = []) => {
+  if (!lines.length) return [];
+
+  const groups = [];
+  let current = null;
+
+  lines.forEach((line) => {
+    const cleaned = cleanField(line.replace(/^[-*]\s*/, ''));
+    if (!cleaned) return;
+
+    const looksLikeProjectName =
+      !line.trim().startsWith('-') &&
+      !line.trim().startsWith('*') &&
+      cleaned.length <= 90 &&
+      !cleaned.endsWith('.') &&
+      !/^https?:\/\//i.test(cleaned);
+
+    if (!current || looksLikeProjectName) {
+      if (current) groups.push(current);
+      current = { name: cleaned, bullets: [] };
+      return;
+    }
+
+    current.bullets.push(cleaned);
+  });
+
+  if (current) groups.push(current);
+
+  return groups
+    .map((project, index) => ({
+      name: project.name || `Project ${index + 1}`,
+      bullets: normalizeList(project.bullets),
+    }))
+    .filter((project) => project.name || project.bullets.length);
+};
+
+const isProjectSectionTitle = (title = '') => /project/i.test(cleanField(title));
+
+const buildProjectItemsFromCustomSections = (customSections = []) =>
+  (Array.isArray(customSections) ? customSections : [])
+    .filter((section) => isProjectSectionTitle(section?.title))
+    .flatMap((section) =>
+      normalizeList(section?.items).map((item, index) => {
+        const [nameCandidate, ...detailParts] = item.split(/\s*[:|-]\s+/);
+        const details = detailParts.length ? detailParts : [item];
+        return {
+          name: cleanField(nameCandidate || `Project ${index + 1}`),
+          bullets: normalizeList(details),
+        };
+      }),
+    )
+    .filter((project) => project.name || project.bullets.length);
+
 const buildEducationItems = (lines = []) => {
   if (!lines.length) return [];
 
@@ -908,6 +961,7 @@ const buildImportedResumeData = (resumeText = '', originalName = '', template = 
   const explicitSkillLines = collectExplicitSkillLines(lines);
   const skills = splitSkillTokens(explicitSkillLines.length ? explicitSkillLines : sectionMap.skills || []);
   const experience = buildExperienceItems(sectionMap.experience || []);
+  const projects = buildProjectItems(sectionMap.projects || []);
   const sectionEducation = buildEducationItems(sectionMap.education || []);
   const fallbackEducation = buildEducationItems(collectEducationLinesFromDocument(lines));
   const looseSignalEducation = buildEducationItemsFromLooseSignals(collectEducationLinesFromDocument(lines));
@@ -937,10 +991,11 @@ const buildImportedResumeData = (resumeText = '', originalName = '', template = 
     experience: experience.length
       ? experience
       : [{ company: '', role: '', startDate: '', endDate: '', description: '' }],
+    projects: projects.length ? projects : [{ name: '', bullets: [''] }],
     skills,
     summary: summaryLines.join(' ').trim() || inferSummary(lines, title),
     customSections: Object.entries(sectionMap)
-      .filter(([key, values]) => !['summary', 'skills', 'experience', 'education', 'contact'].includes(key) && values.length)
+      .filter(([key, values]) => !['summary', 'skills', 'experience', 'education', 'projects', 'contact'].includes(key) && values.length)
       .map(([key, values]) => ({
         title: toTitleCase(key),
         items: filterFilled(values).filter(
@@ -1005,6 +1060,20 @@ const groundImportedResumeData = (resumeData = {}, resumeText = '', originalName
     return grounded.length ? grounded : fallbackItems;
   };
 
+  const projectCandidates = [
+    ...(Array.isArray(resumeData?.projects) ? resumeData.projects : []),
+    ...buildProjectItemsFromCustomSections(resumeData?.customSections),
+  ];
+  const fallbackProjects = fallback.projects || [{ name: '', bullets: [''] }];
+  const groundedProjects = projectCandidates
+    .map((project) => ({
+      name: sanitizeGroundedText(project?.name, ''),
+      bullets: normalizeList(project?.bullets)
+        .map((bullet) => sanitizeGroundedText(bullet, ''))
+        .filter(Boolean),
+    }))
+    .filter((project) => project.name || project.bullets.length);
+
   return {
     template: resumeData?.template || fallback.template,
     personalInfo: {
@@ -1028,6 +1097,7 @@ const groundImportedResumeData = (resumeData = {}, resumeText = '', originalName
       fallback.experience,
       ['company', 'role', 'startDate', 'endDate', 'description'],
     ),
+    projects: groundedProjects.length ? groundedProjects : fallbackProjects,
     skills: Array.from(
       new Set(
         normalizeList(resumeData?.skills)
@@ -1037,14 +1107,18 @@ const groundImportedResumeData = (resumeData = {}, resumeText = '', originalName
     ).slice(0, 24),
     summary: summaryFromSource || '',
     customSections: sanitizeCollection(
-      resumeData?.customSections?.map((section) => ({
-        title: cleanField(section?.title),
-        items: normalizeList(section?.items).join(' || '),
-      })),
-      fallback.customSections.map((section) => ({
-        title: section.title,
-        items: normalizeList(section.items).join(' || '),
-      })),
+      resumeData?.customSections
+        ?.filter((section) => !isProjectSectionTitle(section?.title))
+        .map((section) => ({
+          title: cleanField(section?.title),
+          items: normalizeList(section?.items).join(' || '),
+        })),
+      fallback.customSections
+        .filter((section) => !isProjectSectionTitle(section?.title))
+        .map((section) => ({
+          title: section.title,
+          items: normalizeList(section.items).join(' || '),
+        })),
       ['title', 'items'],
     ).map((section) => ({
       title: section.title,
@@ -1088,6 +1162,15 @@ const buildResumeTextFromData = (resumeData = {}) => {
     });
   }
 
+  if (Array.isArray(resumeData.projects) && resumeData.projects.some((item) => item.name || normalizeList(item.bullets).length)) {
+    lines.push('', 'PROJECTS');
+    resumeData.projects.forEach((item, index) => {
+      lines.push(item.name || `Project ${index + 1}`);
+      normalizeList(item.bullets).forEach((bullet) => lines.push(`- ${bullet}`));
+      lines.push('');
+    });
+  }
+
   if (Array.isArray(resumeData.education) && resumeData.education.some((item) => item.degree || item.institution || item.fieldOfStudy)) {
     lines.push('EDUCATION');
     resumeData.education.forEach((item) => {
@@ -1121,6 +1204,7 @@ const collectResumeSignals = (resumeData = {}) =>
     resumeData.summary,
     ...(resumeData.skills || []),
     ...(resumeData.experience || []).flatMap((item) => [item.role, item.company, item.description]),
+    ...(resumeData.projects || []).flatMap((item) => [item.name, ...(item.bullets || [])]),
     ...(resumeData.education || []).flatMap((item) => [item.institution, item.degree, item.fieldOfStudy, item.location, item.score]),
     ...(resumeData.customSections || []).flatMap((section) => [section.title, ...(section.items || [])]),
   ]

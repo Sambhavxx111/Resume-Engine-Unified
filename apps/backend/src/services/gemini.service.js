@@ -145,6 +145,12 @@ const PROMPTS = {
             "score": "string"
           }
         ],
+        "projects": [
+          {
+            "name": "string",
+            "bullets": ["project detail 1", "project detail 2"]
+          }
+        ],
         "customSections": []
       },
       "keyChanges": ["change 1", "change 2", "change 3"]
@@ -158,6 +164,7 @@ const PROMPTS = {
     Do NOT use generic filename words such as "resume", "cv", or "final" as part of the person's name.
     The skills array must contain only actual skills, tools, technologies, or concise competencies.
     Never put college names, school names, cities, dates, grades, certifications, job titles, or full bullet sentences into the skills array.
+    Put all project work in the top-level projects array. Do not duplicate projects inside customSections.
     If something is missing, return an empty string or empty array instead.
     Convert bullet points into plain text strings joined naturally inside description fields.
     Use only these top-level keys and no markdown.
@@ -196,6 +203,12 @@ const PROMPTS = {
           "startDate": "YYYY-MM or empty string",
           "endDate": "YYYY-MM or empty string",
           "description": "string"
+        }
+      ],
+      "projects": [
+        {
+          "name": "string",
+          "bullets": ["project detail 1", "project detail 2"]
         }
       ],
       "skills": ["skill 1", "skill 2"],
@@ -524,7 +537,7 @@ const diagnoseResume = async (resumeJson) => {
 // Optimize resume based on job description
 const optimizeResume = async (resumeJson, jobDescription = null) => {
   try {
-    console.log('optimizeResume called');
+    if (process.env.GEMINI_DEBUG === 'true') console.log('optimizeResume called');
 
     if (!resumeJson || typeof resumeJson !== 'object') {
       throw new Error('Resume must be a valid JSON object');
@@ -703,6 +716,12 @@ const parseResumeForBuilder = async (resumeText, originalName = '') => {
                 endDate: item?.endDate || '',
                 location: item?.location || '',
                 score: item?.score || '',
+              }))
+            : [],
+          projects: Array.isArray(parsed.projects)
+            ? parsed.projects.map((item) => ({
+                name: item?.name || '',
+                bullets: Array.isArray(item?.bullets) ? item.bullets : [],
               }))
             : [],
           experience: Array.isArray(parsed.experience) ? parsed.experience : [],
