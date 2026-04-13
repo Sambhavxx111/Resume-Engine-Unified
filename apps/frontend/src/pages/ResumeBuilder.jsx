@@ -178,6 +178,11 @@ const defaultResumePhotoPlacement = {
   y: 0.06,
 };
 
+const defaultResumePhotoCrop = {
+  x: 0.5,
+  y: 0.5,
+};
+
 function ResumeBuilder() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -350,8 +355,10 @@ function ResumeBuilder() {
         width: dimensions.width,
         height: dimensions.height,
         placement: defaultResumePhotoPlacement,
+        crop: defaultResumePhotoCrop,
+        zoom: 1,
       });
-      setSuccessMessage("Resume photo uploaded. Drag it inside the preview or use a photo-ready template.");
+      setSuccessMessage("Resume photo uploaded. Place it in the preview, then zoom and adjust it inside the circle.");
     } catch (photoError) {
       setError(photoError.message || "Unable to upload the selected image.");
       setSuccessMessage("");
@@ -365,6 +372,14 @@ function ResumeBuilder() {
 
   const handlePhotoPlacementChange = (placement) => {
     setResumePhoto((prev) => (prev ? { ...prev, placement } : prev));
+  };
+
+  const handlePhotoCropChange = (crop) => {
+    setResumePhoto((prev) => (prev ? { ...prev, crop: { ...prev.crop, ...crop } } : prev));
+  };
+
+  const handlePhotoZoomChange = (zoom) => {
+    setResumePhoto((prev) => (prev ? { ...prev, zoom } : prev));
   };
 
   const handleImportResume = async () => {
@@ -559,6 +574,8 @@ function ResumeBuilder() {
             onPhotoUpload={handlePhotoUpload}
             onPhotoRemove={handlePhotoRemove}
             onPhotoPlacementChange={handlePhotoPlacementChange}
+            onPhotoCropChange={handlePhotoCropChange}
+            onPhotoZoomChange={handlePhotoZoomChange}
             previewRef={previewRef}
           />
         </div>

@@ -251,10 +251,60 @@ const sanitizeRenderedSkills = (skills = []) =>
     ),
   );
 
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
 const getPhotoImageFormat = (src = "") => {
   const match = String(src || "").match(/^data:image\/(png|jpeg|jpg|webp);/i);
   if (!match) return "PNG";
   return /jpe?g/i.test(match[1]) ? "JPEG" : "PNG";
+};
+
+const prepareResumePhotoAsset = (resumePhoto, frameWidth, frameHeight, shape = "rounded") => {
+  if (!resumePhoto?.src || typeof document === "undefined") {
+    return null;
+  }
+
+  const cropX = clamp(resumePhoto?.crop?.x ?? 0.5, 0, 1);
+  const cropY = clamp(resumePhoto?.crop?.y ?? 0.5, 0, 1);
+  const zoom = clamp(resumePhoto?.zoom ?? 1, 1, 2.5);
+  const image = new Image();
+  image.src = resumePhoto.src;
+
+  const imageWidth = resumePhoto.width || image.width || 1;
+  const imageHeight = resumePhoto.height || image.height || 1;
+  const outputSize = 512;
+  const baseScale = Math.max(outputSize / imageWidth, outputSize / imageHeight);
+  const drawWidth = imageWidth * baseScale * zoom;
+  const drawHeight = imageHeight * baseScale * zoom;
+  const drawX = (outputSize - drawWidth) * cropX;
+  const drawY = (outputSize - drawHeight) * cropY;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = outputSize;
+  canvas.height = outputSize;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return null;
+  }
+
+  context.clearRect(0, 0, outputSize, outputSize);
+  context.save();
+  if (shape === "circle") {
+    context.beginPath();
+    context.arc(outputSize / 2, outputSize / 2, outputSize / 2, 0, Math.PI * 2);
+    context.closePath();
+    context.clip();
+  }
+  context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+  context.restore();
+
+  return {
+    src: canvas.toDataURL("image/png"),
+    format: "PNG",
+    width: frameWidth,
+    height: frameHeight,
+  };
 };
 
 const drawResumePhoto = (doc, template, resumePhoto = null) => {
@@ -262,7 +312,6 @@ const drawResumePhoto = (doc, template, resumePhoto = null) => {
     return;
   }
 
-  const format = getPhotoImageFormat(resumePhoto.src);
   let x = 12;
   let y = 12;
   let width = 32;
@@ -285,7 +334,9 @@ const drawResumePhoto = (doc, template, resumePhoto = null) => {
     y = 12 + Math.max(0, Math.min(usableHeight, (resumePhoto.placement?.y ?? 0.06) * usableHeight));
   }
 
-  doc.addImage(resumePhoto.src, format, x, y, width, height, undefined, "FAST");
+  const shape = template === "creative" || template === "enhancv-columns" ? "circle" : "rounded";
+  const preparedPhoto = prepareResumePhotoAsset(resumePhoto, width, height, shape);
+  doc.addImage(preparedPhoto?.src || resumePhoto.src, preparedPhoto?.format || getPhotoImageFormat(resumePhoto.src), x, y, width, height, undefined, "FAST");
 
   if (template === "creative") {
     doc.setDrawColor(226, 232, 240);

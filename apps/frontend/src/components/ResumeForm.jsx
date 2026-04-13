@@ -33,6 +33,7 @@ const TEMPLATE_ID_ALIASES = {
 };
 
 const normalizeTemplateId = (templateId) => TEMPLATE_ID_ALIASES[templateId] || templateId || "contemporary";
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const TEMPLATE_OPTIONS = [
   {
@@ -619,6 +620,8 @@ function ResumeForm({
   onPhotoUpload,
   onPhotoRemove,
   onPhotoPlacementChange,
+  onPhotoCropChange,
+  onPhotoZoomChange,
   previewRef,
 }) {
   const [skillInput, setSkillInput] = useState("");
@@ -929,6 +932,9 @@ function ResumeForm({
     ...templateStyle,
     skill: "rounded-md px-3 py-1.5 text-[12px] font-semibold text-cyan-950",
   };
+  const photoCropX = clamp(resumePhoto?.crop?.x ?? 0.5, 0, 1);
+  const photoCropY = clamp(resumePhoto?.crop?.y ?? 0.5, 0, 1);
+  const photoZoom = clamp(resumePhoto?.zoom ?? 1, 1, 2.5);
 
   useEffect(() => {
     const handlePointerMove = (event) => {
@@ -1002,6 +1008,11 @@ function ResumeForm({
           src={resumePhoto.src}
           alt="Resume profile"
           className="aspect-[4/5] h-auto w-full object-cover"
+          style={{
+            objectPosition: `${photoCropX * 100}% ${photoCropY * 100}%`,
+            transform: `scale(${photoZoom})`,
+            transformOrigin: `${photoCropX * 100}% ${photoCropY * 100}%`,
+          }}
           draggable={false}
         />
       </div>
@@ -1152,53 +1163,6 @@ function ResumeForm({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Resume Photo</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
-                    Upload an image up to 2 MB. Drag it anywhere in the preview, or let photo-ready templates place it automatically.
-                  </p>
-                </div>
-                {resumePhoto ? (
-                  <button
-                    type="button"
-                    className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
-                    onClick={onPhotoRemove}
-                  >
-                    Remove
-                  </button>
-                ) : null}
-              </div>
-              <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="block w-full text-sm text-slate-400 file:mr-4 file:rounded-full file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-medium file:text-slate-950"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0] || null;
-                    onPhotoUpload?.(file);
-                    event.target.value = "";
-                  }}
-                />
-                {resumePhoto ? (
-                  <div className="mt-4 flex items-center gap-4 rounded-[18px] bg-white p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
-                    <img src={resumePhoto.src} alt="Resume profile preview" className="h-16 w-16 rounded-2xl object-cover" />
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{resumePhoto.name}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {(resumePhoto.size / (1024 * 1024)).toFixed(2)} MB
-                        {templateUsesBuiltInPhoto
-                          ? " • Auto-fitted into this template"
-                          : " • Drag it inside the preview to place it"}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-3 text-sm text-slate-400">No photo uploaded yet.</p>
-                )}
-              </div>
-            </div>
 
             <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -1398,6 +1362,109 @@ function ResumeForm({
 
           <aside className="space-y-6">
             <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Resume Photo</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Upload an image up to 2 MB. Drag it anywhere in the preview, or let photo-ready templates place it automatically.
+                  </p>
+                </div>
+                {resumePhoto ? (
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
+                    onClick={onPhotoRemove}
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+              <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="block w-full text-sm text-slate-400 file:mr-4 file:rounded-full file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-medium file:text-slate-950"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    onPhotoUpload?.(file);
+                    event.target.value = "";
+                  }}
+                />
+                {resumePhoto ? (
+                  <div className="mt-4 flex items-center gap-4 rounded-[18px] bg-white p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                    <img
+                      src={resumePhoto.src}
+                      alt="Resume profile preview"
+                      className="h-16 w-16 rounded-full object-cover"
+                      style={{
+                        objectPosition: `${photoCropX * 100}% ${photoCropY * 100}%`,
+                      }}
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{resumePhoto.name}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {(resumePhoto.size / (1024 * 1024)).toFixed(2)} MB
+                        {templateUsesBuiltInPhoto
+                          ? " • Auto-fitted into this template"
+                          : " • Drag it inside the preview to place it"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-400">No photo uploaded yet.</p>
+                )}
+                {resumePhoto ? (
+                  <div className="mt-4 space-y-3 rounded-[18px] bg-white p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                    <label className="block">
+                      <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                        <span>Zoom</span>
+                        <span>{photoZoom.toFixed(2)}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="2.5"
+                        step="0.01"
+                        value={photoZoom}
+                        className="w-full accent-slate-900"
+                        onChange={(event) => onPhotoZoomChange?.(Number(event.target.value))}
+                      />
+                    </label>
+                    <label className="block">
+                      <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                        <span>Horizontal</span>
+                        <span>{Math.round(photoCropX * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={photoCropX}
+                        className="w-full accent-slate-900"
+                        onChange={(event) => onPhotoCropChange?.({ x: Number(event.target.value) })}
+                      />
+                    </label>
+                    <label className="block">
+                      <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                        <span>Vertical</span>
+                        <span>{Math.round(photoCropY * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={photoCropY}
+                        className="w-full accent-slate-900"
+                        onChange={(event) => onPhotoCropChange?.({ y: Number(event.target.value) })}
+                      />
+                    </label>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <h3 className="mb-4 text-lg font-semibold text-slate-900">Professional Summary</h3>
               <textarea className="field min-h-44" placeholder="Write a concise, impact-focused professional summary" value={formData.summary} onChange={(event) => setFormData((prev) => ({ ...prev, summary: event.target.value }))} />
             </div>
@@ -1520,6 +1587,11 @@ function ResumeForm({
                             src={resumePhoto.src}
                             alt="Resume profile"
                             className="h-full w-full object-cover"
+                            style={{
+                              objectPosition: `${photoCropX * 100}% ${photoCropY * 100}%`,
+                              transform: `scale(${photoZoom})`,
+                              transformOrigin: `${photoCropX * 100}% ${photoCropY * 100}%`,
+                            }}
                             draggable={false}
                           />
                         ) : (
@@ -1879,6 +1951,11 @@ function ResumeForm({
                             src={resumePhoto.src}
                             alt="Resume profile"
                             className="h-full w-full object-cover"
+                            style={{
+                              objectPosition: `${photoCropX * 100}% ${photoCropY * 100}%`,
+                              transform: `scale(${photoZoom})`,
+                              transformOrigin: `${photoCropX * 100}% ${photoCropY * 100}%`,
+                            }}
                             draggable={false}
                           />
                         ) : (
