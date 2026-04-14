@@ -386,7 +386,7 @@ const templatePreviewClasses = {
     layout: "compact",
     shell: "border-slate-200 bg-white",
     header: "border-b border-slate-300 pb-4",
-    name: "text-[2.15rem] font-black uppercase tracking-[0.03em] text-slate-900",
+    name: "text-[2.15rem] font-black tracking-[0.03em] text-slate-900",
     title: "mt-1.5 text-[15px] font-semibold text-slate-700",
     sectionTitle: "text-[12px] font-black uppercase tracking-[0.24em] text-slate-800",
     skill: "rounded-full bg-cyan-50 px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-cyan-900",
@@ -413,7 +413,7 @@ const templatePreviewClasses = {
     layout: "enhancv-replica",
     shell: "border-slate-300 bg-white",
     header: "border-b border-slate-200 pb-3",
-    name: "text-[2.2rem] font-black uppercase tracking-[0.02em] text-blue-950",
+    name: "text-[2.2rem] font-black tracking-[0.02em] text-blue-950",
     title: "mt-1.5 text-[17px] font-bold text-orange-600",
     sectionTitle: "text-[15px] font-black uppercase tracking-[0.02em] text-blue-950",
     skill: "border-b border-slate-500 pb-1.5 text-[13px] font-semibold text-slate-700",
@@ -422,7 +422,7 @@ const templatePreviewClasses = {
     layout: "enhancv-columns",
     shell: "border-slate-300 bg-white",
     header: "border-b border-slate-200 pb-3",
-    name: "text-[2.15rem] font-black uppercase tracking-[0.01em] text-emerald-950",
+    name: "text-[2.15rem] font-black tracking-[0.01em] text-emerald-950",
     title: "mt-1 text-[16px] font-bold text-emerald-700",
     sectionTitle: "text-[13px] font-black uppercase tracking-[0.01em] text-emerald-950",
     skill: "border-b border-slate-500 pb-1.5 text-[12px] font-semibold text-emerald-950",
@@ -934,7 +934,7 @@ function ResumeForm({
   };
   const photoCropX = clamp(resumePhoto?.crop?.x ?? 0.5, 0, 1);
   const photoCropY = clamp(resumePhoto?.crop?.y ?? 0.5, 0, 1);
-  const photoZoom = clamp(resumePhoto?.zoom ?? 1, 1, 2.5);
+  const photoZoom = clamp(resumePhoto?.zoom ?? 1, 1, 3.5);
 
   useEffect(() => {
     const handlePointerMove = (event) => {
@@ -997,7 +997,7 @@ function ResumeForm({
     resumePhoto && !templateUsesBuiltInPhoto ? (
       <div
         ref={photoImageRef}
-        className="absolute z-20 w-[18%] min-w-[72px] max-w-[118px] cursor-grab overflow-hidden rounded-2xl border-2 border-white bg-white shadow-[0_18px_35px_rgba(15,23,42,0.2)] active:cursor-grabbing"
+        className="absolute z-20 aspect-square w-[19.5%] min-w-[96px] max-w-[128px] cursor-grab overflow-hidden rounded-full border border-white/15 bg-white/10 shadow-[0_18px_35px_rgba(15,23,42,0.2)] active:cursor-grabbing"
         style={{
           left: `${(resumePhoto.placement?.x ?? 0.72) * 100}%`,
           top: `${(resumePhoto.placement?.y ?? 0.06) * 100}%`,
@@ -1007,7 +1007,7 @@ function ResumeForm({
         <img
           src={resumePhoto.src}
           alt="Resume profile"
-          className="aspect-[4/5] h-auto w-full object-cover"
+          className="h-full w-full object-cover"
           style={{
             objectPosition: `${photoCropX * 100}% ${photoCropY * 100}%`,
             transform: `scale(${photoZoom})`,
@@ -1423,7 +1423,7 @@ function ResumeForm({
                       <input
                         type="range"
                         min="1"
-                        max="2.5"
+                        max="3.5"
                         step="0.01"
                         value={photoZoom}
                         className="w-full accent-slate-900"
@@ -1581,7 +1581,7 @@ function ResumeForm({
                           <span className="break-words">{formData.personalInfo.location || "[Location]"}</span>
                         </div>
                       </div>
-                      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100">
+                      <div className="mx-auto flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-white/10">
                         {resumePhoto ? (
                           <img
                             src={resumePhoto.src}
@@ -2066,7 +2066,7 @@ function ResumeForm({
                           <h2 className={templateStyle.name}>{previewName}</h2>
                           <p className={templateStyle.title}>{previewTitle}</p>
                         </div>
-                        <div className="grid gap-1 text-right text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                        <div className="grid gap-1 text-right text-[11px] tracking-[0.18em] text-slate-500">
                           <span>{formData.personalInfo.email || "email@example.com"}</span>
                           <span>{formData.personalInfo.phone || "+91 0000000000"}</span>
                           <span>{formData.personalInfo.location || "Your location"}</span>

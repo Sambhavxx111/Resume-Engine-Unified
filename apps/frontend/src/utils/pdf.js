@@ -266,7 +266,7 @@ const prepareResumePhotoAsset = (resumePhoto, frameWidth, frameHeight, shape = "
 
   const cropX = clamp(resumePhoto?.crop?.x ?? 0.5, 0, 1);
   const cropY = clamp(resumePhoto?.crop?.y ?? 0.5, 0, 1);
-  const zoom = clamp(resumePhoto?.zoom ?? 1, 1, 2.5);
+  const zoom = clamp(resumePhoto?.zoom ?? 1, 1, 3.5);
   const image = new Image();
   image.src = resumePhoto.src;
 
@@ -314,8 +314,8 @@ const drawResumePhoto = (doc, template, resumePhoto = null) => {
 
   let x = 12;
   let y = 12;
-  let width = 32;
-  let height = 40;
+  let width = 28;
+  let height = 28;
 
   if (template === "creative") {
     x = 168;
@@ -323,10 +323,10 @@ const drawResumePhoto = (doc, template, resumePhoto = null) => {
     width = 28;
     height = 28;
   } else if (template === "enhancv-columns") {
-    x = 172;
+    x = 168;
     y = 9;
-    width = 22;
-    height = 22;
+    width = 28;
+    height = 28;
   } else {
     const usableWidth = PAGE_WIDTH - 24 - width;
     const usableHeight = PAGE_HEIGHT - 24 - height;
@@ -338,17 +338,16 @@ const drawResumePhoto = (doc, template, resumePhoto = null) => {
   const preparedPhoto = prepareResumePhotoAsset(resumePhoto, width, height, shape);
   doc.addImage(preparedPhoto?.src || resumePhoto.src, preparedPhoto?.format || getPhotoImageFormat(resumePhoto.src), x, y, width, height, undefined, "FAST");
 
-  if (template === "creative") {
+  if (template === "creative" || template === "enhancv-columns") {
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.9);
-    doc.circle(182, 28, 14);
-  } else if (template === "enhancv-columns") {
-    doc.setDrawColor(148, 163, 184);
-    doc.setLineWidth(0.8);
-    doc.circle(183, 20, 11);
   } else {
     doc.setDrawColor(255, 255, 255);
     doc.setLineWidth(0.8);
+  }
+  if (shape === "circle") {
+    doc.circle(x + width / 2, y + height / 2, Math.min(width, height) / 2);
+  } else {
     doc.roundedRect(x, y, width, height, 2, 2);
   }
 };
