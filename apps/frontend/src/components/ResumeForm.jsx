@@ -371,7 +371,8 @@ const templatePreviewClasses = {
     name: "text-[2.15rem] font-bold tracking-tight text-slate-900",
     title: "mt-1.5 text-lg font-semibold text-cyan-800",
     sectionTitle: "text-[13px] font-bold uppercase tracking-[0.22em] text-slate-700",
-    skill: "rounded-full bg-slate-100 px-3 py-1.5 text-[13px] font-medium text-slate-800",
+    skill: "text-[13px] font-medium text-slate-800",
+    skillGap: "gap-4",
   },
   "single-column": {
     layout: "single-column",
@@ -456,7 +457,7 @@ const getPreviewSections = (formData) => {
     key: "skills",
     title: "Skills",
     render: (templateStyle) => (
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className={`mt-2 flex flex-wrap ${templateStyle.skillGap || "gap-2"}`}>
         {renderedSkills.length ? (
           renderedSkills.map((skill, index) => (
             <span
@@ -2043,6 +2044,7 @@ function ResumeForm({
                       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">
                         <span>{formData.personalInfo.email || "email@example.com"}</span>
                         <span>{formData.personalInfo.phone || "+91 0000000000"}</span>
+                        <span className="break-all">{formData.personalInfo.portfolio || "LinkedIn / Portfolio"}</span>
                         <span>{formData.personalInfo.location || "Your location"}</span>
                       </div>
                     </div>

@@ -40,7 +40,7 @@ const TEMPLATE_CONFIG = {
     contactColor: [30, 41, 59],
     sectionColor: [30, 41, 59],
     lineColor: [180, 195, 210],
-    skillMode: "pill-light",
+    skillMode: "plain",
     order: ["summary", "education", "skills", "experience", "projects", "certifications", "achievements", "languages", "interests", "custom"],
   },
   "single-column": {
@@ -192,6 +192,12 @@ const formatDateRange = (startDate, endDate) => {
   if (start && end) return `${start} - ${end}`;
   return start || end || "";
 };
+
+const formatEducationMeta = (item = {}) =>
+  [formatDateRange(item.startDate, item.endDate), safeText(item.location), safeText(item.score)]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" | ");
 
 const splitBulletLines = (value = "") =>
   String(value)
@@ -402,7 +408,7 @@ const getResumeSections = (formData) => {
   }
 
   const educationItems = (formData.education || []).filter(
-    (item) => item.institution || item.degree || item.fieldOfStudy,
+    (item) => item.institution || item.degree || item.fieldOfStudy || item.location || item.score,
   );
   if (educationItems.length) {
     sections.push({
@@ -411,7 +417,7 @@ const getResumeSections = (formData) => {
       items: educationItems.map((item) => ({
         heading: [safeText(item.degree), safeText(item.fieldOfStudy)].filter(Boolean).join(", "),
         subheading: safeText(item.institution),
-        meta: formatDateRange(item.startDate, item.endDate),
+        meta: formatEducationMeta(item),
       })),
     });
   }
@@ -469,6 +475,37 @@ const drawWrappedText = (doc, text, x, y, width, lineHeight = 5.4) => {
   return y + lines.length * lineHeight;
 };
 
+const drawWrappedTextPaginated = (doc, text, x, y, width, lineHeight, config) => {
+  const cleaned = safeText(text);
+  if (!cleaned) return y;
+
+  const lines = doc.splitTextToSize(cleaned, width);
+  lines.forEach((line) => {
+    y = ensurePage(doc, y, lineHeight, config.background);
+    doc.text(line, x, y);
+    y += lineHeight;
+  });
+
+  return y;
+};
+
+const drawBulletTextPaginated = (doc, bullet, x, y, width, lineHeight, config) => {
+  const cleaned = safeText(bullet);
+  if (!cleaned) return y;
+
+  const lines = doc.splitTextToSize(cleaned, width - 4);
+  lines.forEach((line, index) => {
+    y = ensurePage(doc, y, lineHeight, config.background);
+    if (index === 0) {
+      doc.text("-", x, y);
+    }
+    doc.text(line, x + 4, y);
+    y += lineHeight;
+  });
+
+  return y;
+};
+
 const drawSectionTitle = (doc, title, x, y, width, config, variant = "default") => {
   const label = title.toUpperCase();
   doc.setTextColor(...config.sectionColor);
@@ -486,6 +523,8 @@ const drawSkills = (doc, skills, x, y, width, config) => {
   let cursorX = x;
   let cursorY = y + 4;
   let rowHeight = 9;
+  const skillGap = config.skillMode === "plain" ? 6 : 3;
+  const rowGap = config.skillMode === "plain" ? 4 : 2;
 
   skills.forEach((skill) => {
     const label = String(skill || "").trim();
@@ -497,14 +536,18 @@ const drawSkills = (doc, skills, x, y, width, config) => {
     const longestLineWidth = Math.max(...labelLines.map((line) => doc.getTextWidth(line)), 0);
     const pillWidth = Math.min(
       longestLineWidth +
-        (config.skillMode === "outlined" || config.skillMode === "enhancv-line" ? 2 : 8),
+        (config.skillMode === "plain"
+          ? 1
+          : config.skillMode === "outlined" || config.skillMode === "enhancv-line"
+            ? 2
+            : 8),
       width,
     );
     const pillHeight = Math.max(7.5, labelLines.length * 4.1 + 2);
 
     if (cursorX + pillWidth > x + width) {
       cursorX = x;
-      cursorY += rowHeight + 2;
+      cursorY += rowHeight + rowGap;
       rowHeight = 9;
     }
 
@@ -522,7 +565,7 @@ const drawSkills = (doc, skills, x, y, width, config) => {
         cursorX + pillWidth - 1,
         cursorY + labelLines.length * 3.6 + 0.8,
       );
-    } else if (config.skillMode === "outlined") {
+    } else if (config.skillMode === "outlined" || config.skillMode === "plain") {
       doc.setTextColor(30, 41, 59);
     } else if (config.skillMode === "light-box") {
       doc.setFillColor(255, 255, 255);
@@ -539,14 +582,59 @@ const drawSkills = (doc, skills, x, y, width, config) => {
     doc.setFontSize(config.skillMode === "compact" ? 9.1 : 9.6);
     doc.text(
       labelLines,
-      cursorX + (config.skillMode === "outlined" || config.skillMode === "enhancv-line" ? 0 : 4),
+      cursorX +
+        (config.skillMode === "outlined" || config.skillMode === "enhancv-line" || config.skillMode === "plain"
+          ? 0
+          : 4),
       cursorY,
     );
-    cursorX += pillWidth + 3;
+    cursorX += pillWidth + skillGap;
     rowHeight = Math.max(rowHeight, pillHeight);
   });
 
   return cursorY + rowHeight;
+};
+
+const measureSkillsHeight = (doc, skills, width, config) => {
+  let cursorX = 0;
+  let cursorY = 4;
+  let rowHeight = 9;
+  const skillGap = config.skillMode === "plain" ? 6 : 3;
+  const rowGap = config.skillMode === "plain" ? 4 : 2;
+
+  doc.setFont("helvetica", config.skillMode === "compact" ? "bold" : "normal");
+  doc.setFontSize(config.skillMode === "compact" ? 9.1 : 9.6);
+
+  skills.forEach((skill) => {
+    const label = String(skill || "").trim();
+    if (!label) return;
+
+    const maxLabelWidth =
+      config.skillMode === "enhancv-line" ? Math.max(width / 2 - 4, 18) : Math.max(width - 8, 20);
+    const labelLines = doc.splitTextToSize(label, maxLabelWidth);
+    const longestLineWidth = Math.max(...labelLines.map((line) => doc.getTextWidth(line)), 0);
+    const pillWidth = Math.min(
+      longestLineWidth +
+        (config.skillMode === "plain"
+          ? 1
+          : config.skillMode === "outlined" || config.skillMode === "enhancv-line"
+            ? 2
+            : 8),
+      width,
+    );
+    const pillHeight = Math.max(7.5, labelLines.length * 4.1 + 2);
+
+    if (cursorX + pillWidth > width) {
+      cursorX = 0;
+      cursorY += rowHeight + rowGap;
+      rowHeight = 9;
+    }
+
+    cursorX += pillWidth + skillGap;
+    rowHeight = Math.max(rowHeight, pillHeight);
+  });
+
+  return cursorY + rowHeight + 3;
 };
 
 const drawSkillGrid = (doc, skills, x, y, width, columns = 2) => {
@@ -641,6 +729,68 @@ const drawSectionBody = (doc, section, x, y, width, config) => {
   return y;
 };
 
+const drawPaginatedSectionBody = (doc, section, x, y, width, config) => {
+  doc.setTextColor(30, 41, 59);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10.8);
+
+  if (section.skills) {
+    y = ensurePage(doc, y, measureSkillsHeight(doc, section.skills, width, config), config.background);
+    return drawSkills(doc, section.skills, x, y, width, config) + 3;
+  }
+
+  if (section.lines) {
+    section.lines.forEach((line) => {
+      y = drawWrappedTextPaginated(doc, line, x, y, width, 5.9, config) + 1.6;
+    });
+    return y + 1;
+  }
+
+  if (section.items) {
+    section.items.forEach((item) => {
+      doc.setTextColor(15, 23, 42);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.9);
+      y = drawWrappedTextPaginated(doc, item.heading, x, y, width, 5.5, config);
+
+      if (item.subheading && safeText(item.subheading) !== safeText(item.heading)) {
+        doc.setTextColor(51, 65, 85);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        y = drawWrappedTextPaginated(doc, item.subheading, x, y, width, 5.2, config) + 0.7;
+      }
+
+      if (item.meta) {
+        doc.setTextColor(71, 85, 105);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9.3);
+        y = drawWrappedTextPaginated(doc, item.meta, x, y, width, 4.9, config) + 1;
+      }
+
+      if (item.body) {
+        doc.setTextColor(30, 41, 59);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10.2);
+        y = drawWrappedTextPaginated(doc, item.body, x, y, width, 5.4, config) + 2.2;
+      }
+
+      if (Array.isArray(item.bullets) && item.bullets.length) {
+        doc.setTextColor(30, 41, 59);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10.2);
+        item.bullets.forEach((bullet) => {
+          y = drawBulletTextPaginated(doc, bullet, x, y, width, 5.1, config) + 0.7;
+        });
+        y += 1.5;
+      } else if (!item.body) {
+        y += 1.5;
+      }
+    });
+  }
+
+  return y;
+};
+
 const drawStandardHeader = (doc, formData, config, centered = false) => {
   const x = 15;
   const width = 180;
@@ -700,7 +850,7 @@ const renderStandardTemplate = (doc, formData, config) => {
   sections.forEach((section) => {
     y = ensurePage(doc, y, 18, config.background);
     y = drawSectionTitle(doc, section.title, 15, y, 180, config);
-    y = drawSectionBody(doc, section, 15, y, 180, config) + 2.5;
+    y = drawPaginatedSectionBody(doc, section, 15, y, 180, config) + 2.5;
   });
 };
 
@@ -711,7 +861,7 @@ const renderSingleColumnTemplate = (doc, formData, config) => {
   sections.forEach((section) => {
     y = ensurePage(doc, y, 18, config.background);
     y = drawSectionTitle(doc, section.title, 21, y, 168, config, "strong");
-    y = drawSectionBody(doc, section, 21, y, 168, config) + 3.2;
+    y = drawPaginatedSectionBody(doc, section, 21, y, 168, config) + 3.2;
   });
 };
 
@@ -853,7 +1003,7 @@ const renderTimelineTemplate = (doc, formData, config) => {
     doc.setDrawColor(203, 213, 225);
     doc.line(20, y + 1.5, 20, Math.min(PAGE_LIMIT, y + 24));
     y = drawSectionTitle(doc, section.title, 26, y, 166, config);
-    y = drawSectionBody(doc, section, 26, y, 166, config) + 4;
+    y = drawPaginatedSectionBody(doc, section, 26, y, 166, config) + 4;
   });
 };
 
