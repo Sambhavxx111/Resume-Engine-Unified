@@ -193,6 +193,54 @@ const formatDateRange = (startDate, endDate) => {
   return start || end || "";
 };
 
+const normalizeExternalHref = (value = "") => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+};
+
+const getPortfolioContactPart = (portfolio = "") => {
+  const url = normalizeExternalHref(portfolio);
+  return url ? { text: "LinkedIn", url } : null;
+};
+
+const drawLinkedText = (doc, text, x, y, url, underlineColor = [30, 41, 59]) => {
+  doc.textWithLink(text, x, y, { url });
+  doc.setDrawColor(...underlineColor);
+  doc.setLineWidth(0.2);
+  doc.line(x, y + 0.7, x + doc.getTextWidth(text), y + 0.7);
+};
+
+const drawInlineContactParts = (
+  doc,
+  parts,
+  x,
+  y,
+  { separator = " | ", align = "left", underlineColor = [30, 41, 59] } = {},
+) => {
+  const filledParts = parts.filter(Boolean);
+  if (!filledParts.length) return;
+
+  const totalWidth = filledParts.reduce((sum, part, index) => {
+    return sum + doc.getTextWidth(part.text) + (index ? doc.getTextWidth(separator) : 0);
+  }, 0);
+  let cursorX = align === "center" ? x - totalWidth / 2 : align === "right" ? x - totalWidth : x;
+
+  filledParts.forEach((part, index) => {
+    if (index) {
+      doc.text(separator, cursorX, y);
+      cursorX += doc.getTextWidth(separator);
+    }
+
+    if (part.url) {
+      drawLinkedText(doc, part.text, cursorX, y, part.url, underlineColor);
+    } else {
+      doc.text(part.text, cursorX, y);
+    }
+    cursorX += doc.getTextWidth(part.text);
+  });
+};
+
 const formatEducationMeta = (item = {}) =>
   [formatDateRange(item.startDate, item.endDate), safeText(item.location), safeText(item.score)]
     .map((value) => String(value || "").trim())
@@ -819,28 +867,33 @@ const drawStandardHeader = (doc, formData, config, centered = false) => {
     doc.text(formData.personalInfo.title, x, 28);
   }
 
-  const contactLine = filterFilled([
-    safeText(formData.personalInfo.email),
-    safeText(formData.personalInfo.phone),
-    safeText(formData.personalInfo.portfolio),
-    safeText(formData.personalInfo.location),
-  ]).join(" | ");
+  const contactParts = filterFilled([
+    safeText(formData.personalInfo.email) ? { text: safeText(formData.personalInfo.email) } : null,
+    safeText(formData.personalInfo.phone) ? { text: safeText(formData.personalInfo.phone) } : null,
+    getPortfolioContactPart(formData.personalInfo.portfolio),
+    safeText(formData.personalInfo.location) ? { text: safeText(formData.personalInfo.location) } : null,
+  ]);
 
   doc.setTextColor(...config.contactColor);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
 
-  if (!contactLine) {
+  if (!contactParts.length) {
     return centered ? 41 : 40;
   }
 
   if (centered) {
-    const lines = doc.splitTextToSize(contactLine, 150);
-    doc.text(lines, PAGE_WIDTH / 2, 35.5, { align: "center" });
-    return 45 + lines.length * 4.9;
+    drawInlineContactParts(doc, contactParts, PAGE_WIDTH / 2, 35.5, {
+      align: "center",
+      underlineColor: config.contactColor,
+    });
+    return 49.9;
   }
 
-  return drawWrappedText(doc, contactLine, x, 35.5, width, 4.9) + 4.5;
+  drawInlineContactParts(doc, contactParts, x, 35.5, {
+    underlineColor: config.contactColor,
+  });
+  return 44.9;
 };
 
 const renderStandardTemplate = (doc, formData, config) => {
@@ -881,10 +934,10 @@ const renderCompactTemplate = (doc, formData, config) => {
   }
 
   const contactLines = filterFilled([
-    safeText(formData.personalInfo.email),
-    safeText(formData.personalInfo.phone),
-    safeText(formData.personalInfo.portfolio),
-    safeText(formData.personalInfo.location),
+    safeText(formData.personalInfo.email) ? { text: safeText(formData.personalInfo.email) } : null,
+    safeText(formData.personalInfo.phone) ? { text: safeText(formData.personalInfo.phone) } : null,
+    getPortfolioContactPart(formData.personalInfo.portfolio),
+    safeText(formData.personalInfo.location) ? { text: safeText(formData.personalInfo.location) } : null,
   ]);
 
   doc.setTextColor(...config.contactColor);
@@ -892,7 +945,13 @@ const renderCompactTemplate = (doc, formData, config) => {
   doc.setFontSize(9.1);
   let contactY = 17;
   contactLines.forEach((line) => {
-    doc.text(line.toUpperCase(), 195, contactY, { align: "right" });
+    const label = line.url ? line.text : line.text.toUpperCase();
+    const lineX = 195 - doc.getTextWidth(label);
+    if (line.url) {
+      drawLinkedText(doc, label, lineX, contactY, line.url, config.contactColor);
+    } else {
+      doc.text(label, 195, contactY, { align: "right" });
+    }
     contactY += 5.6;
   });
 
@@ -944,13 +1003,18 @@ const renderCreativeTemplate = (doc, formData, config) => {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9.4);
-  const leftContact = filterFilled([
-    safeText(formData.personalInfo.phone),
-    safeText(formData.personalInfo.portfolio),
-  ]);
-  leftContact.forEach((line, index) => {
-    doc.text(line, 12, 36 + index * 6);
-  });
+  if (safeText(formData.personalInfo.phone)) {
+    doc.text(safeText(formData.personalInfo.phone), 12, 36);
+  }
+
+  const portfolioHref = normalizeExternalHref(formData.personalInfo.portfolio);
+  if (portfolioHref) {
+    const linkY = safeText(formData.personalInfo.phone) ? 42 : 36;
+    doc.textWithLink("LinkedIn", 12, linkY, { url: portfolioHref });
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.2);
+    doc.line(12, linkY + 0.7, 12 + doc.getTextWidth("LinkedIn"), linkY + 0.7);
+  }
 
   if (safeText(formData.personalInfo.email)) {
     doc.text(formData.personalInfo.email, 98, 39);
@@ -1011,10 +1075,10 @@ const renderEnhancvReplicaTemplate = (doc, formData, config) => {
   const name = safeText(formData.personalInfo.fullName);
   const title = safeText(formData.personalInfo.title);
   const contactParts = filterFilled([
-    safeText(formData.personalInfo.phone),
-    safeText(formData.personalInfo.email),
-    safeText(formData.personalInfo.portfolio),
-    safeText(formData.personalInfo.location),
+    safeText(formData.personalInfo.phone) ? { text: safeText(formData.personalInfo.phone) } : null,
+    safeText(formData.personalInfo.email) ? { text: safeText(formData.personalInfo.email) } : null,
+    getPortfolioContactPart(formData.personalInfo.portfolio),
+    safeText(formData.personalInfo.location) ? { text: safeText(formData.personalInfo.location) } : null,
   ]);
   const customSections = (formData.customSections || [])
     .map((section) => ({
@@ -1041,10 +1105,10 @@ const renderEnhancvReplicaTemplate = (doc, formData, config) => {
   doc.setTextColor(...config.contactColor);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.4);
-  const contactLine = contactParts.join("   ");
-  if (contactLine) {
-    drawWrappedText(doc, contactLine, 12, 30, 184, 4.4);
-  }
+  drawInlineContactParts(doc, contactParts, 12, 30, {
+    separator: "   ",
+    underlineColor: config.contactColor,
+  });
 
   let y = 38;
   const drawTitle = (label) => {
@@ -1238,15 +1302,15 @@ const renderEnhancvColumnsTemplate = (doc, formData, config) => {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.8);
   const contactParts = filterFilled([
-    safeText(formData.personalInfo.phone),
-    safeText(formData.personalInfo.email),
-    safeText(formData.personalInfo.portfolio),
-    safeText(formData.personalInfo.location),
+    safeText(formData.personalInfo.phone) ? { text: safeText(formData.personalInfo.phone) } : null,
+    safeText(formData.personalInfo.email) ? { text: safeText(formData.personalInfo.email) } : null,
+    getPortfolioContactPart(formData.personalInfo.portfolio),
+    safeText(formData.personalInfo.location) ? { text: safeText(formData.personalInfo.location) } : null,
   ]);
-  const contactLine = contactParts.join("   ");
-  if (contactLine) {
-    drawWrappedText(doc, contactLine, 12, 29, 150, 4.2);
-  }
+  drawInlineContactParts(doc, contactParts, 12, 29, {
+    separator: "   ",
+    underlineColor: config.contactColor,
+  });
 
   doc.setDrawColor(190, 196, 201);
   doc.setFillColor(245, 245, 245);

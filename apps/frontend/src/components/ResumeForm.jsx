@@ -97,6 +97,26 @@ const formatDateRange = (startDate, endDate) => {
   return start || end || "";
 };
 
+const normalizeExternalHref = (value = "") => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+};
+
+const renderPortfolioPreviewLink = (portfolio, className = "break-all") =>
+  portfolio ? (
+    <a
+      className={`${className} underline underline-offset-2`}
+      href={normalizeExternalHref(portfolio)}
+      target="_blank"
+      rel="noreferrer"
+    >
+      LinkedIn
+    </a>
+  ) : (
+    <span className={className}>LinkedIn / Portfolio</span>
+  );
+
 const hasEducationContent = (item = {}) =>
   Boolean(
     item.institution ||
@@ -1578,7 +1598,7 @@ function ResumeForm({
                         <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-slate-700">
                           <span className="break-words">{formData.personalInfo.phone || "[Phone Number]"}</span>
                           <span className="break-all">{formData.personalInfo.email || "yourname@email.com"}</span>
-                          <span className="break-all">{formData.personalInfo.portfolio || "LinkedIn/Portfolio"}</span>
+                          {renderPortfolioPreviewLink(formData.personalInfo.portfolio)}
                           <span className="break-words">{formData.personalInfo.location || "[Location]"}</span>
                         </div>
                       </div>
@@ -1767,7 +1787,7 @@ function ResumeForm({
                       <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-slate-700">
                         <span className="break-words">{formData.personalInfo.phone || "[Phone Number]"}</span>
                         <span className="break-all">{formData.personalInfo.email || "yourname@email.com"}</span>
-                        <span className="break-all">{formData.personalInfo.portfolio || "LinkedIn/Portfolio"}</span>
+                        {renderPortfolioPreviewLink(formData.personalInfo.portfolio)}
                         <span className="break-words">{formData.personalInfo.location || "[Location]"}</span>
                       </div>
                     </div>
@@ -1943,7 +1963,7 @@ function ResumeForm({
                           <p>{formData.personalInfo.phone || "[Phone Number]"}</p>
                           <p>{formData.personalInfo.email || "[Email]"}</p>
                           <p>{formData.personalInfo.location || "[Location]"}</p>
-                          <p>LinkedIn / Portfolio</p>
+                          {renderPortfolioPreviewLink(formData.personalInfo.portfolio)}
                         </div>
                       </div>
                       <div className="mx-auto flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-white/10">
@@ -2023,6 +2043,7 @@ function ResumeForm({
                       <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-slate-600">
                         <span>{formData.personalInfo.email || "email@example.com"}</span>
                         <span>{formData.personalInfo.phone || "+91 0000000000"}</span>
+                        {renderPortfolioPreviewLink(formData.personalInfo.portfolio)}
                         <span>{formData.personalInfo.location || "Your location"}</span>
                       </div>
                     </div>
@@ -2044,7 +2065,7 @@ function ResumeForm({
                       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">
                         <span>{formData.personalInfo.email || "email@example.com"}</span>
                         <span>{formData.personalInfo.phone || "+91 0000000000"}</span>
-                        <span className="break-all">{formData.personalInfo.portfolio || "LinkedIn / Portfolio"}</span>
+                        {renderPortfolioPreviewLink(formData.personalInfo.portfolio)}
                         <span>{formData.personalInfo.location || "Your location"}</span>
                       </div>
                     </div>
@@ -2071,6 +2092,7 @@ function ResumeForm({
                         <div className="grid gap-1 text-right text-[11px] tracking-[0.18em] text-slate-500">
                           <span>{formData.personalInfo.email || "email@example.com"}</span>
                           <span>{formData.personalInfo.phone || "+91 0000000000"}</span>
+                          {renderPortfolioPreviewLink(formData.personalInfo.portfolio)}
                           <span>{formData.personalInfo.location || "Your location"}</span>
                         </div>
                       </div>
@@ -2093,6 +2115,7 @@ function ResumeForm({
                       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">
                         <span>{formData.personalInfo.email || "email@example.com"}</span>
                         <span>{formData.personalInfo.phone || "+91 0000000000"}</span>
+                        {renderPortfolioPreviewLink(formData.personalInfo.portfolio)}
                         <span>{formData.personalInfo.location || "Your location"}</span>
                       </div>
                     </div>
