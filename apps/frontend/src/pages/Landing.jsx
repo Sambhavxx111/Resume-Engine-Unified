@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const ResumeBuilderIcon = () => (
   <svg viewBox="0 0 24 24" className="h-6 w-6 text-cyan-200" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -68,6 +69,8 @@ const features = [
 ];
 
 function Landing() {
+  const { isAuthenticated, authLoading } = useAuth();
+
   return (
     <main className="page-shell">
       <div className="ambient-orb left-[-6rem] top-8 h-56 w-56 bg-cyan-400/20" />
@@ -102,12 +105,27 @@ function Landing() {
             </div>
           </div>
           <div className="reveal-up delay-3 flex flex-wrap gap-4">
-            <Link to="/signup" className="button-primary">
-              Create Account
-            </Link>
-            <Link to="/login" className="button-secondary">
-              Login
-            </Link>
+            {authLoading ? (
+              <div className="h-12 w-40 rounded-[18px] border border-slate-200 bg-white/80 shadow-sm" />
+            ) : isAuthenticated ? (
+              <>
+                <Link to="/dashboard" className="button-primary">
+                  Open Dashboard
+                </Link>
+                <Link to="/resume" className="button-secondary">
+                  Go to Builder
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link to="/signup" className="button-primary">
+                  Create Account
+                </Link>
+                <Link to="/login" className="button-secondary">
+                  Login
+                </Link>
+              </>
+            )}
           </div>
         </div>
 

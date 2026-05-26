@@ -12,7 +12,7 @@ const navLinks = [
 ];
 
 function Navbar() {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, authLoading, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -120,7 +120,9 @@ function Navbar() {
         </nav>
 
         <div className="relative flex flex-shrink-0 items-center justify-end gap-3 justify-self-end">
-          {isAuthenticated ? (
+          {authLoading ? (
+            <div className={`h-11 w-[8.5rem] rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.88)] ${useDarkCareerNavbar ? "border-slate-700 bg-slate-950/70" : "border-slate-200 bg-white/70"}`} />
+          ) : isAuthenticated ? (
             <button type="button" className="button-secondary" onClick={handleLogout}>
               Logout
             </button>

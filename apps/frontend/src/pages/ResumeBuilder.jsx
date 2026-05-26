@@ -5,6 +5,7 @@ import { API } from "../api/services";
 import Loader from "../components/Loader";
 import ResumeForm from "../components/ResumeForm";
 import { exportResumePdf } from "../utils/pdf";
+import { flattenSkillCategories, normalizeSkillsForStorage } from "../utils/skills";
 import { useAuth } from "../context/AuthContext";
 
 const TEMPLATE_ID_ALIASES = {
@@ -13,6 +14,7 @@ const TEMPLATE_ID_ALIASES = {
   "compact-impact": "compact",
   "modern-split": "creative",
   "minimal-grid": "timeline",
+  socs: "socs-official",
 };
 
 const normalizeTemplateId = (templateId) => TEMPLATE_ID_ALIASES[templateId] || templateId || "contemporary";
@@ -109,9 +111,52 @@ const normalizeProjectItems = (projects = [], customSections = []) => {
   return normalized.length ? normalized : defaultResumeState.projects;
 };
 
-const normalizeCustomSections = (customSections = []) =>
+const isInternshipSectionTitle = (title = "") =>
+  /\b(internship|internships|training|industrial training|work experience)\b/i.test(String(title || "").trim());
+
+const hasMeaningfulExperience = (experience = []) =>
+  (Array.isArray(experience) ? experience : []).some((item) =>
+    [item?.company, item?.role, item?.description, item?.startDate, item?.endDate]
+      .map((value) => String(value || "").trim())
+      .some(Boolean),
+  );
+
+const normalizeDuplicateComparisonText = (value = "") =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const isCustomSectionDuplicatedInExperience = (section = {}, experience = []) => {
+  const sectionText = normalizeDuplicateComparisonText(
+    [section?.title, ...(Array.isArray(section?.items) ? section.items : [])].join(" "),
+  );
+  const experienceText = normalizeDuplicateComparisonText(
+    (Array.isArray(experience) ? experience : [])
+      .flatMap((item) => [item?.company, item?.role, item?.description, item?.startDate, item?.endDate])
+      .join(" "),
+  );
+
+  if (!sectionText || !experienceText) return false;
+  if (experienceText.includes(sectionText) || sectionText.includes(experienceText)) return true;
+
+  const sectionTokens = Array.from(new Set(sectionText.split(" ").filter((token) => token.length > 3)));
+  if (sectionTokens.length < 3) return false;
+
+  const matchedTokens = sectionTokens.filter((token) => experienceText.includes(token));
+  return matchedTokens.length / sectionTokens.length >= 0.72;
+};
+
+const normalizeCustomSections = (customSections = [], experience = []) =>
   (Array.isArray(customSections) ? customSections : []).filter(
-    (section) => !isProjectSectionTitle(section?.title),
+    (section) =>
+      !isProjectSectionTitle(section?.title) &&
+      !(
+        hasMeaningfulExperience(experience) &&
+        (isInternshipSectionTitle(section?.title) ||
+          (!String(section?.title || "").trim() && isCustomSectionDuplicatedInExperience(section, experience)))
+      ),
   );
 
 const toConciseInsight = (value) => {
@@ -141,6 +186,7 @@ const defaultResumeState = {
     phone: "",
     location: "",
     portfolio: "",
+    github: "",
   },
   education: [
     {
@@ -183,18 +229,23 @@ const defaultResumePhotoCrop = {
   y: 0.5,
 };
 
+const defaultResumePhotoFrameScale = 1;
+const MIN_SAVE_FEEDBACK_MS = 700;
+
 function ResumeBuilder() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const [formData, setFormData] = useState(defaultResumeState);
   const [loadingResume, setLoadingResume] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [saveAction, setSaveAction] = useState("");
   const [aiLoading, setAiLoading] = useState("");
   const [importingResume, setImportingResume] = useState(false);
   const [resumeImportFile, setResumeImportFile] = useState(null);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [exportError, setExportError] = useState("");
+  const [summaryUpdateSuccess, setSummaryUpdateSuccess] = useState(false);
   const [aiInsights, setAiInsights] = useState(null);
   const [resumePhoto, setResumePhoto] = useState(null);
   const previewRef = useRef(null);
@@ -237,8 +288,8 @@ function ResumeBuilder() {
                 : defaultResumeState.experience,
             projects:
               normalizeProjectItems(data.resume.projects, data.resume.customSections),
-            skills: Array.isArray(data.resume.skills) ? data.resume.skills : [],
-            customSections: normalizeCustomSections(data.resume.customSections),
+            skills: normalizeSkillsForStorage(data.resume.skills),
+            customSections: normalizeCustomSections(data.resume.customSections, data.resume.experience),
             template: normalizeTemplateId(data.resume.template) || defaultResumeState.template,
           });
         }
@@ -264,29 +315,75 @@ function ResumeBuilder() {
     });
   };
 
-  const handleSave = async () => {
+  const persistResume = async (mode = "resume") => {
     if (!isAuthenticated) {
-      redirectToLogin("Please log in with your personal email to save your resume.");
+      redirectToLogin(
+        mode === "draft"
+          ? "Please log in with your personal email to save your draft."
+          : "Please log in with your personal email to save your resume.",
+      );
       return;
     }
 
-    setSaving(true);
+    setSaveAction(mode);
     setError("");
+    setExportError("");
     setSuccessMessage("");
+    const saveStartedAt = Date.now();
+    let saveResponse = null;
 
     try {
-      const { data } = await axiosInstance.post(API.saveResume, formData);
-      await exportResumePdf(formData, { resumePhoto });
-      setSuccessMessage(data.message || "Resume saved successfully.");
+      const resumeForSave = {
+        ...formData,
+        skills: normalizeSkillsForStorage(formData.skills),
+      };
+      const { data } = await axiosInstance.post(API.saveResume, resumeForSave);
+      saveResponse = data;
+      setSuccessMessage(
+        mode === "draft"
+          ? "Draft saved successfully"
+          : data.message || "Resume saved successfully.",
+      );
+
+      if (mode === "resume" || mode === "hard-copy") {
+        try {
+          await exportResumePdf(resumeForSave, {
+            previewElement: previewRef.current,
+            resumePhoto,
+            hardCopyMode: mode === "hard-copy",
+          });
+        } catch (exportError) {
+          setExportError(exportError?.message || "Resume saved successfully, but PDF export failed.");
+        }
+      }
+
+      const elapsed = Date.now() - saveStartedAt;
+      if (elapsed < MIN_SAVE_FEEDBACK_MS) {
+        await new Promise((resolve) => window.setTimeout(resolve, MIN_SAVE_FEEDBACK_MS - elapsed));
+      }
     } catch (requestError) {
       setError(
         requestError.response?.data?.message ||
           requestError.response?.data?.error ||
-          "Unable to save resume. Please try again.",
+          (mode === "draft"
+            ? "Unable to save your draft. Please try again."
+            : "Unable to save resume. Please try again."),
       );
     } finally {
-      setSaving(false);
+      setSaveAction("");
     }
+  };
+
+  const handleSaveDraft = async () => {
+    await persistResume("draft");
+  };
+
+  const handleSave = async () => {
+    await persistResume("resume");
+  };
+
+  const handleSaveHardCopy = async () => {
+    await persistResume("hard-copy");
   };
 
   const handlePhotoUpload = async (file) => {
@@ -356,6 +453,7 @@ function ResumeBuilder() {
         height: dimensions.height,
         placement: defaultResumePhotoPlacement,
         crop: defaultResumePhotoCrop,
+        frameScale: defaultResumePhotoFrameScale,
         zoom: 1,
       });
       setSuccessMessage("Resume photo uploaded. Place it in the preview, then zoom and adjust it inside the circle.");
@@ -380,6 +478,10 @@ function ResumeBuilder() {
 
   const handlePhotoZoomChange = (zoom) => {
     setResumePhoto((prev) => (prev ? { ...prev, zoom } : prev));
+  };
+
+  const handlePhotoFrameScaleChange = (frameScale) => {
+    setResumePhoto((prev) => (prev ? { ...prev, frameScale } : prev));
   };
 
   const handleImportResume = async () => {
@@ -426,8 +528,8 @@ function ResumeBuilder() {
             : defaultResumeState.experience,
         projects:
           normalizeProjectItems(data.resume?.projects, data.resume?.customSections),
-        skills: Array.isArray(data.resume?.skills) ? data.resume.skills : [],
-        customSections: normalizeCustomSections(data.resume?.customSections),
+        skills: normalizeSkillsForStorage(data.resume?.skills),
+        customSections: normalizeCustomSections(data.resume?.customSections, data.resume?.experience),
         template: formData.template || defaultResumeState.template,
       };
 
@@ -451,6 +553,19 @@ function ResumeBuilder() {
     }
   };
 
+  const handleBeginFromScratch = () => {
+    setFormData((prev) => ({
+      ...defaultResumeState,
+      template: prev.template || defaultResumeState.template,
+    }));
+    setResumePhoto(null);
+    setResumeImportFile(null);
+    setError("");
+    setSuccessMessage("");
+    setSummaryUpdateSuccess(false);
+    setAiInsights(null);
+  };
+
   const deriveSkillSeed = () => {
     const candidates = [
       formData.personalInfo.title,
@@ -471,6 +586,9 @@ function ResumeBuilder() {
     setError("");
     setSuccessMessage("");
     setAiInsights(null);
+    if (action === "summary") {
+      setSummaryUpdateSuccess(false);
+    }
 
     try {
       if (action === "summary") {
@@ -481,17 +599,12 @@ function ResumeBuilder() {
         if (typeof data.summary === "string") {
           setFormData((prev) => ({ ...prev, summary: data.summary }));
         }
-
-        setAiInsights({
-          title: "Generated Summary",
-          lines: buildConciseInsights([data.summary]),
-        });
-        setSuccessMessage(data.message || "Summary generated successfully.");
+        setSummaryUpdateSuccess(true);
         return;
       }
 
       if (action === "skills") {
-        const cleanedSkills = formData.skills.map((skill) => skill.trim()).filter(Boolean);
+        const cleanedSkills = flattenSkillCategories(formData.skills);
         const skillSeed = cleanedSkills.length ? cleanedSkills : deriveSkillSeed();
 
         if (!skillSeed.length) {
@@ -560,15 +673,20 @@ function ResumeBuilder() {
             formData={formData}
             setFormData={setFormData}
             onSave={handleSave}
+            onSaveHardCopy={handleSaveHardCopy}
+            onSaveDraft={handleSaveDraft}
             onAIAction={handleAIAction}
             onImportResume={handleImportResume}
+            onBeginFromScratch={handleBeginFromScratch}
             onImportFileChange={setResumeImportFile}
             importFile={resumeImportFile}
             importLoading={importingResume}
-            loading={saving}
+            saveAction={saveAction}
             aiLoading={aiLoading}
             error={error}
             successMessage={successMessage}
+            exportError={exportError}
+            summaryUpdateSuccess={summaryUpdateSuccess}
             aiInsights={aiInsights}
             resumePhoto={resumePhoto}
             onPhotoUpload={handlePhotoUpload}
@@ -576,6 +694,7 @@ function ResumeBuilder() {
             onPhotoPlacementChange={handlePhotoPlacementChange}
             onPhotoCropChange={handlePhotoCropChange}
             onPhotoZoomChange={handlePhotoZoomChange}
+            onPhotoFrameScaleChange={handlePhotoFrameScaleChange}
             previewRef={previewRef}
           />
         </div>

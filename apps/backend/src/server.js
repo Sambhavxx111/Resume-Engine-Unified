@@ -1,31 +1,43 @@
 require('dotenv').config();
 const app = require('./App');
 const pool = require('./config/db');
+const userModel = require('./models/user.model');
 
-// Get port from environment or use default
 const PORT = process.env.PORT || 3000;
+let server;
 
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`✓ Server is running on port ${PORT}`);
-  console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+const startServer = async () => {
+  try {
+    await userModel.ensureAuthSchema();
+    console.log('Auth schema verified');
+  } catch (error) {
+    console.error('Auth schema verification failed:', error.message);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    }
+  }
 
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
+  server = app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+};
+
+const shutdown = () => {
+  console.log('Shutdown signal received: closing HTTP server');
+  if (!server) {
+    pool.end();
+    process.exit(0);
+  }
+
   server.close(() => {
     console.log('HTTP server closed');
     pool.end();
     process.exit(0);
   });
-});
+};
 
-process.on('SIGINT', () => {
-  console.log('SIGINT signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-    pool.end();
-    process.exit(0);
-  });
-});
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+startServer();

@@ -14,38 +14,38 @@ const readCookie = (cookieHeader = '', key) => {
   return decodeURIComponent(match.slice(key.length + 1));
 };
 
+const getTokenFromRequest = (req) => {
+  const authHeader = req.headers.authorization;
+  const cookieToken = readCookie(req.headers.cookie, 'authToken');
+
+  if (!authHeader && !cookieToken) {
+    return null;
+  }
+
+  return authHeader
+    ? (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader)
+    : cookieToken;
+};
+
+const verifyToken = (token) =>
+  jwt.verify(token, process.env.JWT_SECRET, {
+    algorithms: ['HS256'],
+  });
+
 const authMiddleware = (req, res, next) => {
   try {
     if (!process.env.JWT_SECRET) {
       return res.status(500).json({ error: 'JWT is not configured' });
     }
 
-    // Read Authorization header
-    const authHeader = req.headers.authorization;
-    const cookieToken = readCookie(req.headers.cookie, 'authToken');
-
-    if (!authHeader && !cookieToken) {
-      return res.status(401).json({ error: 'Missing authorization header' });
-    }
-
-    // Extract Bearer token
-    const token = authHeader
-      ? (authHeader.startsWith('Bearer ')
-          ? authHeader.slice(7)
-          : authHeader)
-      : cookieToken;
-
+    const token = getTokenFromRequest(req);
     if (!token) {
-      return res.status(401).json({ error: 'Missing token' });
+      return res.status(401).json({ error: 'Missing authorization token' });
     }
 
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Attach userId to request
+    const decoded = verifyToken(token);
     req.user = { userId: decoded.userId };
-
-    next();
+    return next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ error: 'Invalid token' });
@@ -64,26 +64,13 @@ const optionalAuthMiddleware = (req, res, next) => {
       return next();
     }
 
-    const authHeader = req.headers.authorization;
-    const cookieToken = readCookie(req.headers.cookie, 'authToken');
-
-    if (!authHeader && !cookieToken) {
-      req.user = null;
-      return next();
-    }
-
-    const token = authHeader
-      ? (authHeader.startsWith('Bearer ')
-          ? authHeader.slice(7)
-          : authHeader)
-      : cookieToken;
-
+    const token = getTokenFromRequest(req);
     if (!token) {
       req.user = null;
       return next();
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = verifyToken(token);
     req.user = { userId: decoded.userId };
     return next();
   } catch (error) {

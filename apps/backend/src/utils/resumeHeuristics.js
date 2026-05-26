@@ -8,6 +8,9 @@ const SECTION_NAME_MAP = {
   work_experience: 'experience',
   professional_experience: 'experience',
   employment: 'experience',
+  internship: 'experience',
+  internships: 'experience',
+  training: 'experience',
   education: 'education',
   academics: 'education',
   skills: 'skills',
@@ -116,6 +119,116 @@ const isLikelySkillValue = (value = '') => {
   if (tokens.length > 5) return false;
 
   return /[A-Za-z]/.test(cleaned);
+};
+
+const normalizeSkillTextList = (skills = []) => {
+  if (!Array.isArray(skills)) return [];
+
+  const rawItems = skills.flatMap((skill) => {
+    if (typeof skill === 'string') return [skill];
+    if (!skill || typeof skill !== 'object' || Array.isArray(skill)) return [];
+    if (Array.isArray(skill.items)) return skill.items;
+    if (Array.isArray(skill.skills)) return skill.skills;
+    if (Array.isArray(skill.values)) return skill.values;
+    return [];
+  });
+
+  return Array.from(
+    new Set(
+      rawItems
+        .map((skill) => cleanField(skill))
+        .filter(Boolean),
+    ),
+  );
+};
+
+const SKILL_CATEGORY_RULES = [
+  {
+    category: 'Programming Languages',
+    pattern: /^(c|c\+\+|c#|java|python|javascript|typescript|php|ruby|go|golang|kotlin|swift|scala|r|matlab)$/i,
+  },
+  {
+    category: 'Frontend',
+    pattern: /^(html|css|react(?:\.js)?|redux|next(?:\.js)?|angular|vue|tailwind(?: css)?|bootstrap|sass|figma|ui\/ux|responsive design|web technologies)$/i,
+  },
+  {
+    category: 'Backend',
+    pattern: /^(node(?:\.js)?|express(?:\.js)?|django|flask|fastapi|spring(?: boot)?|rest(?: api)?|api design|jwt|authentication)$/i,
+  },
+  {
+    category: 'Databases',
+    pattern: /^(sql|mysql|postgres(?:ql)?|mongodb|dbms|oracle|firebase|redis|sqlite|database design)$/i,
+  },
+  {
+    category: 'Cloud & DevOps',
+    pattern: /^(aws|azure|gcp|docker|kubernetes|linux|git|github|ci\/cd|jenkins|vercel|netlify)$/i,
+  },
+  {
+    category: 'Cyber Security Tools',
+    pattern: /^(ftk imager|wireshark|threat hunting|thread hunting|burp suite|nmap|metasploit|kali linux|splunk|siem|vulnerability assessment)$/i,
+  },
+  {
+    category: 'Data & Analytics',
+    pattern: /^(machine learning|data analysis|data visualization|pandas|numpy|power bi|tableau|excel|statistics|reporting|eda)$/i,
+  },
+  {
+    category: 'Core CS',
+    pattern: /^(dsa|data structures|algorithms|oop|os|operating systems|computer networks|networking)$/i,
+  },
+  {
+    category: 'Soft Skills',
+    pattern: /^(communication|leadership|teamwork|problem solving|quick learner|public speaking|documentation|collaboration|time management)$/i,
+  },
+];
+
+const normalizeSkillCategoryName = (value = '') =>
+  cleanField(value)
+    .replace(/^cyber secutrity tools?$/i, 'Cyber Security Tools')
+    .replace(/^cyber secu?rity tools?$/i, 'Cyber Security Tools')
+    .replace(/^web technologies?$/i, 'Web Technologies')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b(skills?|technologies|tools)\b$/i, (match) => match)
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+
+const inferSkillCategory = (skill = '') =>
+  SKILL_CATEGORY_RULES.find((rule) => rule.pattern.test(cleanField(skill)))?.category || 'Technical Skills';
+
+const groupFlatSkillsByCategory = (skills = []) => {
+  const groups = [];
+  const indexByCategory = new Map();
+
+  normalizeSkillTextList(skills).forEach((skill) => {
+    const category = inferSkillCategory(skill);
+    if (!indexByCategory.has(category)) {
+      indexByCategory.set(category, groups.length);
+      groups.push({ category, items: [] });
+    }
+    groups[indexByCategory.get(category)].items.push(skill);
+  });
+
+  return groups;
+};
+
+const normalizeSkillCategories = (skills = []) => {
+  if (!Array.isArray(skills) || !skills.length) return [];
+
+  const hasCategoryObjects = skills.some((skill) => skill && typeof skill === 'object' && !Array.isArray(skill));
+  if (!hasCategoryObjects) {
+    return groupFlatSkillsByCategory(skills);
+  }
+
+  return skills
+    .flatMap((group) => {
+      if (!group || typeof group !== 'object' || Array.isArray(group)) return null;
+      const items = normalizeSkillTextList(group.items || group.skills || group.values || []);
+      if (!items.length) return null;
+      const category = normalizeSkillCategoryName(group.category || group.name || group.title || 'Skills');
+      if (/^skills?$/i.test(category) && items.length > 1) {
+        return groupFlatSkillsByCategory(items);
+      }
+      return { category, items };
+    })
+    .filter(Boolean);
 };
 
 const isLikelyNameLine = (line = '') => {
@@ -418,12 +531,19 @@ const isLowConfidenceEducationItem = (item = {}) => {
   );
 };
 
+const hasParsedEducationDate = (items = []) =>
+  items.some((item) => cleanField(item.startDate || item.endDate));
+
 const collectExplicitSkillLines = (lines = []) =>
   lines.filter((line) =>
-    /^(programming languages|data visualization|data analysis|data analysis & manipulation|machine learning|statistics|reporting & tools|reporting|technical skills|tools\s*&\s*technologies)\s*:/i.test(
-      cleanField(line),
-    ),
+    SKILL_CATEGORY_LINE_PATTERN.test(cleanField(line)),
   );
+
+const SKILL_CATEGORY_LINE_PATTERN =
+  /^(programming languages?|languages?|frontend|front end|backend|back end|web technologies?|databases?|database technologies|data visualization|data analysis|data analysis & manipulation|machine learning|statistics|reporting & tools|reporting|technical skills|cyber secu?rity tools?|cyber secutrity tools?|security tools?|tools\s*&\s*technologies|tools|frameworks|libraries|soft skills|core skills|cloud|devops|cloud & devops)\s*:/i;
+
+const SKILL_CATEGORY_HEADING_PATTERN =
+  /^(programming languages?|languages?|frontend|front end|backend|back end|web technologies?|databases?|database technologies|data visualization|data analysis|data analysis & manipulation|machine learning|statistics|reporting & tools|reporting|technical skills|cyber secu?rity tools?|cyber secutrity tools?|security tools?|tools\s*&\s*technologies|tools|frameworks|libraries|soft skills|core skills|cloud|devops|cloud & devops)$/i;
 
 const splitSkillTokens = (lines = []) =>
   Array.from(
@@ -438,7 +558,8 @@ const splitSkillTokens = (lines = []) =>
         const baseParts = candidateText
           .split(/[,|/]|•|\t+/)
           .flatMap((part) => part.split(/\s{2,}/))
-          .map((part) => part.replace(/\band\b/gi, '').trim())
+          .flatMap((part) => part.split(/\.(?=\s+[A-Z])/))
+          .map((part) => part.replace(/\band\b/gi, '').replace(/[.;]+$/g, '').trim())
           .filter(Boolean);
 
         return baseParts.flatMap((part) => {
@@ -465,6 +586,61 @@ const splitSkillTokens = (lines = []) =>
       }),
     ),
   ).slice(0, 24);
+
+const extractSkillCategoriesFromLines = (lines = []) => {
+  const groups = [];
+  const seen = new Map();
+
+  const sourceLines = Array.isArray(lines) ? lines : [];
+
+  sourceLines.forEach((line, lineIndex) => {
+    const cleaned = cleanField(String(line || '').replace(/^[-*]\s*/, ''));
+    if (!cleaned) {
+      return;
+    }
+
+    const isColonCategory = cleaned.includes(':') && SKILL_CATEGORY_LINE_PATTERN.test(cleaned);
+    const isStandaloneCategory = !cleaned.includes(':') && SKILL_CATEGORY_HEADING_PATTERN.test(cleaned);
+    if (!isColonCategory && !isStandaloneCategory) {
+      return;
+    }
+
+    const [rawCategory, ...rawSkillParts] = isColonCategory ? cleaned.split(':') : [cleaned, sourceLines[lineIndex + 1] || ''];
+    const category = normalizeSkillCategoryName(rawCategory);
+    const items = splitSkillTokens([rawSkillParts.join(':')]);
+
+    if (!items.length) {
+      return;
+    }
+
+    if (!seen.has(category.toLowerCase())) {
+      seen.set(category.toLowerCase(), groups.length);
+      groups.push({ category, items: [] });
+    }
+
+    const group = groups[seen.get(category.toLowerCase())];
+    items.forEach((item) => {
+      if (!group.items.some((existing) => existing.toLowerCase() === item.toLowerCase())) {
+        group.items.push(item);
+      }
+    });
+  });
+
+  return groups;
+};
+
+const buildSkillCategories = (skillLines = [], allLines = []) => {
+  const explicitGroups = extractSkillCategoriesFromLines([
+    ...(Array.isArray(skillLines) ? skillLines : []),
+    ...(Array.isArray(allLines) ? allLines : []),
+  ]);
+
+  if (explicitGroups.length) {
+    return explicitGroups;
+  }
+
+  return groupFlatSkillsByCategory(splitSkillTokens(skillLines));
+};
 
 const inferSummary = (lines = [], title = '') => {
   const longLine = lines.find(
@@ -495,7 +671,7 @@ const isInstitutionLine = (line = '') =>
   /(university|college|school|academy|institute|vidyapeeth|polytechnic)/i.test(cleanField(line));
 
 const isDegreeLine = (line = '') =>
-  /(bachelor|master|b\.?\s?tech|m\.?\s?tech|bca|mca|bsc|msc|phd|secondary|certificate|diploma|cse|computer science|data science|engineering)/i.test(
+  /(10th|12th|xii?|cbse|icse|bachelor|master|b\.?\s?tech|m\.?\s?tech|bca|mca|bsc|msc|phd|secondary|certificate|diploma|cse|computer science|data science|engineering)/i.test(
     cleanField(line),
   );
 
@@ -510,10 +686,10 @@ const isEducationScoreLine = (line = '') =>
   /\b\d{1,3}(?:\.\d+)?%\b/.test(cleanField(line));
 
 const isEducationDateLine = (line = '') =>
-  /\b(19|20)\d{2}\b|present|current|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(cleanField(line));
+  /\b(19|20)\d{2}\b|present|current|till\s*date|till\s*now|ongoing|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(cleanField(line));
 
 const extractEducationScore = (line = '') => {
-  const cleaned = cleanField(line);
+  const cleaned = normalizeEducationDateSource(line);
   if (!cleaned) return '';
 
   const labeled =
@@ -528,9 +704,32 @@ const extractEducationScore = (line = '') => {
   );
 };
 
+const EDUCATION_MONTH_PATTERN = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*';
+const EDUCATION_DATE_TOKEN_PATTERN = `${EDUCATION_MONTH_PATTERN}\\s*,?\\s*\\d{2,4}|\\d{4}`;
+const EDUCATION_CURRENT_TOKEN_PATTERN = '(?:present|current|till\\s*date|till\\s*now|ongoing)';
+
+const normalizeEducationDateSource = (line = '') =>
+  String(line || '')
+    .replace(/\s+/g, ' ')
+    .replace(/[–—]/g, '-')
+    .replace(/â€“|â€”|Ã¢â‚¬â€œ|Ã¢â‚¬â€/g, '-')
+    .replace(new RegExp(`(?<=[A-Za-z0-9/%])(?=${EDUCATION_MONTH_PATTERN}\\s*,?\\s*\\d{2,4}\\b)`, 'gi'), ' ')
+    .replace(/\btilldate\b/gi, 'Till date')
+    .trim();
+
 const extractEducationDateRange = (line = '') => {
-  const cleaned = cleanField(line);
+  const cleaned = normalizeEducationDateSource(line);
   if (!cleaned) return { startDate: '', endDate: '' };
+
+  const normalizedRangeMatch = cleaned.match(
+    new RegExp(`(${EDUCATION_DATE_TOKEN_PATTERN})\\s*(?:to|-|until|through)\\s*(${EDUCATION_CURRENT_TOKEN_PATTERN}|${EDUCATION_DATE_TOKEN_PATTERN})`, 'i'),
+  );
+  if (normalizedRangeMatch) {
+    return {
+      startDate: cleanField(normalizedRangeMatch[1]),
+      endDate: cleanField(normalizedRangeMatch[2]),
+    };
+  }
 
   const match = cleaned.match(
     /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\d{4})\s*(?:to|-|–|—)\s*((?:present|current)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\d{4})/i,
@@ -576,11 +775,12 @@ const hasEducationAnchor = (entry = {}) =>
   entry.rawLines.some((line) => isInstitutionLine(line) || isEducationDateLine(line) || extractEducationLocation(line));
 
 const extractEducationLocation = (line = '') => {
-  const cleaned = cleanField(line);
+  const educationDateRangePattern = new RegExp(`(${EDUCATION_DATE_TOKEN_PATTERN})\\s*(?:to|-|until|through)\\s*(${EDUCATION_CURRENT_TOKEN_PATTERN}|${EDUCATION_DATE_TOKEN_PATTERN})`, 'gi');
+  const cleaned = normalizeEducationDateSource(line);
   if (!cleaned) return '';
 
   const withoutDates = cleanField(
-    cleaned.replace(
+    cleaned.replace(educationDateRangePattern, '').replace(
       /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\b(?:19|20)\d{2}\b)\s*(?:to|-|â€“|â€”)\s*((?:present|current)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\b(?:19|20)\d{2}\b)/gi,
       '',
     ).replace(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{2,4}\b/gi, '').replace(/\b(?:19|20)\d{2}\b/g, ''),
@@ -622,7 +822,8 @@ const extractEducationLocation = (line = '') => {
 };
 
 const stripEducationLineArtifacts = (line = '', { removeLocation = false } = {}) => {
-  let cleaned = cleanField(line);
+  const educationDateRangePattern = new RegExp(`(${EDUCATION_DATE_TOKEN_PATTERN})\\s*(?:to|-|until|through)\\s*(${EDUCATION_CURRENT_TOKEN_PATTERN}|${EDUCATION_DATE_TOKEN_PATTERN})`, 'gi');
+  let cleaned = normalizeEducationDateSource(line);
   if (!cleaned) return '';
 
   cleaned = cleanField(
@@ -631,6 +832,7 @@ const stripEducationLineArtifacts = (line = '', { removeLocation = false } = {})
         /\b(?:sgpa|cgpa|gpa|grade|percentage|marks|score)\s*[:\-]?\s*[A-Za-z0-9./%]+(?:\s*\/\s*[A-Za-z0-9.]+)?/gi,
         '',
       )
+      .replace(educationDateRangePattern, '')
       .replace(
         /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\b(?:19|20)\d{2}\b)\s*(?:to|-|â€“|â€”)\s*((?:present|current)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\b(?:19|20)\d{2}\b)/gi,
         '',
@@ -646,7 +848,7 @@ const stripEducationLineArtifacts = (line = '', { removeLocation = false } = {})
     }
   }
 
-  return cleaned.replace(/[,-]\s*$/, '').trim();
+  return cleaned.replace(/[|,-]\s*$/, '').trim();
 };
 
 const isLocationOnlyLine = (line = '') => {
@@ -761,6 +963,62 @@ const buildProjectItemsFromCustomSections = (customSections = []) =>
     )
     .filter((project) => project.name || project.bullets.length);
 
+const isInternshipSectionTitle = (title = '') =>
+  /\b(internship|internships|training|industrial training|work experience)\b/i.test(String(title || '').trim());
+
+const hasMeaningfulExperience = (experience = []) =>
+  (Array.isArray(experience) ? experience : []).some((item) =>
+    [item?.company, item?.role, item?.description, item?.startDate, item?.endDate]
+      .map((value) => String(value || '').trim())
+      .some(Boolean),
+  );
+
+const normalizeDuplicateComparisonText = (value = '') =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const isCustomSectionDuplicatedInExperience = (section = {}, experience = []) => {
+  const sectionText = normalizeDuplicateComparisonText(
+    [section?.title, ...(Array.isArray(section?.items) ? section.items : [])].join(' '),
+  );
+  const experienceText = normalizeDuplicateComparisonText(
+    (Array.isArray(experience) ? experience : [])
+      .flatMap((item) => [item?.company, item?.role, item?.description, item?.startDate, item?.endDate])
+      .join(' '),
+  );
+
+  if (!sectionText || !experienceText) {
+    return false;
+  }
+
+  if (experienceText.includes(sectionText) || sectionText.includes(experienceText)) {
+    return true;
+  }
+
+  const sectionTokens = Array.from(new Set(sectionText.split(' ').filter((token) => token.length > 3)));
+  if (sectionTokens.length < 3) {
+    return false;
+  }
+
+  const matchedTokens = sectionTokens.filter((token) => experienceText.includes(token));
+  return matchedTokens.length / sectionTokens.length >= 0.72;
+};
+
+const removeRedundantInternshipCustomSections = (customSections = [], experience = []) => {
+  if (!hasMeaningfulExperience(experience)) {
+    return customSections;
+  }
+
+  return (Array.isArray(customSections) ? customSections : []).filter(
+    (section) =>
+      !isInternshipSectionTitle(section?.title) &&
+      !(isCustomSectionDuplicatedInExperience(section, experience) && !String(section?.title || '').trim()),
+  );
+};
+
 const buildEducationItems = (lines = []) => {
   if (!lines.length) return [];
 
@@ -784,7 +1042,10 @@ const buildEducationItems = (lines = []) => {
         !isEducationScoreOnlyLine(cleaned) &&
         currentHasAnchor &&
         (current.degreeLine || current.institutionLine)) ||
-        (isInstitutionLine(cleaned) && current.institutionLine));
+        (isInstitutionLine(cleaned) && current.institutionLine) ||
+        (current.rawLines.some((rawLine) => isEducationDateLine(rawLine)) &&
+          hasEducationAnchorLine(cleaned) &&
+          !isEducationScoreOnlyLine(cleaned)));
 
     if (startsNewEntry) {
       pushCurrent();
@@ -959,14 +1220,15 @@ const buildImportedResumeData = (resumeText = '', originalName = '', template = 
   const title = inferProfessionalTitle(introLines, summarySectionLines);
   const summaryLines = summarySectionLines.filter((line) => line.length > 25);
   const explicitSkillLines = collectExplicitSkillLines(lines);
-  const skills = splitSkillTokens(explicitSkillLines.length ? explicitSkillLines : sectionMap.skills || []);
+  const skillSourceLines = explicitSkillLines.length ? explicitSkillLines : sectionMap.skills || [];
+  const skills = buildSkillCategories(skillSourceLines, explicitSkillLines.length ? [] : lines);
   const experience = buildExperienceItems(sectionMap.experience || []);
   const projects = buildProjectItems(sectionMap.projects || []);
   const sectionEducation = buildEducationItems(sectionMap.education || []);
   const fallbackEducation = buildEducationItems(collectEducationLinesFromDocument(lines));
   const looseSignalEducation = buildEducationItemsFromLooseSignals(collectEducationLinesFromDocument(lines));
   const education = postProcessEducationItems(
-    sectionEducation.length && !sectionEducation.every((item) => isLowConfidenceEducationItem(item))
+    sectionEducation.length && (hasParsedEducationDate(sectionEducation) || !sectionEducation.every((item) => isLowConfidenceEducationItem(item)))
       ? sectionEducation
       : looseSignalEducation.length && !looseSignalEducation.every((item) => isLowConfidenceEducationItem(item))
         ? looseSignalEducation
@@ -994,7 +1256,8 @@ const buildImportedResumeData = (resumeText = '', originalName = '', template = 
     projects: projects.length ? projects : [{ name: '', bullets: [''] }],
     skills,
     summary: summaryLines.join(' ').trim() || inferSummary(lines, title),
-    customSections: Object.entries(sectionMap)
+    customSections: removeRedundantInternshipCustomSections(
+      Object.entries(sectionMap)
       .filter(([key, values]) => !['summary', 'skills', 'experience', 'education', 'projects', 'contact'].includes(key) && values.length)
       .map(([key, values]) => ({
         title: toTitleCase(key),
@@ -1006,6 +1269,8 @@ const buildImportedResumeData = (resumeText = '', originalName = '', template = 
             !/^[Eq\s]+$/i.test(item),
         ),
       })),
+      experience,
+    ),
     raw_text: resumeText,
   };
 };
@@ -1073,6 +1338,11 @@ const groundImportedResumeData = (resumeData = {}, resumeText = '', originalName
         .filter(Boolean),
     }))
     .filter((project) => project.name || project.bullets.length);
+  const groundedExperience = sanitizeCollection(
+    resumeData?.experience,
+    fallback.experience,
+    ['company', 'role', 'startDate', 'endDate', 'description'],
+  );
 
   return {
     template: resumeData?.template || fallback.template,
@@ -1092,38 +1362,55 @@ const groundImportedResumeData = (resumeData = {}, resumeText = '', originalName
       fallback.education,
       ['institution', 'degree', 'fieldOfStudy', 'startDate', 'endDate', 'location', 'score'],
     ),
-    experience: sanitizeCollection(
-      resumeData?.experience,
-      fallback.experience,
-      ['company', 'role', 'startDate', 'endDate', 'description'],
-    ),
+    experience: groundedExperience,
     projects: groundedProjects.length ? groundedProjects : fallbackProjects,
-    skills: Array.from(
-      new Set(
-        normalizeList(resumeData?.skills)
-          .filter((skill) => isLikelySkillValue(skill) && hasEnoughGrounding(skill, sourceText))
-          .concat(fallback.skills),
-      ),
-    ).slice(0, 24),
+    skills: normalizeSkillCategories(fallback.skills)
+      .concat(
+        normalizeSkillCategories(resumeData?.skills)
+          .map((group) => ({
+            category: group.category,
+            items: group.items.filter((skill) => isLikelySkillValue(skill) && hasEnoughGrounding(skill, sourceText)),
+          }))
+          .filter((group) => group.items.length),
+      )
+      .reduce((groups, group) => {
+        const seenSkills = new Set(groups.flatMap((item) => item.items.map((skill) => skill.toLowerCase())));
+        const uniqueItems = group.items.filter((skill) => !seenSkills.has(skill.toLowerCase()));
+        if (!uniqueItems.length) {
+          return groups;
+        }
+        const existing = groups.find((item) => item.category.toLowerCase() === group.category.toLowerCase());
+        if (!existing) {
+          groups.push({ category: group.category, items: [...uniqueItems] });
+          return groups;
+        }
+        existing.items.push(...uniqueItems);
+        return groups;
+      }, [])
+      .map((group) => ({ ...group, items: group.items.slice(0, 12) }))
+      .slice(0, 8),
     summary: summaryFromSource || '',
-    customSections: sanitizeCollection(
-      resumeData?.customSections
-        ?.filter((section) => !isProjectSectionTitle(section?.title))
-        .map((section) => ({
-          title: cleanField(section?.title),
-          items: normalizeList(section?.items).join(' || '),
-        })),
-      fallback.customSections
-        .filter((section) => !isProjectSectionTitle(section?.title))
-        .map((section) => ({
-          title: section.title,
-          items: normalizeList(section.items).join(' || '),
-        })),
-      ['title', 'items'],
-    ).map((section) => ({
-      title: section.title,
-      items: normalizeList(String(section.items || '').split('||')),
-    })),
+    customSections: removeRedundantInternshipCustomSections(
+      sanitizeCollection(
+        resumeData?.customSections
+          ?.filter((section) => !isProjectSectionTitle(section?.title))
+          .map((section) => ({
+            title: cleanField(section?.title),
+            items: normalizeList(section?.items).join(' || '),
+          })),
+        fallback.customSections
+          .filter((section) => !isProjectSectionTitle(section?.title))
+          .map((section) => ({
+            title: section.title,
+            items: normalizeList(section.items).join(' || '),
+          })),
+        ['title', 'items'],
+      ).map((section) => ({
+        title: section.title,
+        items: normalizeList(String(section.items || '').split('||')),
+      })),
+      groundedExperience,
+    ),
     raw_text: resumeText,
   };
 };
@@ -1146,8 +1433,9 @@ const buildResumeTextFromData = (resumeData = {}) => {
     lines.push('', 'SUMMARY', resumeData.summary);
   }
 
-  if (Array.isArray(resumeData.skills) && resumeData.skills.length) {
-    lines.push('', 'SKILLS', resumeData.skills.join(', '));
+  const skillTextList = normalizeSkillTextList(resumeData.skills);
+  if (skillTextList.length) {
+    lines.push('', 'SKILLS', skillTextList.join(', '));
   }
 
   if (Array.isArray(resumeData.experience) && resumeData.experience.some((item) => item.role || item.company || item.description)) {
@@ -1202,7 +1490,7 @@ const collectResumeSignals = (resumeData = {}) =>
     resumeData.personalInfo?.fullName,
     resumeData.personalInfo?.title,
     resumeData.summary,
-    ...(resumeData.skills || []),
+    ...normalizeSkillTextList(resumeData.skills),
     ...(resumeData.experience || []).flatMap((item) => [item.role, item.company, item.description]),
     ...(resumeData.projects || []).flatMap((item) => [item.name, ...(item.bullets || [])]),
     ...(resumeData.education || []).flatMap((item) => [item.institution, item.degree, item.fieldOfStudy, item.location, item.score]),
@@ -1225,7 +1513,7 @@ const extractResumeKeywords = (resumeData = {}, limit = 12) =>
 const generateSummaryFallback = (resumeData = {}) => {
   const personalInfo = resumeData.personalInfo || {};
   const title = personalInfo.title || 'candidate';
-  const topSkills = Array.isArray(resumeData.skills) ? resumeData.skills.filter(Boolean).slice(0, 4) : [];
+  const topSkills = normalizeSkillTextList(resumeData.skills).slice(0, 4);
   const topExperience = (resumeData.experience || []).find((item) => item.role || item.company);
 
   const firstSentence = `Results-driven ${String(title).toLowerCase()} with hands-on experience building practical solutions and communicating impact clearly.`;
@@ -1241,7 +1529,7 @@ const generateSummaryFallback = (resumeData = {}) => {
 const suggestSkillsFallback = (resumeData = {}, existingSkills = []) => {
   const normalized = [
     ...existingSkills,
-    ...(Array.isArray(resumeData.skills) ? resumeData.skills : []),
+    ...normalizeSkillTextList(resumeData.skills),
     ...extractResumeKeywords(resumeData, 8),
   ]
     .map((skill) => String(skill || '').trim())
@@ -1307,7 +1595,7 @@ const optimizeResumeFallback = (resumeData = {}, jobDescription = null) => {
     priorityImprovements.push('Quantify experience bullets with real outcomes.');
   }
 
-  if (!Array.isArray(resumeData.skills) || resumeData.skills.length < 5) {
+  if (normalizeSkillTextList(resumeData.skills).length < 5) {
     improvements.push({
       section: 'Skills',
       current: 'Skill coverage is limited.',
@@ -1384,6 +1672,8 @@ module.exports = {
   extractResumeKeywords,
   generateSummaryFallback,
   groundImportedResumeData,
+  normalizeSkillCategories,
+  normalizeSkillTextList,
   suggestSkillsFallback,
   optimizeResumeFallback,
   optimizeUploadedResumeTextFallback,

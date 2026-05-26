@@ -34,7 +34,7 @@ export function AuthProvider({ children }) {
     setAuthLoading(true);
     try {
       const { data } = await axiosInstance.post(API.login, payload);
-      setUser(data.user ?? null);
+      setUser(data.authenticated === false ? null : data.user ?? null);
       return data;
     } finally {
       setAuthLoading(false);
@@ -45,7 +45,7 @@ export function AuthProvider({ children }) {
     setAuthLoading(true);
     try {
       const { data } = await axiosInstance.post(API.signup, payload);
-      setUser(data.user ?? null);
+      setUser(data.authenticated === false ? null : data.user ?? null);
       return data;
     } finally {
       setAuthLoading(false);

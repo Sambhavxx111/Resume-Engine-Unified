@@ -1,4 +1,6 @@
 import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
+import { flattenSkillCategories } from "./skills";
 
 const PAGE_WIDTH = 210;
 const PAGE_HEIGHT = 297;
@@ -10,6 +12,7 @@ const TEMPLATE_ID_ALIASES = {
   "compact-impact": "compact",
   "modern-split": "creative",
   "minimal-grid": "timeline",
+  socs: "socs-official",
 };
 
 const TEMPLATE_FILE_NAMES = {
@@ -20,6 +23,7 @@ const TEMPLATE_FILE_NAMES = {
   creative: "creative",
   "enhancv-replica": "signature-timeline",
   "enhancv-columns": "emerald-columns",
+  "socs-official": "socs-official",
 };
 
 const normalizeTemplateId = (templateId) =>
@@ -145,6 +149,23 @@ const TEMPLATE_CONFIG = {
     skillMode: "enhancv-line",
     order: ["summary", "education", "skills", "experience", "projects", "certifications", "achievements", "languages", "interests", "custom"],
   },
+  "socs-official": {
+    layout: "socs-official",
+    background: [255, 255, 255],
+    headingFont: "helvetica",
+    headingStyle: "bold",
+    headingSize: 14,
+    titleFont: "helvetica",
+    titleStyle: "normal",
+    titleSize: 11,
+    nameColor: [0, 0, 0],
+    titleColor: [0, 0, 0],
+    contactColor: [0, 0, 0],
+    sectionColor: [0, 0, 0],
+    lineColor: [0, 0, 0],
+    skillMode: "plain",
+    order: ["summary", "education", "skills", "experience", "projects", "research", "certifications", "achievements", "custom"],
+  },
 };
 
 const filterFilled = (items = []) => items.filter(Boolean);
@@ -172,8 +193,9 @@ const stripBulletPrefix = (value = "") =>
 const getCustomSectionSortKey = (title = "") => {
   const normalized = String(title || "").trim().toLowerCase();
   if (/project/.test(normalized)) return "projects";
-  if (/certification|certificate|course/.test(normalized)) return "certifications";
-  if (/achievement|award/.test(normalized)) return "achievements";
+  if (/research|publication|paper|journal|conference/.test(normalized)) return "research";
+  if (/certification|certificate|course|accomplishment/.test(normalized)) return "certifications";
+  if (/leadership|activity|activities|achievement|award/.test(normalized)) return "achievements";
   if (/language/.test(normalized)) return "languages";
   if (/interest/.test(normalized)) return "interests";
   return "custom";
@@ -193,11 +215,45 @@ const formatDateRange = (startDate, endDate) => {
   return start || end || "";
 };
 
+const EDUCATION_MONTH_PATTERN_FOR_DISPLAY = "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*";
+const EDUCATION_DATE_TOKEN_PATTERN_FOR_DISPLAY = `${EDUCATION_MONTH_PATTERN_FOR_DISPLAY}\\s*,?\\s*\\d{2,4}|\\d{4}`;
+const EDUCATION_CURRENT_TOKEN_PATTERN_FOR_DISPLAY = "(?:present|current|till\\s*date|till\\s*now|ongoing)";
+const EDUCATION_DATE_RANGE_PATTERN_FOR_DISPLAY = new RegExp(
+  `(${EDUCATION_DATE_TOKEN_PATTERN_FOR_DISPLAY})\\s*(?:to|-|until|through|[–—])\\s*(${EDUCATION_CURRENT_TOKEN_PATTERN_FOR_DISPLAY}|${EDUCATION_DATE_TOKEN_PATTERN_FOR_DISPLAY})`,
+  "i",
+);
+
+const normalizeEducationDateTextForDisplay = (value = "") =>
+  String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/â€“|â€”|Ã¢â‚¬â€œ|Ã¢â‚¬â€/g, "-")
+    .replace(/\btilldate\b/gi, "Till date")
+    .trim();
+
+const extractEducationDateRangeFromTextForDisplay = (value = "") => {
+  const cleaned = normalizeEducationDateTextForDisplay(value);
+  const match = cleaned.match(EDUCATION_DATE_RANGE_PATTERN_FOR_DISPLAY);
+  return match ? `${match[1].trim()} - ${match[2].trim()}` : "";
+};
+
+const getEducationDateDisplay = (item = {}) =>
+  formatDateRange(item.startDate, item.endDate) ||
+  extractEducationDateRangeFromTextForDisplay([
+    item.degree,
+    item.fieldOfStudy,
+    item.institution,
+    item.location,
+    item.score,
+  ].filter(Boolean).join(" "));
+
 const normalizeExternalHref = (value = "") => {
   const trimmed = String(value || "").trim();
   if (!trimmed) return "";
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 };
+
+const stripProtocol = (value = "") =>
+  String(value || "").trim().replace(/^https?:\/\//i, "").replace(/\/$/, "");
 
 const getPortfolioContactPart = (portfolio = "") => {
   const url = normalizeExternalHref(portfolio);
@@ -294,7 +350,7 @@ const RENDER_SKILL_REJECTION_PATTERN =
 const sanitizeRenderedSkills = (skills = []) =>
   Array.from(
     new Set(
-      (Array.isArray(skills) ? skills : [])
+      flattenSkillCategories(skills)
         .map((skill) => String(skill || "").replace(/\s+/g, " ").trim())
         .filter(Boolean)
         .filter((skill) => skill.length <= 40)
@@ -306,6 +362,7 @@ const sanitizeRenderedSkills = (skills = []) =>
   );
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const getResumePhotoFrameScale = (resumePhoto) => clamp(resumePhoto?.frameScale ?? 1, 0.5, 1.4);
 
 const getPhotoImageFormat = (src = "") => {
   const match = String(src || "").match(/^data:image\/(png|jpeg|jpg|webp);/i);
@@ -366,21 +423,18 @@ const drawResumePhoto = (doc, template, resumePhoto = null) => {
     return;
   }
 
+  const frameScale = getResumePhotoFrameScale(resumePhoto);
   let x = 12;
   let y = 12;
-  let width = 28;
-  let height = 28;
+  let width = 28 * frameScale;
+  let height = 28 * frameScale;
 
   if (template === "creative") {
-    x = 168;
-    y = 14;
-    width = 28;
-    height = 28;
+    x = 168 - (width - 28) / 2;
+    y = 14 - (height - 28) / 2;
   } else if (template === "enhancv-columns") {
-    x = 168;
-    y = 9;
-    width = 28;
-    height = 28;
+    x = 168 - (width - 28) / 2;
+    y = 9 - (height - 28) / 2;
   } else {
     const usableWidth = PAGE_WIDTH - 24 - width;
     const usableHeight = PAGE_HEIGHT - 24 - height;
@@ -907,6 +961,218 @@ const renderStandardTemplate = (doc, formData, config) => {
   });
 };
 
+const getSocsSectionItems = (customSections = [], pattern) =>
+  (customSections || [])
+    .filter((section) => pattern.test(String(section?.title || "")))
+    .flatMap((section) => splitCustomSectionItems(section.items || []));
+
+const getSocsOtherCustomSections = (customSections = []) =>
+  (customSections || [])
+    .map((section) => ({
+      title: safeText(section?.title || ""),
+      items: splitCustomSectionItems(section?.items || []),
+    }))
+    .filter((section) => section.title || section.items.length)
+    .filter((section) => !/(research|publication|paper|journal|conference|certification|certificate|course|accomplishment|leadership|activity|activities|achievement|award)/i.test(section.title));
+
+const compareByEndDateDesc = (a = {}, b = {}) => {
+  const getDateValue = (item = {}) => {
+    const raw = item.endDate || item.startDate || "";
+    if (!raw) return -Infinity;
+    const parsed = new Date(String(raw));
+    return Number.isFinite(parsed.valueOf()) ? parsed.valueOf() : -Infinity;
+  };
+
+  const aValue = getDateValue(a);
+  const bValue = getDateValue(b);
+  return bValue - aValue;
+};
+
+const getSocsSkillGroups = (skills = []) => {
+  const flattenedSkills = sanitizeRenderedSkills(skills);
+  if (!flattenedSkills.length) return [];
+
+  if (!Array.isArray(skills) || !skills.some((skill) => skill && typeof skill === "object" && !Array.isArray(skill))) {
+    return [{ category: "Programming/Scripting Languages", items: flattenedSkills }];
+  }
+
+  return skills
+    .map((group) => {
+      const rawCategory = safeText(group?.category || group?.name || group?.title || "Skills");
+      const rawItems = Array.isArray(group?.items)
+        ? group.items
+        : Array.isArray(group?.skills)
+          ? group.skills
+          : Array.isArray(group?.values)
+            ? group.values
+            : [];
+      const items = sanitizeRenderedSkills(rawItems);
+      let category = rawCategory || "Programming/Scripting Languages";
+      if (/^skills?$/i.test(category)) category = "Programming/Scripting Languages";
+      else if (/programming|language/i.test(category)) category = "Programming/Scripting Languages";
+      else if (/database/i.test(category)) category = "Databases";
+      else if (/framework/i.test(category)) category = "Frameworks";
+      else if (/tool|platform|other/i.test(category)) category = "Tools";
+      else if (/operating|os\b/i.test(category)) category = "Operating Systems";
+      return { category, items };
+    })
+    .filter((group) => group.items.length);
+};
+
+const renderSocsOfficialTemplate = (doc, formData, config) => {
+  const marginX = 19.05;
+  const contentWidth = PAGE_WIDTH - marginX * 2;
+  let y = 17;
+
+  const ensureSocsPage = (requiredHeight = 8) => {
+    y = ensurePage(doc, y, requiredHeight, config.background);
+  };
+
+  const drawSocsSectionTitle = (title) => {
+    ensureSocsPage(10);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(title, marginX, y);
+    y += 5.2;
+  };
+
+  const drawSocsParagraph = (text) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    y = drawWrappedTextPaginated(doc, text, marginX, y, contentWidth, 4.1, config) + 1;
+  };
+
+  const drawSocsBullets = (items = []) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    items.forEach((item) => {
+      y = drawBulletTextPaginated(doc, item, marginX, y, contentWidth, 4.1, config);
+    });
+    y += 1;
+  };
+
+  const drawVisibleContactLink = (text, url, x) => {
+    if (url) {
+      doc.textWithLink(text, x, y, { url });
+    } else {
+      doc.text(text, x, y);
+    }
+  };
+
+  resetPage(doc, config.background);
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  if (safeText(formData.personalInfo.fullName)) {
+    doc.text(safeText(formData.personalInfo.fullName), PAGE_WIDTH / 2, y, { align: "center" });
+  }
+
+  y += 6.1;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  const contactParts = [
+    { text: safeText(formData.personalInfo.email) },
+    { text: safeText(formData.personalInfo.phone) },
+    formData.personalInfo.portfolio
+      ? { text: stripProtocol(formData.personalInfo.portfolio), url: normalizeExternalHref(formData.personalInfo.portfolio) }
+      : null,
+    formData.personalInfo.github
+      ? { text: stripProtocol(formData.personalInfo.github), url: normalizeExternalHref(formData.personalInfo.github) }
+      : null,
+  ].filter((part) => part?.text);
+  const contactLineWidth = contactParts.reduce((width, part, index) => width + doc.getTextWidth(part.text) + (index ? doc.getTextWidth(" | ") : 0), 0);
+  let contactX = Math.max(marginX, (PAGE_WIDTH - contactLineWidth) / 2);
+  contactParts.forEach((part, index) => {
+    if (index) {
+      doc.text(" | ", contactX, y);
+      contactX += doc.getTextWidth(" | ");
+    }
+    drawVisibleContactLink(part.text, part.url, contactX);
+    contactX += doc.getTextWidth(part.text);
+  });
+  y += 10;
+
+  if (safeText(formData.summary)) {
+    drawSocsSectionTitle("Professional Summary");
+    drawSocsParagraph(formData.summary);
+  }
+
+  const educationItems = (formData.education || []).filter(
+    (item) => item.institution || item.degree || item.fieldOfStudy || item.location || item.score || item.startDate || item.endDate,
+  ).sort(compareByEndDateDesc);
+  if (educationItems.length) {
+    drawSocsSectionTitle("Education");
+    educationItems.forEach((item) => {
+      drawSocsParagraph(
+        `${[safeText(item.degree), safeText(item.fieldOfStudy)].filter(Boolean).join(" in ")}${item.institution ? `, ${safeText(item.institution)}` : ""}${item.location ? `, ${safeText(item.location)}` : ""}${item.score ? ` | ${safeText(item.score)}` : ""}${getEducationDateDisplay(item) ? ` ${getEducationDateDisplay(item)}` : ""}`,
+      );
+    });
+  }
+
+  const skillGroups = getSocsSkillGroups(formData.skills);
+  if (skillGroups.length) {
+    drawSocsSectionTitle("Technical Skills");
+    skillGroups.forEach((group) => drawSocsParagraph(`${group.category}: ${group.items.join(", ")}`));
+  }
+
+  const internshipItems = (formData.experience || []).filter((item) => item.company || item.role || item.description).sort(compareByEndDateDesc);
+  if (internshipItems.length) {
+    drawSocsSectionTitle("Internships");
+    internshipItems.forEach((item) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      y = drawWrappedTextPaginated(
+        doc,
+        `${[safeText(item.company), safeText(item.role)].filter(Boolean).join(" | ")}${formatDateRange(item.startDate, item.endDate) ? ` ${formatDateRange(item.startDate, item.endDate)}` : ""}`,
+        marginX,
+        y,
+        contentWidth,
+        4.1,
+        config,
+      );
+      drawSocsParagraph("Responsibilities:");
+      drawSocsBullets(splitBulletLines(item.description));
+    });
+  }
+
+  const projectItems = (formData.projects || []).filter(hasProjectContent);
+  if (projectItems.length) {
+    drawSocsSectionTitle("Projects");
+    projectItems.forEach((project, index) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      y = drawWrappedTextPaginated(doc, safeText(project.name) || `Project ${index + 1}`, marginX, y, contentWidth, 4.1, config);
+      drawSocsBullets(getProjectBullets(project));
+    });
+  }
+
+  const researchItems = getSocsSectionItems(formData.customSections, /research|publication|paper|journal|conference/i);
+  if (researchItems.length) {
+    drawSocsSectionTitle("Research and Publications");
+    drawSocsBullets(researchItems);
+  }
+
+  const certificationItems = getSocsSectionItems(formData.customSections, /certification|certificate|course|accomplishment/i);
+  if (certificationItems.length) {
+    drawSocsSectionTitle("Certifications and Accomplishments");
+    drawSocsBullets(certificationItems);
+  }
+
+  const leadershipItems = getSocsSectionItems(formData.customSections, /leadership|activity|activities|achievement|award/i);
+  if (leadershipItems.length) {
+    drawSocsSectionTitle("Leadership / Activities / Achievements");
+    drawSocsBullets(leadershipItems);
+  }
+
+  getSocsOtherCustomSections(formData.customSections).forEach((section) => {
+    drawSocsSectionTitle(section.title || "Additional Section");
+    drawSocsBullets(section.items);
+  });
+};
+
 const renderSingleColumnTemplate = (doc, formData, config) => {
   let y = drawStandardHeader(doc, formData, config, true);
   const sections = sortSections(getResumeSections(formData), config.order);
@@ -1074,10 +1340,12 @@ const renderTimelineTemplate = (doc, formData, config) => {
 const renderEnhancvReplicaTemplate = (doc, formData, config) => {
   const name = safeText(formData.personalInfo.fullName);
   const title = safeText(formData.personalInfo.title);
+  const portfolioHref = normalizeExternalHref(formData.personalInfo.portfolio);
+  const portfolioLabel = safeText(formData.personalInfo.portfolio);
   const contactParts = filterFilled([
     safeText(formData.personalInfo.phone) ? { text: safeText(formData.personalInfo.phone) } : null,
     safeText(formData.personalInfo.email) ? { text: safeText(formData.personalInfo.email) } : null,
-    getPortfolioContactPart(formData.personalInfo.portfolio),
+    portfolioHref ? { text: portfolioLabel || "LinkedIn", url: portfolioHref } : null,
     safeText(formData.personalInfo.location) ? { text: safeText(formData.personalInfo.location) } : null,
   ]);
   const customSections = (formData.customSections || [])
@@ -1087,186 +1355,243 @@ const renderEnhancvReplicaTemplate = (doc, formData, config) => {
     }))
     .filter((section) => section.title || section.items.length);
   const projectItems = (formData.projects || []).filter(hasProjectContent);
+  const experienceItems = (formData.experience || []).filter(
+    (item) => item.company || item.role || item.description,
+  );
+  const educationItems = (formData.education || []).filter(
+    (item) => item.institution || item.degree || item.fieldOfStudy,
+  );
+
+  const leftX = 17;
+  const dateX = 17;
+  const railX = 68;
+  const bodyX = 73.5;
+  const bodyWidth = 120;
+  const signaturePageLimit = 296;
+
+  const ensureSignaturePage = (currentY, requiredHeight = 16) => {
+    if (currentY + requiredHeight <= signaturePageLimit) {
+      return currentY;
+    }
+
+    doc.addPage();
+    resetPage(doc, config.background);
+    return 18;
+  };
+  const drawSignatureBullet = (text) => {
+    y = ensureSignaturePage(y, 6);
+    doc.setFillColor(71, 85, 105);
+    doc.circle(bodyX + 1.5, y - 1.55, 0.65, "F");
+    doc.setTextColor(55, 65, 81);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    y = drawWrappedText(doc, text, bodyX + 5, y, bodyWidth - 5, 5.4) + 1.15;
+  };
+  const splitSkillPair = (skill = "") => {
+    const [rawLabel, ...rawValue] = String(skill || "").split(":");
+    if (!rawValue.length) {
+      return { label: "", value: safeText(skill) };
+    }
+    return {
+      label: `${safeText(rawLabel)} :`,
+      value: safeText(rawValue.join(":")),
+    };
+  };
+  const drawSignatureSkills = (skills = []) => {
+    doc.setFontSize(13);
+    let skillY = y + 2.5;
+    skills.forEach((skill) => {
+      const { label, value } = splitSkillPair(skill);
+      if (!label && !value) return;
+      skillY = ensureSignaturePage(skillY, 12);
+      const labelX = leftX + 3;
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 43, 110);
+      doc.setFontSize(13);
+      doc.text(label || value, labelX, skillY);
+
+      if (label && value) {
+        const valueX = Math.min(labelX + doc.getTextWidth(label) + 4, 94);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(30, 41, 59);
+        doc.setFontSize(13);
+        skillY = Math.max(skillY, drawWrappedText(doc, value, valueX, skillY, 190 - valueX, 5.4));
+      }
+
+      skillY += 11.2;
+    });
+    y = skillY + 2;
+  };
 
   doc.setTextColor(...config.nameColor);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(27);
+  doc.setFontSize(34);
   if (name) {
-    doc.text(name, 12, 17);
+    doc.text(name, leftX, 25);
   }
 
   doc.setTextColor(...config.titleColor);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
+  doc.setFontSize(17);
   if (title) {
-    doc.text(title, 12, 24);
+    doc.text(title, leftX, 34.5);
   }
 
   doc.setTextColor(...config.contactColor);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.4);
-  drawInlineContactParts(doc, contactParts, 12, 30, {
+  doc.setFontSize(12);
+  drawInlineContactParts(doc, contactParts, leftX, 45.5, {
     separator: "   ",
     underlineColor: config.contactColor,
   });
 
-  let y = 38;
+  let y = 58;
   const drawTitle = (label) => {
+    y = ensureSignaturePage(y, 14);
     doc.setTextColor(...config.sectionColor);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(12.2);
-    doc.text(label, 12, y);
-    y += 6;
+    doc.setFontSize(18);
+    doc.text(String(label || "").toUpperCase(), leftX, y);
+    y += 9.2;
   };
 
-  drawTitle("SUMMARY");
-  doc.setTextColor(55, 65, 81);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.6);
-  y = drawWrappedText(
-    doc,
-    safeText(formData.summary),
-    12,
-    y,
-    186,
-    4.9,
-  ) + 4.5;
+  const drawTimelineEntry = ({
+    meta = [],
+    role = "",
+    accent = "",
+    bullets = [],
+    description = "",
+    dotLineHeight = 18,
+  }) => {
+    y = ensureSignaturePage(y, 18);
+    const entryTop = y;
+    const metaLines = filterFilled(meta.map((item) => safeText(item)));
 
-  const educationItems = (formData.education || []).filter(
-    (item) => item.institution || item.degree || item.fieldOfStudy,
-  );
-  const renderedEducation = educationItems;
-
-  if (renderedEducation.length) {
-    drawTitle("EDUCATION");
-  }
-
-  renderedEducation.forEach((item) => {
-    const startY = y;
     doc.setTextColor(56, 88, 148);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.1);
-    const educationDate = formatDateRange(item.startDate, item.endDate);
-    if (educationDate) {
-      doc.text(educationDate, 12, startY);
-    }
-    doc.setTextColor(100, 116, 139);
-    doc.setFont("helvetica", "normal");
-    if (safeText(formData.personalInfo.location)) {
-      doc.text(formData.personalInfo.location, 12, startY + 4);
-    }
+    doc.setFontSize(13);
+    metaLines.forEach((line, index) => {
+      if (!line) return;
+      doc.setFont("helvetica", index === 0 ? "bold" : "normal");
+      doc.setTextColor(index === 0 ? 56 : 100, index === 0 ? 88 : 116, index === 0 ? 148 : 139);
+      doc.text(line, dateX, entryTop + index * 7.7);
+    });
 
     doc.setDrawColor(138, 143, 153);
+    doc.setFillColor(15, 23, 42);
     doc.setLineWidth(0.25);
-    doc.circle(44, startY - 0.5, 0.9, "F");
+    doc.circle(railX, entryTop - 0.5, 0.9, "F");
+    if (dotLineHeight > 0) {
+      doc.line(railX, entryTop + 1.4, railX, Math.min(signaturePageLimit, entryTop + dotLineHeight));
+    }
 
-    doc.setTextColor(30, 41, 59);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10.4);
-    doc.text(
-      [safeText(item.degree), safeText(item.fieldOfStudy)].filter(Boolean).join(", "),
-      50,
-      startY,
-    );
+    if (role) {
+      doc.setTextColor(71, 85, 105);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(16);
+      y = drawWrappedText(doc, role, bodyX, y, bodyWidth, 6.6);
+    }
 
-    doc.setTextColor(210, 96, 16);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.8);
-    y = drawWrappedText(doc, safeText(item.institution), 50, startY + 4, 140, 4.6);
-    y += 3.5;
-  });
+    if (accent) {
+      doc.setTextColor(...config.titleColor);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      y = drawWrappedText(doc, accent, bodyX, y + (role ? 1 : 0), bodyWidth, 5.8);
+    }
 
-  customSections.forEach((section, index) => {
-    drawTitle(section.title || `SECTION ${index + 1}`);
+    const descriptionLines = splitBulletLines(description);
+    const bulletItems = bullets.length ? bullets : descriptionLines;
+    if (bulletItems.length) {
+      y += 3.1;
+      bulletItems.forEach((bullet) => drawSignatureBullet(bullet));
+    }
+
+    y = Math.max(y, entryTop + metaLines.length * 7.7) + 9.8;
+  };
+
+  if (safeText(formData.summary)) {
+    drawTitle("SUMMARY");
     doc.setTextColor(55, 65, 81);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9.2);
-    const items = splitCustomSectionItems(section.items);
-    items.forEach((item) => {
-      doc.text("-", 12, y);
-      y = drawWrappedText(doc, item, 15, y, 180, 4.8) + 1.2;
+    doc.setFontSize(12);
+    y = drawWrappedText(doc, safeText(formData.summary), leftX, y, 184, 5.9) + 12;
+  }
+
+  if (experienceItems.length) {
+    drawTitle("EXPERIENCE");
+    experienceItems.forEach((item) => {
+      drawTimelineEntry({
+        meta: [
+          formatDateRange(item.startDate, item.endDate),
+          safeText(item.location) || safeText(formData.personalInfo.location),
+        ],
+        role: safeText(item.role),
+        accent: safeText(item.company),
+        description: item.description,
+      });
     });
-    y += 2;
-  });
+  }
+
+  if (educationItems.length) {
+    drawTitle("EDUCATION");
+    educationItems.forEach((item) => {
+      const educationTitle = item.fieldOfStudy
+        ? `${safeText(item.degree)} (${safeText(item.fieldOfStudy)})`
+        : safeText(item.degree);
+      drawTimelineEntry({
+        meta: [
+          formatDateRange(item.startDate, item.endDate),
+          safeText(item.location),
+          safeText(item.score),
+        ],
+        role: educationTitle,
+        accent: safeText(item.institution),
+        dotLineHeight: 13,
+      });
+    });
+  }
 
   if (projectItems.length) {
     drawTitle("PROJECTS");
     projectItems.forEach((project, index) => {
-      doc.setTextColor(30, 41, 59);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10.5);
-      y = drawWrappedText(doc, safeText(project.name) || `Project ${index + 1}`, 12, y, 180, 4.8) + 1;
-      doc.setTextColor(55, 65, 81);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9.2);
-      getProjectBullets(project).forEach((bullet) => {
-        doc.text("-", 12, y);
-        y = drawWrappedText(doc, bullet, 15, y, 180, 4.8) + 1.2;
+      drawTimelineEntry({
+        meta: ["Project"],
+        role: safeText(project.name) || `Project ${index + 1}`,
+        bullets: getProjectBullets(project),
+        dotLineHeight: 13,
       });
-      y += 2;
     });
   }
 
-  if (filterFilled(formData.skills).length) {
+  const signatureSkills = sanitizeRenderedSkills(formData.skills);
+  if (signatureSkills.length) {
     drawTitle("SKILLS");
-    y = drawSkills(doc, filterFilled(formData.skills), 12, y, 180, config);
+    drawSignatureSkills(signatureSkills);
   }
 
-  const experienceItems = (formData.experience || []).filter(
-    (item) => item.company || item.role || item.description,
-  );
-  const renderedExperience = experienceItems;
-
-  if (renderedExperience.length) {
-    drawTitle("EXPERIENCE");
-  }
-
-  renderedExperience.forEach((item) => {
-    const startY = y;
-    doc.setTextColor(56, 88, 148);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.1);
-    const experienceDate = formatDateRange(item.startDate, item.endDate);
-    if (experienceDate) {
-      doc.text(experienceDate, 12, startY);
+  customSections.forEach((section, index) => {
+    if (index === 0 && y > 277) {
+      y = 277;
     }
-    doc.setTextColor(100, 116, 139);
-    doc.setFont("helvetica", "normal");
-    if (safeText(formData.personalInfo.location)) {
-      doc.text(formData.personalInfo.location, 12, startY + 4);
-    }
-
-    doc.setDrawColor(138, 143, 153);
-    doc.setLineWidth(0.25);
-    doc.circle(44, startY - 0.5, 0.9, "F");
-    doc.line(44, startY + 1.2, 44, startY + 14);
-
-    doc.setTextColor(71, 85, 105);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9.6);
-    if (safeText(item.role)) {
-      doc.text(item.role, 50, startY);
-    }
-
-    doc.setTextColor(210, 96, 16);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    if (safeText(item.company)) {
-      doc.text(item.company, 50, startY + 4);
-    }
-
-    const bullets = splitBulletLines(item.description);
-    const fallbackBullet = bullets.length ? bullets : [];
+    drawTitle(section.title || `SECTION ${index + 1}`);
     doc.setTextColor(55, 65, 81);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.9);
-    let bulletY = startY + 8;
-    fallbackBullet.forEach((bullet) => {
-      doc.text("-", 50, bulletY);
-      bulletY = drawWrappedText(doc, bullet, 53, bulletY, 138, 4.5);
+    doc.setFontSize(13);
+    splitCustomSectionItems(section.items).forEach((item) => {
+      y = ensureSignaturePage(y, 8);
+      doc.setFillColor(71, 85, 105);
+      doc.circle(leftX + 1.5, y - 1.65, 0.65, "F");
+      y = drawWrappedText(doc, item, leftX + 6, y, 180, 5.8) + 1.6;
     });
-    y = bulletY + 3;
+    y += 2;
   });
+
+  doc.setTextColor(120, 138, 168);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.8);
+  doc.text("www.enhancv.com", leftX, 293);
+  doc.text("Powered by", 178, 293);
 };
 
 const renderEnhancvColumnsTemplate = (doc, formData, config) => {
@@ -1425,7 +1750,7 @@ const renderEnhancvColumnsTemplate = (doc, formData, config) => {
   });
 
   centerY = drawColumnTitle("SKILLS", centerX, centerY, centerWidth);
-  const skills = filterFilled(formData.skills);
+  const skills = sanitizeRenderedSkills(formData.skills);
   const skillItems = skills.length
     ? skills
     : [];
@@ -1552,11 +1877,16 @@ const renderTemplatePdf = (doc, formData, config) => {
     return;
   }
 
+  if (config.layout === "socs-official") {
+    renderSocsOfficialTemplate(doc, formData, config);
+    return;
+  }
+
   renderStandardTemplate(doc, formData, config);
 };
 
-const getResumeFileName = (formData, template) =>
-  `${(formData.personalInfo.fullName || "resume").replace(/\s+/g, "_")}_${TEMPLATE_FILE_NAMES[template] || "contemporary"}.pdf`;
+const getResumeFileName = (formData, template, suffix = "") =>
+  `${(formData.personalInfo.fullName || "resume").replace(/\s+/g, "_")}_${TEMPLATE_FILE_NAMES[template] || "contemporary"}${suffix}.pdf`;
 
 const SECTION_NAME_MAP = {
   contact: "contact",
@@ -1845,7 +2175,7 @@ const parseOptimizedResumeText = (optimizedResumeText = "", fileName = "", headl
 };
 
 const KNOWN_SKILL_PATTERN =
-  /(python|java|javascript|typescript|react|node(?:\.js)?|express|mongodb|mysql|sql|postgres(?:ql)?|aws|azure|gcp|docker|kubernetes|linux|git|github|html|css|tailwind|bootstrap|c\+\+|c#|\bc\b|spring|django|flask|machine learning|data structures|algorithms|oop|\bos\b|dbms|dsa|siem|vapt|soc|incident response|digital forensics|wireshark|burp suite|nmap|metasploit|threat intelligence|malware analysis|api|rest|rest api|cloud security|network security|cybersecurity)/i;
+  /(python|r\b|java|javascript|typescript|react|node(?:\.js)?|express|mongodb|mysql|sql|postgres(?:ql)?|aws|azure|gcp|docker|kubernetes|linux|git|github|html|css|tailwind|bootstrap|c\+\+|c#|\bc\b|spring|django|flask|fastapi|machine learning|supervised learning|unsupervised learning|model evaluation|scikit-learn|data structures|algorithms|oop|\bos\b|dbms|dsa|power bi|tableau|excel|advanced excel|vlookup|pivot tables|pandas|numpy|data analysis|data visualization|dashboard|dashboard development|reporting|eda|exploratory data analysis|data wrangling|data preprocessing|statistics|siem|vapt|soc|incident response|digital forensics|wireshark|burp suite|nmap|metasploit|threat intelligence|malware analysis|api|rest|rest api|cloud security|network security|cybersecurity)/i;
 
 const isLikelyName = (value = "") =>
   /^[A-Za-z]+(?:[.\s'-][A-Za-z]+){1,4}$/.test(String(value).trim()) &&
@@ -1888,7 +2218,7 @@ const sanitizeSkillItems = (skills = [], personalInfo = {}) => {
 
   return Array.from(
     new Set(
-      (skills || [])
+      flattenSkillCategories(skills)
         .map((skill) => String(skill || "").trim())
         .filter(Boolean)
         .filter((skill) => !/@|https?:\/\/|linkedin\.com|github\.com/i.test(skill))
@@ -1896,7 +2226,7 @@ const sanitizeSkillItems = (skills = [], personalInfo = {}) => {
         .filter((skill) => !/^(candidate|experience|critical|flaws|detection|security|digital)$/i.test(skill))
         .filter((skill) => KNOWN_SKILL_PATTERN.test(skill)),
     ),
-  ).slice(0, 16);
+  ).slice(0, 32);
 };
 
 const sanitizeOptimizedResumeData = (optimizedResume = {}, fileName = "") => {
@@ -1917,6 +2247,15 @@ const sanitizeOptimizedResumeData = (optimizedResume = {}, fileName = "") => {
   const normalizedEducation = (Array.isArray(optimizedResume.education) ? optimizedResume.education : [])
     .map((item) => normalizeEntry(item, ["degree", "institution", "fieldOfStudy", "startDate", "endDate"]))
     .filter((item) => item.degree || item.institution || item.fieldOfStudy);
+
+  const normalizedProjects = (Array.isArray(optimizedResume.projects) ? optimizedResume.projects : [])
+    .map((item) => ({
+      name: cleanResumeText(item?.name || ""),
+      bullets: Array.isArray(item?.bullets)
+        ? item.bullets.map((bullet) => stripBulletPrefix(bullet)).filter(Boolean)
+        : splitBulletLines(item?.description || ""),
+    }))
+    .filter((item) => item.name || item.bullets.length);
 
   const customSections = Array.isArray(optimizedResume.customSections)
     ? optimizedResume.customSections.map((section) => ({
@@ -2018,6 +2357,7 @@ const sanitizeOptimizedResumeData = (optimizedResume = {}, fileName = "") => {
     summary: resolvedSummary,
     skills: mergedSkills,
     experience: normalizedExperience,
+    projects: normalizedProjects,
     education: normalizedEducation,
     customSections: filteredCustomSections,
   };
@@ -2052,6 +2392,14 @@ const compactOptimizedResumeToSinglePage = (resume = {}) => {
     }))
     .filter((item) => item.degree || item.institution || item.fieldOfStudy);
 
+  const compactProjects = (Array.isArray(resume.projects) ? resume.projects : [])
+    .slice(0, 2)
+    .map((project, index) => ({
+      name: safeText(project.name || `Project ${index + 1}`),
+      bullets: getProjectBullets(project).slice(0, 2),
+    }))
+    .filter(hasProjectContent);
+
   const compactCustomSections = (Array.isArray(resume.customSections) ? resume.customSections : [])
     .filter((section) => /project|certification|achievement|publication|internship/i.test(String(section?.title || "")))
     .slice(0, 5)
@@ -2064,21 +2412,702 @@ const compactOptimizedResumeToSinglePage = (resume = {}) => {
   return {
     ...resume,
     summary: compactSummary,
-    skills: (Array.isArray(resume.skills) ? resume.skills : []).map((skill) => safeText(skill)).filter(Boolean).slice(0, 14),
+    skills: sanitizeRenderedSkills(resume.skills).map((skill) => safeText(skill)).filter(Boolean).slice(0, 28),
     experience: compactExperience,
+    projects: compactProjects,
     education: compactEducation,
     customSections: compactCustomSections,
   };
 };
 
+const waitForPreviewAssets = async (previewElement) => {
+  if (typeof document !== "undefined" && document.fonts?.ready) {
+    await document.fonts.ready;
+  }
+
+  const imageElements = Array.from(previewElement?.querySelectorAll?.("img") || []);
+  await Promise.all(
+    imageElements.map(async (image) => {
+      if (image.complete && image.naturalWidth > 0) {
+        return;
+      }
+
+      if (typeof image.decode === "function") {
+        try {
+          await image.decode();
+          return;
+        } catch {
+          // Some already-rendered data URLs reject decode; load/error listeners still settle export.
+        }
+      }
+
+      await new Promise((resolve) => {
+        image.addEventListener("load", resolve, { once: true });
+        image.addEventListener("error", resolve, { once: true });
+      });
+    }),
+  );
+
+  if (typeof window !== "undefined") {
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+  }
+};
+
+const A4_EXPORT_WIDTH_PX = 794;
+const A4_EXPORT_HEIGHT_PX = Math.round((A4_EXPORT_WIDTH_PX * PAGE_HEIGHT) / PAGE_WIDTH);
+const PDF_CAPTURE_SCALE = 3;
+const PREVIEW_PLACEHOLDER_TEXT = new Set([
+  "[Phone Number]",
+  "[Email]",
+  "[Location]",
+  "yourname@email.com",
+  "email@example.com",
+  "+91 0000000000",
+  "Your location",
+  "Title",
+  "Company Name",
+  "University / Institute",
+  "Degree / Program",
+  "Institution Name",
+  "Add items to populate this section.",
+  "Add projects to highlight practical work.",
+  "Add project details as bullet points.",
+  "Add skills to populate the preview.",
+  "Highlight your accomplishments, using numbers if possible.",
+  "Your professional summary will appear here once you add it.",
+  "Your professional summary will appear here as you write or generate it.",
+]);
+
+const removePreviewOnlyPlaceholders = (root) => {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+
+  while (walker.nextNode()) {
+    textNodes.push(walker.currentNode);
+  }
+
+  textNodes.forEach((node) => {
+    const normalized = String(node.nodeValue || "").replace(/\s+/g, " ").trim();
+    if (PREVIEW_PLACEHOLDER_TEXT.has(normalized)) {
+      node.nodeValue = "";
+    }
+  });
+};
+
+const showFullLinkText = (root) => {
+  root.querySelectorAll("a[href]").forEach((link) => {
+    const fullHref = String(link.href || "").trim();
+    if (!fullHref) {
+      return;
+    }
+
+    link.textContent = fullHref;
+    link.style.overflowWrap = "anywhere";
+    link.style.wordBreak = "break-word";
+  });
+};
+
+const createStableExportClone = async (previewElement, options = {}) => {
+  const exportHost = document.createElement("div");
+  exportHost.setAttribute("data-resume-pdf-export-host", "true");
+  exportHost.style.position = "absolute";
+  exportHost.style.left = "-10000px";
+  exportHost.style.top = "0";
+  exportHost.style.width = `${A4_EXPORT_WIDTH_PX}px`;
+  exportHost.style.minWidth = `${A4_EXPORT_WIDTH_PX}px`;
+  exportHost.style.maxWidth = `${A4_EXPORT_WIDTH_PX}px`;
+  exportHost.style.background = "#ffffff";
+  exportHost.style.pointerEvents = "none";
+  exportHost.style.overflow = "visible";
+  exportHost.style.zIndex = "-1";
+
+  const clonedPreview = previewElement.cloneNode(true);
+  clonedPreview.style.width = `${A4_EXPORT_WIDTH_PX}px`;
+  clonedPreview.style.minWidth = `${A4_EXPORT_WIDTH_PX}px`;
+  clonedPreview.style.maxWidth = `${A4_EXPORT_WIDTH_PX}px`;
+  clonedPreview.style.margin = "0";
+  clonedPreview.style.border = "0";
+  clonedPreview.style.borderRadius = "0";
+  clonedPreview.style.boxShadow = "none";
+  clonedPreview.style.outline = "0";
+  clonedPreview.style.background = "#ffffff";
+  clonedPreview.style.overflow = "visible";
+  clonedPreview.style.transform = "none";
+  clonedPreview.style.transformOrigin = "top left";
+
+  removePreviewOnlyPlaceholders(clonedPreview);
+  if (options.fullLinkText) {
+    showFullLinkText(clonedPreview);
+  }
+  clonedPreview.querySelectorAll("a").forEach((link) => {
+    link.style.textDecoration = "none";
+    link.style.borderBottom = "0";
+  });
+  clonedPreview.querySelectorAll('[data-compact-empty="true"]').forEach((section) => {
+    section.remove();
+  });
+  clonedPreview.querySelectorAll('[data-resume-section-empty="true"]').forEach((section) => {
+    section.remove();
+  });
+  clonedPreview.querySelectorAll("section, article, ul, ol, li, h1, h2, h3, h4").forEach((element) => {
+    element.style.breakInside = "avoid";
+    element.style.pageBreakInside = "avoid";
+  });
+  clonedPreview.querySelectorAll('[class*="grid-cols"], [class*="space-y"], [class*="border-b"]').forEach((element) => {
+    element.style.breakInside = "avoid";
+    element.style.pageBreakInside = "avoid";
+  });
+  clonedPreview.querySelectorAll("section span").forEach((element) => {
+    if (element.textContent?.trim() && element.closest("section")?.textContent?.includes("SKILLS")) {
+      element.style.textDecoration = "none";
+      element.style.borderBottom = "0";
+    }
+  });
+  clonedPreview.querySelectorAll("section").forEach((section) => {
+    const heading = section.querySelector("h1, h2, h3, h4")?.textContent?.trim().toUpperCase();
+    if (heading !== "SKILLS") {
+      return;
+    }
+
+    section.querySelectorAll("*").forEach((element) => {
+      element.style.textDecoration = "none";
+      if (element !== section) {
+        element.style.borderBottomColor = "transparent";
+      }
+    });
+  });
+
+  const exportStyle = document.createElement("style");
+  exportStyle.textContent = `
+    [data-resume-pdf-root="true"],
+    [data-resume-pdf-root="true"] * {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    [data-resume-pdf-root="true"] section,
+    [data-resume-pdf-root="true"] article,
+    [data-resume-pdf-root="true"] ul,
+    [data-resume-pdf-root="true"] ol,
+    [data-resume-pdf-root="true"] li {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    [data-resume-pdf-root="true"] a {
+      color: inherit;
+      text-decoration: none !important;
+      border-bottom: 0 !important;
+    }
+  `;
+  clonedPreview.prepend(exportStyle);
+
+  exportHost.appendChild(clonedPreview);
+  document.body.appendChild(exportHost);
+
+  await waitForPreviewAssets(clonedPreview);
+
+  return {
+    element: clonedPreview,
+    cleanup: () => exportHost.remove(),
+  };
+};
+
+const getResumeSafeBreakpoints = (exportElement, canvasScale) => {
+  const rootRect = exportElement.getBoundingClientRect();
+  const candidates = new Set([0]);
+  const selector = [
+    "section",
+    "article",
+    "ul",
+    "ol",
+    "li",
+    "h3",
+    '[class*="grid-cols"]',
+    '[class*="space-y"] > *',
+  ].join(",");
+
+  exportElement.querySelectorAll(selector).forEach((element) => {
+    const rect = element.getBoundingClientRect();
+    const top = Math.round((rect.top - rootRect.top) * canvasScale);
+    const bottom = Math.round((rect.bottom - rootRect.top) * canvasScale);
+
+    if (top > 0) candidates.add(top);
+    if (bottom > 0) candidates.add(bottom);
+  });
+
+  return Array.from(candidates).sort((a, b) => a - b);
+};
+
+const getExportElementLinks = (exportElement) => {
+  const rootRect = exportElement.getBoundingClientRect();
+
+  return Array.from(exportElement.querySelectorAll("a[href]")).flatMap((link) => {
+    const url = link.href;
+    if (!url) {
+      return [];
+    }
+
+    return Array.from(link.getClientRects())
+      .map((rect) => ({
+        url,
+        left: rect.left - rootRect.left,
+        top: rect.top - rootRect.top,
+        width: rect.width,
+        height: rect.height,
+      }))
+      .filter((rect) => rect.width > 0 && rect.height > 0);
+  });
+};
+
+const addPdfLink = (doc, link, scaleX, scaleY) => {
+  doc.link(
+    link.left * scaleX,
+    link.top * scaleY,
+    link.width * scaleX,
+    link.height * scaleY,
+    { url: link.url },
+  );
+};
+
+const isMostlyWhiteCanvasRow = (context, width, y) => {
+  const { data } = context.getImageData(0, y, width, 1);
+  let whitePixels = 0;
+
+  for (let index = 0; index < data.length; index += 4) {
+    if (data[index] > 245 && data[index + 1] > 245 && data[index + 2] > 245 && data[index + 3] > 245) {
+      whitePixels += 1;
+    }
+  }
+
+  return whitePixels / width > 0.985;
+};
+
+const getCanvasPageSliceHeight = (canvas, sourceY, targetPageHeightPx, breakpoints = []) => {
+  const remainingHeight = canvas.height - sourceY;
+  if (remainingHeight <= targetPageHeightPx) {
+    return remainingHeight;
+  }
+
+  const idealBreakY = Math.min(sourceY + targetPageHeightPx, canvas.height - 1);
+  const minBreakY = sourceY + Math.floor(targetPageHeightPx * 0.72);
+  const preferredBreakpoint = [...breakpoints]
+    .reverse()
+    .find((breakpoint) => breakpoint < idealBreakY && breakpoint > minBreakY);
+
+  if (preferredBreakpoint) {
+    return preferredBreakpoint - sourceY;
+  }
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return Math.min(targetPageHeightPx, remainingHeight);
+  }
+
+  const maxLookback = Math.min(260, idealBreakY - minBreakY);
+
+  for (let offset = 0; offset <= maxLookback; offset += 3) {
+    const candidateY = idealBreakY - offset;
+    if (candidateY <= minBreakY) {
+      break;
+    }
+
+    if (
+      isMostlyWhiteCanvasRow(context, canvas.width, candidateY) &&
+      isMostlyWhiteCanvasRow(context, canvas.width, Math.max(sourceY, candidateY - 6)) &&
+      isMostlyWhiteCanvasRow(context, canvas.width, Math.min(canvas.height - 1, candidateY + 6))
+    ) {
+      return candidateY - sourceY;
+    }
+  }
+
+  return Math.min(targetPageHeightPx, remainingHeight);
+};
+
+const addCanvasLinksToPdf = (doc, links, sourceY, sliceHeight, topPadding, canvasScale, mmPerPx) => {
+  links.forEach((link) => {
+    const linkLeft = link.left * canvasScale;
+    const linkTop = link.top * canvasScale;
+    const linkWidth = link.width * canvasScale;
+    const linkHeight = link.height * canvasScale;
+    const linkBottom = linkTop + linkHeight;
+    const sliceBottom = sourceY + sliceHeight;
+    const overlapTop = Math.max(linkTop, sourceY);
+    const overlapBottom = Math.min(linkBottom, sliceBottom);
+
+    if (overlapBottom <= overlapTop) {
+      return;
+    }
+
+    doc.link(
+      linkLeft * mmPerPx,
+      (topPadding + overlapTop - sourceY) * mmPerPx,
+      linkWidth * mmPerPx,
+      (overlapBottom - overlapTop) * mmPerPx,
+      { url: link.url },
+    );
+  });
+};
+
+const addCanvasToPdf = (doc, canvas, breakpoints = [], links = [], canvasScale = 1) => {
+  const imageWidth = PAGE_WIDTH;
+  const imageHeight = (canvas.height * imageWidth) / canvas.width;
+  const pageHeightPx = Math.floor((canvas.width * PAGE_HEIGHT) / PAGE_WIDTH);
+  const pageTopPaddingPx = Math.round(28 * PDF_CAPTURE_SCALE);
+  const pageBottomPaddingPx = Math.round(24 * PDF_CAPTURE_SCALE);
+  const mmPerPx = PAGE_WIDTH / canvas.width;
+
+  if (imageHeight <= PAGE_HEIGHT) {
+    doc.addImage(canvas.toDataURL("image/png", 1), "PNG", 0, 0, imageWidth, imageHeight, undefined, "FAST");
+    addCanvasLinksToPdf(doc, links, 0, canvas.height, 0, canvasScale, mmPerPx);
+    return;
+  }
+
+  let sourceY = 0;
+  let pageIndex = 0;
+
+  while (sourceY < canvas.height) {
+    const topPadding = pageIndex === 0 ? 0 : pageTopPaddingPx;
+    const availablePageHeight = pageHeightPx - topPadding - pageBottomPaddingPx;
+    const sliceHeight = getCanvasPageSliceHeight(canvas, sourceY, availablePageHeight, breakpoints);
+    const pageCanvas = document.createElement("canvas");
+    pageCanvas.width = canvas.width;
+    pageCanvas.height = pageHeightPx;
+    const context = pageCanvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Unable to prepare PDF page canvas.");
+    }
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+    context.drawImage(
+      canvas,
+      0,
+      sourceY,
+      canvas.width,
+      sliceHeight,
+      0,
+      topPadding,
+      canvas.width,
+      sliceHeight,
+    );
+
+    if (pageIndex > 0) {
+      doc.addPage();
+    }
+
+    doc.addImage(pageCanvas.toDataURL("image/png", 1), "PNG", 0, 0, PAGE_WIDTH, PAGE_HEIGHT, undefined, "FAST");
+    addCanvasLinksToPdf(doc, links, sourceY, sliceHeight, topPadding, canvasScale, mmPerPx);
+    sourceY += sliceHeight;
+    pageIndex += 1;
+  }
+};
+
+const isEmeraldColumnsPreview = (previewElement) =>
+  previewElement?.getAttribute?.("data-resume-template") === "enhancv-columns" ||
+  !!previewElement?.querySelector?.('[data-emerald-columns-body="true"]');
+
+const cloneEmeraldSectionWithItem = (section, item, labelSuffix = "") => {
+  const clone = section.cloneNode(true);
+  const heading = clone.querySelector("h3");
+  if (heading && labelSuffix) {
+    heading.textContent = `${heading.textContent.replace(/\s*\(CONT\.\)$/i, "")} ${labelSuffix}`;
+  }
+
+  const clonedItems = Array.from(clone.querySelectorAll("[data-emerald-item]"));
+  if (!clonedItems.length) {
+    return clone;
+  }
+
+  const targetParent = clonedItems[0].parentElement;
+  clonedItems.forEach((node) => node.remove());
+  targetParent?.appendChild(item.cloneNode(true));
+  return clone;
+};
+
+const splitEmeraldSectionIntoItemUnits = (section) => {
+  const items = Array.from(section.querySelectorAll("[data-emerald-item]"));
+  if (items.length <= 1) {
+    return [section.cloneNode(true)];
+  }
+
+  return items.map((item, index) => cloneEmeraldSectionWithItem(section, item, index ? "(CONT.)" : ""));
+};
+
+const prepareEmeraldColumnPage = (sourceRoot, pageIndex) => {
+  const page = sourceRoot.cloneNode(true);
+  page.style.width = `${A4_EXPORT_WIDTH_PX}px`;
+  page.style.minWidth = `${A4_EXPORT_WIDTH_PX}px`;
+  page.style.maxWidth = `${A4_EXPORT_WIDTH_PX}px`;
+  page.style.height = `${A4_EXPORT_HEIGHT_PX}px`;
+  page.style.minHeight = `${A4_EXPORT_HEIGHT_PX}px`;
+  page.style.maxHeight = `${A4_EXPORT_HEIGHT_PX}px`;
+  page.style.overflow = "hidden";
+  page.style.margin = "0";
+  page.style.border = "0";
+  page.style.borderRadius = "0";
+  page.style.boxShadow = "none";
+
+  const header = page.querySelector('[data-emerald-header="true"]');
+  const body = page.querySelector('[data-emerald-columns-body="true"]');
+  if (!body) {
+    return null;
+  }
+
+  if (pageIndex > 0 && header) {
+    header.remove();
+    body.style.marginTop = "0";
+  }
+
+  body.innerHTML = "";
+  body.style.display = "grid";
+  body.style.columnCount = "auto";
+  body.style.columnGap = "normal";
+  body.style.gridTemplateColumns = "1.04fr 1.42fr 1.12fr";
+  body.style.alignItems = "start";
+  body.style.gap = "20px";
+
+  const columns = Array.from({ length: 3 }, () => {
+    const column = document.createElement("div");
+    column.style.display = "flex";
+    column.style.flexDirection = "column";
+    column.style.gap = "16px";
+    column.style.minWidth = "0";
+    column.style.breakInside = "avoid";
+    column.style.pageBreakInside = "avoid";
+    body.appendChild(column);
+    return column;
+  });
+
+  return { page, body, columns, currentColumnIndex: 0 };
+};
+
+const getEmeraldColumnLimit = (page, body) => {
+  const pageRect = page.getBoundingClientRect();
+  const bodyRect = body.getBoundingClientRect();
+  return Math.max(240, pageRect.bottom - bodyRect.top - 32);
+};
+
+const prepareEmeraldUnit = (unit) => {
+  unit.style.marginBottom = "0";
+  unit.style.breakInside = "avoid";
+  unit.style.pageBreakInside = "avoid";
+  unit.querySelectorAll("[data-emerald-item], li, ul, p").forEach((element) => {
+    element.style.breakInside = "avoid";
+    element.style.pageBreakInside = "avoid";
+  });
+  return unit;
+};
+
+const appendEmeraldUnitToCurrentColumn = (pageState, unit) => {
+  const limit = getEmeraldColumnLimit(pageState.page, pageState.body);
+  const column = pageState.columns[pageState.currentColumnIndex];
+  prepareEmeraldUnit(unit);
+  column.appendChild(unit);
+
+  if (column.scrollHeight <= limit) {
+    return true;
+  }
+
+  unit.remove();
+  return false;
+};
+
+const appendEmeraldUnitInReadingFlow = (pageState, unit) => {
+  if (appendEmeraldUnitToCurrentColumn(pageState, unit)) {
+    return true;
+  }
+
+  while (pageState.currentColumnIndex < pageState.columns.length - 1) {
+    pageState.currentColumnIndex += 1;
+    if (appendEmeraldUnitToCurrentColumn(pageState, unit)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const buildEmeraldPaginatedPages = (exportElement) => {
+  const host = document.createElement("div");
+  host.style.width = `${A4_EXPORT_WIDTH_PX}px`;
+  host.style.minWidth = `${A4_EXPORT_WIDTH_PX}px`;
+  host.style.background = "#ffffff";
+  exportElement.replaceWith(host);
+
+  const sections = Array.from(exportElement.querySelectorAll("[data-emerald-section]"));
+  const pages = [];
+
+  const createPage = () => {
+    const pageState = prepareEmeraldColumnPage(exportElement, pages.length);
+    if (!pageState) {
+      return null;
+    }
+    pages.push(pageState);
+    host.appendChild(pageState.page);
+    return pageState;
+  };
+
+  let currentPage = createPage();
+  if (!currentPage) {
+    return { element: exportElement, pages: [exportElement], cleanup: () => {} };
+  }
+
+  const appendItemUnitsAcrossPages = (section) => {
+    splitEmeraldSectionIntoItemUnits(section).forEach((itemUnit) => {
+      const nextUnit = itemUnit.cloneNode(true);
+      if (appendEmeraldUnitInReadingFlow(currentPage, nextUnit)) {
+        return;
+      }
+
+      currentPage = createPage();
+      const retryUnit = itemUnit.cloneNode(true);
+      if (!appendEmeraldUnitInReadingFlow(currentPage, retryUnit)) {
+        prepareEmeraldUnit(retryUnit);
+        currentPage.columns[currentPage.currentColumnIndex].appendChild(retryUnit);
+      }
+    });
+  };
+
+  sections.forEach((section) => {
+    const wholeSection = section.cloneNode(true);
+    if (appendEmeraldUnitInReadingFlow(currentPage, wholeSection)) {
+      return;
+    }
+
+    currentPage = createPage();
+    const retryWholeSection = section.cloneNode(true);
+    if (appendEmeraldUnitInReadingFlow(currentPage, retryWholeSection)) {
+      return;
+    }
+
+    retryWholeSection.remove();
+    appendItemUnitsAcrossPages(section);
+  });
+
+  return {
+    element: host,
+    pages: pages.map((pageState) => pageState.page),
+    cleanup: () => {},
+  };
+};
+
+const exportEmeraldColumnsPreviewPdf = async (previewElement, fileName, options = {}) => {
+  const { element: exportElement, cleanup } = await createStableExportClone(previewElement, options);
+
+  try {
+    const { pages } = buildEmeraldPaginatedPages(exportElement);
+    await waitForPreviewAssets(pages[0] || exportElement);
+
+    const doc = new jsPDF({
+      compress: true,
+      format: "a4",
+      orientation: "portrait",
+      unit: "mm",
+    });
+
+    for (const [pageIndex, page] of pages.entries()) {
+      const rect = page.getBoundingClientRect();
+      const pageLinks = getExportElementLinks(page);
+      const canvas = await html2canvas(page, {
+        backgroundColor: "#ffffff",
+        height: A4_EXPORT_HEIGHT_PX,
+        imageTimeout: 15000,
+        logging: false,
+        removeContainer: true,
+        scale: PDF_CAPTURE_SCALE,
+        scrollX: 0,
+        scrollY: 0,
+        useCORS: true,
+        width: A4_EXPORT_WIDTH_PX,
+        windowHeight: Math.ceil(rect.height || A4_EXPORT_HEIGHT_PX),
+        windowWidth: A4_EXPORT_WIDTH_PX,
+      });
+
+      if (pageIndex > 0) {
+        doc.addPage();
+      }
+      doc.addImage(canvas.toDataURL("image/png", 1), "PNG", 0, 0, PAGE_WIDTH, PAGE_HEIGHT, undefined, "FAST");
+      pageLinks.forEach((link) => {
+        addPdfLink(doc, link, PAGE_WIDTH / (rect.width || A4_EXPORT_WIDTH_PX), PAGE_HEIGHT / A4_EXPORT_HEIGHT_PX);
+      });
+    }
+
+    doc.save(fileName);
+  } finally {
+    cleanup();
+  }
+};
+
+const exportPreviewElementPdf = async (previewElement, fileName, options = {}) => {
+  if (!previewElement || typeof window === "undefined" || typeof document === "undefined") {
+    throw new Error("Resume preview is not ready for PDF export.");
+  }
+
+  if (isEmeraldColumnsPreview(previewElement)) {
+    await exportEmeraldColumnsPreviewPdf(previewElement, fileName, options);
+    return;
+  }
+
+  const { element: exportElement, cleanup } = await createStableExportClone(previewElement, options);
+
+  try {
+    const rect = exportElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      throw new Error("Resume preview has no visible layout to export.");
+    }
+
+    const canvas = await html2canvas(exportElement, {
+      backgroundColor: "#ffffff",
+      height: Math.ceil(rect.height),
+      imageTimeout: 15000,
+      logging: false,
+      removeContainer: true,
+      scale: 3,
+      scrollX: 0,
+      scrollY: 0,
+      useCORS: true,
+      width: A4_EXPORT_WIDTH_PX,
+      windowHeight: Math.ceil(rect.height),
+      windowWidth: A4_EXPORT_WIDTH_PX,
+    });
+    const canvasScale = canvas.width / rect.width;
+    const breakpoints = getResumeSafeBreakpoints(exportElement, canvasScale);
+    const links = getExportElementLinks(exportElement);
+
+    const doc = new jsPDF({
+      compress: true,
+      format: "a4",
+      orientation: "portrait",
+      unit: "mm",
+    });
+
+    addCanvasToPdf(doc, canvas, breakpoints, links, canvasScale);
+    doc.save(fileName);
+  } finally {
+    cleanup();
+  }
+};
+
 export async function exportResumePdf(formData, options = {}) {
-  const doc = new jsPDF();
   const template = normalizeTemplateId(formData.template);
+  const fileName = getResumeFileName(formData, template, options.hardCopyMode ? "_hard-copy" : "");
+
+  if (options.previewElement) {
+    await exportPreviewElementPdf(options.previewElement, fileName, {
+      fullLinkText: Boolean(options.hardCopyMode),
+    });
+    return;
+  }
+
+  const doc = new jsPDF();
   const config = TEMPLATE_CONFIG[template] || TEMPLATE_CONFIG.contemporary;
 
   renderTemplatePdf(doc, formData, config);
   drawResumePhoto(doc, template, options.resumePhoto || null);
-  doc.save(getResumeFileName(formData, template));
+  doc.save(fileName);
 }
 
 export function exportOptimizedUploadPdf(
@@ -2088,9 +3117,8 @@ export function exportOptimizedUploadPdf(
   optimizedResumeData = null,
 ) {
   const safeName = (fileName || "optimized_resume").replace(/\.[^/.]+$/, "").replace(/\s+/g, "_");
-  const chosenTemplate = "compact";
   const doc = new jsPDF();
-  const optimizedResume = compactOptimizedResumeToSinglePage(sanitizeOptimizedResumeData(
+  const optimizedResume = sanitizeOptimizedResumeData(
     optimizedResumeData && typeof optimizedResumeData === "object"
       ? {
           ...optimizedResumeData,
@@ -2114,7 +3142,8 @@ export function exportOptimizedUploadPdf(
         }
       : parseOptimizedResumeText(optimizedResumeText, fileName, headline),
     fileName,
-  ));
+  );
+  const chosenTemplate = normalizeTemplateId(optimizedResume.template || "single-column");
   const config = TEMPLATE_CONFIG[chosenTemplate];
 
   renderTemplatePdf(doc, { ...optimizedResume, template: chosenTemplate }, config);

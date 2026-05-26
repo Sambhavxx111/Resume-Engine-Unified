@@ -1,21 +1,17 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import axiosInstance from "../api/axios";
 import { API } from "../api/services";
 import Loader from "../components/Loader";
 import { exportOptimizedUploadPdf } from "../utils/pdf";
-import { useAuth } from "../context/AuthContext";
 
 function ATSAnalysis() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { isAuthenticated } = useAuth();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [optimizedUpload, setOptimizedUpload] = useState(null);
+  const [jobDescription, setJobDescription] = useState("");
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -32,6 +28,9 @@ function ATSAnalysis() {
 
     const formData = new FormData();
     formData.append("resume", file);
+    if (jobDescription.trim()) {
+      formData.append("jobDescription", jobDescription.trim());
+    }
 
     try {
       const { data } = await axiosInstance.post(API.atsScoreFile, formData, {
@@ -57,22 +56,15 @@ function ATSAnalysis() {
       return;
     }
 
-    if (!isAuthenticated) {
-      navigate("/login", {
-        state: {
-          from: location,
-          authPrompt: "Please log in with your personal email to optimize and download your uploaded resume.",
-        },
-      });
-      return;
-    }
-
     setOptimizing(true);
     setError("");
     setOptimizedUpload(null);
 
     const formData = new FormData();
     formData.append("resume", file);
+    if (jobDescription.trim()) {
+      formData.append("jobDescription", jobDescription.trim());
+    }
 
     try {
       const { data } = await axiosInstance.post(API.atsOptimizeFile, formData, {
@@ -130,6 +122,16 @@ function ATSAnalysis() {
               />
             </label>
 
+            <label className="glass-card block p-5">
+              <span className="block text-sm font-medium text-slate-600">Target job description or role context</span>
+              <textarea
+                value={jobDescription}
+                onChange={(event) => setJobDescription(event.target.value)}
+                className="mt-4 min-h-[140px] w-full rounded-[18px] border border-white/70 bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/30"
+                placeholder="Optional, but recommended. Paste the JD here for a sharper RAG-based ATS score and optimized resume."
+              />
+            </label>
+
             {error ? (
               <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-[0_10px_24px_rgba(244,63,94,0.08)]">
                 {error}
@@ -178,6 +180,11 @@ function ATSAnalysis() {
                 <p className="mt-3 text-5xl font-bold text-slate-900">
                   {result.totalScore ?? result.score ?? "--"}
                 </p>
+                {result.source ? (
+                  <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">
+                    {result.source}
+                  </p>
+                ) : null}
               </div>
 
               <div className="glass-card p-6">

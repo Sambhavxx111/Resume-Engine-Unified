@@ -6,6 +6,7 @@ const {
   extractResumeKeywords,
   generateSummaryFallback,
   groundImportedResumeData,
+  normalizeSkillTextList,
   suggestSkillsFallback,
   optimizeResumeFallback,
   optimizeUploadedResumeTextFallback,
@@ -162,9 +163,13 @@ const PROMPTS = {
     Keep everything truthful to the source resume.
     Do NOT invent facts, achievements, dates, companies, institutions, or links.
     Do NOT use generic filename words such as "resume", "cv", or "final" as part of the person's name.
-    The skills array must contain only actual skills, tools, technologies, or concise competencies.
-    Never put college names, school names, cities, dates, grades, certifications, job titles, or full bullet sentences into the skills array.
+    The skills array must be category-based: [{ "category": "Technical Skills", "items": ["React", "Node.js"] }].
+    If the source resume already has skill categories such as Programming Languages, Tools, Databases, or Soft Skills, preserve those category names.
+    If the source resume has only a flat skills list, group the skills into truthful categories based only on the listed skills.
+    Skill items must contain only actual skills, tools, technologies, languages, or concise competencies.
+    Never put college names, school names, cities, dates, grades, certifications, job titles, or full bullet sentences into skill items.
     Put all project work in the top-level projects array. Do not duplicate projects inside customSections.
+    Treat internship, internships, training, and industrial training sections as experience. Do not duplicate them inside customSections.
     If something is missing, return an empty string or empty array instead.
     Convert bullet points into plain text strings joined naturally inside description fields.
     Use only these top-level keys and no markdown.
@@ -211,7 +216,12 @@ const PROMPTS = {
           "bullets": ["project detail 1", "project detail 2"]
         }
       ],
-      "skills": ["skill 1", "skill 2"],
+      "skills": [
+        {
+          "category": "category name",
+          "items": ["skill 1", "skill 2"]
+        }
+      ],
       "summary": "string",
       "customSections": [
         {
@@ -354,7 +364,11 @@ const mergeOptimizedUploadedResumeData = (optimizedResumeData = {}, originalResu
       '',
   },
   summary: optimizedResumeData.summary || originalResumeData.summary || '',
-  skills: mergeUniqueStrings(optimizedResumeData.skills || [], originalResumeData.skills || [], 24),
+  skills: mergeUniqueStrings(
+    normalizeSkillTextList(optimizedResumeData.skills),
+    normalizeSkillTextList(originalResumeData.skills),
+    24,
+  ),
   experience: mergeEntriesByIdentity(
     optimizedResumeData.experience || [],
     originalResumeData.experience || [],
@@ -438,7 +452,7 @@ const suggestSkills = async (resumeData, existingSkills = []) => {
       normalizedExistingSkills.length
         ? normalizedExistingSkills
         : [
-            ...(Array.isArray(normalizedResumeData.skills) ? normalizedResumeData.skills : []),
+            ...normalizeSkillTextList(normalizedResumeData.skills),
             ...extractResumeKeywords(normalizedResumeData, 8),
           ].slice(0, 8);
     const prompt = PROMPTS.SUGGEST_SKILLS(normalizedResumeData, resumeText, derivedExistingSkills);

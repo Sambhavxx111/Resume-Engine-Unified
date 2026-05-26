@@ -30,5 +30,6 @@ export const CAREER_API = {
   uploadResume: '/api/resume/upload',
   matchJobs: '/api/jobs/match',
   chat: '/api/chatbot/query',
+  chatRich: '/api/chatbot/query-rich',
   chatStructured: '/api/chatbot/query-structured',
 };

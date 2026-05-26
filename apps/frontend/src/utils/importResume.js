@@ -339,18 +339,47 @@ const isLowConfidenceEducationItem = (item = {}) => {
   );
 };
 
+const hasParsedEducationDate = (items = []) =>
+  items.some((item) => String(item.startDate || item.endDate || "").trim());
+
 const collectExplicitSkillLines = (lines = []) =>
   lines.filter((line) =>
-    /^(programming languages|data visualization|data analysis|data analysis & manipulation|machine learning|statistics|reporting & tools|reporting|technical skills|tools\s*&\s*technologies)\s*:/i.test(
-      String(line || "").replace(/\s+/g, " ").trim(),
-    ),
+    SKILL_CATEGORY_LINE_PATTERN.test(String(line || "").replace(/\s+/g, " ").trim()),
   );
+
+const SKILL_CATEGORY_LINE_PATTERN =
+  /^(programming languages?|languages?|frontend|front end|backend|back end|web technologies?|databases?|database technologies|data visualization|data analysis|data analysis & manipulation|machine learning|statistics|reporting & tools|reporting|technical skills|cyber secu?rity tools?|cyber secutrity tools?|security tools?|tools\s*&\s*technologies|tools|frameworks|libraries|soft skills|core skills|cloud|devops|cloud & devops)\s*:/i;
+
+const SKILL_CATEGORY_HEADING_PATTERN =
+  /^(programming languages?|languages?|frontend|front end|backend|back end|web technologies?|databases?|database technologies|data visualization|data analysis|data analysis & manipulation|machine learning|statistics|reporting & tools|reporting|technical skills|cyber secu?rity tools?|cyber secutrity tools?|security tools?|tools\s*&\s*technologies|tools|frameworks|libraries|soft skills|core skills|cloud|devops|cloud & devops)$/i;
+
+const SKILL_CATEGORY_RULES = [
+  { category: "Programming Languages", pattern: /^(c|c\+\+|c#|java|python|javascript|typescript|php|ruby|go|golang|kotlin|swift|scala|r|matlab)$/i },
+  { category: "Frontend", pattern: /^(html|css|react(?:\.js)?|redux|next(?:\.js)?|angular|vue|tailwind(?: css)?|bootstrap|sass|figma|ui\/ux|responsive design|web technologies)$/i },
+  { category: "Backend", pattern: /^(node(?:\.js)?|express(?:\.js)?|django|flask|fastapi|spring(?: boot)?|rest(?: api)?|api design|jwt|authentication)$/i },
+  { category: "Databases", pattern: /^(sql|mysql|postgres(?:ql)?|mongodb|dbms|oracle|firebase|redis|sqlite|database design)$/i },
+  { category: "Cloud & DevOps", pattern: /^(aws|azure|gcp|docker|kubernetes|linux|git|github|ci\/cd|jenkins|vercel|netlify)$/i },
+  { category: "Cyber Security Tools", pattern: /^(ftk imager|wireshark|threat hunting|thread hunting|burp suite|nmap|metasploit|kali linux|splunk|siem|vulnerability assessment)$/i },
+  { category: "Data & Analytics", pattern: /^(machine learning|data analysis|data visualization|pandas|numpy|power bi|tableau|excel|statistics|reporting|eda)$/i },
+  { category: "Core CS", pattern: /^(dsa|data structures|algorithms|oop|os|operating systems|computer networks|networking)$/i },
+  { category: "Soft Skills", pattern: /^(communication|leadership|teamwork|problem solving|quick learner|public speaking|documentation|collaboration|time management)$/i },
+];
+
+const normalizeSkillCategoryName = (value = "") =>
+  String(value || "Skills")
+    .replace(/^cyber secutrity tools?$/i, "Cyber Security Tools")
+    .replace(/^cyber secu?rity tools?$/i, "Cyber Security Tools")
+    .replace(/^web technologies?$/i, "Web Technologies")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (match) => match.toUpperCase());
 
 const isInstitutionLine = (line = "") =>
   /(university|college|school|academy|institute|vidyapeeth|polytechnic)/i.test(String(line || "").trim());
 
 const isDegreeLine = (line = "") =>
-  /(bachelor|master|b\.?\s?tech|m\.?\s?tech|bca|mca|bsc|msc|phd|secondary|certificate|diploma|cse|computer science|data science|engineering)/i.test(
+  /(10th|12th|xii?|cbse|icse|bachelor|master|b\.?\s?tech|m\.?\s?tech|bca|mca|bsc|msc|phd|secondary|certificate|diploma|cse|computer science|data science|engineering)/i.test(
     String(line || "").trim(),
   );
 
@@ -365,12 +394,12 @@ const isEducationScoreLine = (line = "") =>
   /\b\d{1,3}(?:\.\d+)?%\b/.test(String(line || "").trim());
 
 const isEducationDateLine = (line = "") =>
-  /\b(19|20)\d{2}\b|present|current|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(
+  /\b(19|20)\d{2}\b|present|current|till\s*date|till\s*now|ongoing|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(
     String(line || "").trim(),
   );
 
 const extractEducationScore = (line = "") => {
-  const cleaned = String(line || "").replace(/\s+/g, " ").trim();
+  const cleaned = normalizeEducationDateSource(line);
   if (!cleaned) return "";
 
   const labeled =
@@ -385,9 +414,32 @@ const extractEducationScore = (line = "") => {
   );
 };
 
+const EDUCATION_MONTH_PATTERN = "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*";
+const EDUCATION_DATE_TOKEN_PATTERN = `${EDUCATION_MONTH_PATTERN}\\s*,?\\s*\\d{2,4}|\\d{4}`;
+const EDUCATION_CURRENT_TOKEN_PATTERN = "(?:present|current|till\\s*date|till\\s*now|ongoing)";
+
+const normalizeEducationDateSource = (line = "") =>
+  String(line || "")
+    .replace(/\s+/g, " ")
+    .replace(/[–—]/g, "-")
+    .replace(/â€“|â€”|Ã¢â‚¬â€œ|Ã¢â‚¬â€/g, "-")
+    .replace(new RegExp(`(?<=[A-Za-z0-9/%])(?=${EDUCATION_MONTH_PATTERN}\\s*,?\\s*\\d{2,4}\\b)`, "gi"), " ")
+    .replace(/\btilldate\b/gi, "Till date")
+    .trim();
+
 const extractEducationDateRange = (line = "") => {
-  const cleaned = String(line || "").replace(/\s+/g, " ").trim();
+  const cleaned = normalizeEducationDateSource(line);
   if (!cleaned) return { startDate: "", endDate: "" };
+
+  const normalizedRangeMatch = cleaned.match(
+    new RegExp(`(${EDUCATION_DATE_TOKEN_PATTERN})\\s*(?:to|-|until|through)\\s*(${EDUCATION_CURRENT_TOKEN_PATTERN}|${EDUCATION_DATE_TOKEN_PATTERN})`, "i"),
+  );
+  if (normalizedRangeMatch) {
+    return {
+      startDate: normalizedRangeMatch[1].replace(/\s+/g, " ").trim(),
+      endDate: normalizedRangeMatch[2].replace(/\s+/g, " ").trim(),
+    };
+  }
 
   const match = cleaned.match(
     /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\d{4})\s*(?:to|-|â€“|â€”)\s*((?:present|current)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\d{4})/i,
@@ -420,8 +472,11 @@ const isEducationScoreOnlyLine = (line = "") => {
 };
 
 const extractEducationLocation = (line = "") => {
-  const cleaned = String(line || "")
+  const educationDateRangePattern = new RegExp(`(${EDUCATION_DATE_TOKEN_PATTERN})\\s*(?:to|-|until|through)\\s*(${EDUCATION_CURRENT_TOKEN_PATTERN}|${EDUCATION_DATE_TOKEN_PATTERN})`, "gi");
+  const cleaned = normalizeEducationDateSource(line)
     .replace(/\s+/g, " ")
+    .replace(educationDateRangePattern, "")
+    .replace(/\b(?:sgpa|cgpa|gpa|grade|percentage|marks|score)\s*[:\-]?\s*[A-Za-z0-9./%]+(?:\s*\/\s*[A-Za-z0-9.]+)?/gi, "")
     .replace(
       /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\b(?:19|20)\d{2}\b)\s*(?:to|-|â€“|â€”)\s*((?:present|current)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\b(?:19|20)\d{2}\b)/gi,
       "",
@@ -457,11 +512,13 @@ const extractEducationLocation = (line = "") => {
 };
 
 const stripEducationLineArtifacts = (line = "", { removeLocation = false } = {}) => {
-  let cleaned = String(line || "").replace(/\s+/g, " ").trim();
+  const educationDateRangePattern = new RegExp(`(${EDUCATION_DATE_TOKEN_PATTERN})\\s*(?:to|-|until|through)\\s*(${EDUCATION_CURRENT_TOKEN_PATTERN}|${EDUCATION_DATE_TOKEN_PATTERN})`, "gi");
+  let cleaned = normalizeEducationDateSource(line);
   if (!cleaned) return "";
 
   cleaned = cleaned
     .replace(/\b(?:sgpa|cgpa|gpa|grade|percentage|marks|score)\s*[:\-]?\s*[A-Za-z0-9./%]+(?:\s*\/\s*[A-Za-z0-9.]+)?/gi, "")
+    .replace(educationDateRangePattern, "")
     .replace(
       /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\b(?:19|20)\d{2}\b)\s*(?:to|-|â€“|â€”)\s*((?:present|current)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s,/-]*\d{2,4}|\b(?:19|20)\d{2}\b)/gi,
       "",
@@ -477,7 +534,7 @@ const stripEducationLineArtifacts = (line = "", { removeLocation = false } = {})
     }
   }
 
-  return cleaned.replace(/[,-]\s*$/, "").trim();
+  return cleaned.replace(/[|,-]\s*$/, "").trim();
 };
 
 const isLocationOnlyLine = (line = "") => {
@@ -517,6 +574,104 @@ const splitSkillTokens = (lines = []) =>
         .filter((skill) => isLikelySkillValue(skill)),
     ),
   ).slice(0, 24);
+
+const inferSkillCategory = (skill = "") =>
+  SKILL_CATEGORY_RULES.find((rule) => rule.pattern.test(String(skill || "").replace(/\s+/g, " ").trim()))?.category ||
+  "Technical Skills";
+
+const splitSkillTokensForCategories = (lines = []) =>
+  Array.from(
+    new Set(
+      (Array.isArray(lines) ? lines : []).flatMap((line) => {
+        const simpleSkillTokenPattern =
+          /^(c|c\+\+|c#|python|java|javascript|typescript|html|css|react|node(?:\.js)?|express(?:\.js)?|mysql|sql|mongodb|postgres(?:ql)?|dbms|dsa|os|oop|aws|docker|linux|git)$/i;
+
+        return String(line || "")
+          .split(/[,|/]|â€¢|\t+/)
+          .flatMap((part) => part.split(/\s{2,}/))
+          .flatMap((part) => part.split(/\.(?=\s+[A-Z])/))
+          .flatMap((skill) => {
+            const cleaned = skill
+              .replace(/^[-*â€¢]\s*/, "")
+              .replace(/\band\b/gi, "")
+              .replace(/[.;]+$/g, "")
+              .replace(/\s+/g, " ")
+              .trim();
+            const spaceTokens = cleaned.split(" ").filter(Boolean);
+
+            if (spaceTokens.length >= 2 && spaceTokens.every((token) => simpleSkillTokenPattern.test(token))) {
+              return spaceTokens;
+            }
+
+            return [cleaned];
+          })
+          .filter((skill) => isLikelySkillValue(skill));
+      }),
+    ),
+  ).slice(0, 24);
+
+const groupFlatSkillsByCategory = (skills = []) => {
+  const groups = [];
+  const indexByCategory = new Map();
+
+  (Array.isArray(skills) ? skills : []).forEach((skill) => {
+    const cleaned = String(skill || "").replace(/\s+/g, " ").trim();
+    if (!cleaned) return;
+    const category = inferSkillCategory(cleaned);
+    if (!indexByCategory.has(category)) {
+      indexByCategory.set(category, groups.length);
+      groups.push({ category, items: [] });
+    }
+    groups[indexByCategory.get(category)].items.push(cleaned);
+  });
+
+  return groups;
+};
+
+const extractSkillCategoriesFromLines = (lines = []) => {
+  const groups = [];
+  const seen = new Map();
+
+  const sourceLines = Array.isArray(lines) ? lines : [];
+
+  sourceLines.forEach((line, lineIndex) => {
+    const cleaned = String(line || "").replace(/^[-*]\s*/, "").replace(/\s+/g, " ").trim();
+    if (!cleaned) return;
+
+    const isColonCategory = cleaned.includes(":") && SKILL_CATEGORY_LINE_PATTERN.test(cleaned);
+    const isStandaloneCategory = !cleaned.includes(":") && SKILL_CATEGORY_HEADING_PATTERN.test(cleaned);
+    if (!isColonCategory && !isStandaloneCategory) return;
+
+    const [rawCategory, ...rawSkillParts] = isColonCategory ? cleaned.split(":") : [cleaned, sourceLines[lineIndex + 1] || ""];
+    const category = normalizeSkillCategoryName(rawCategory);
+    const items = splitSkillTokensForCategories([rawSkillParts.join(":")]);
+    if (!items.length) return;
+
+    const key = category.toLowerCase();
+    if (!seen.has(key)) {
+      seen.set(key, groups.length);
+      groups.push({ category, items: [] });
+    }
+
+    const group = groups[seen.get(key)];
+    items.forEach((item) => {
+      if (!group.items.some((existing) => existing.toLowerCase() === item.toLowerCase())) {
+        group.items.push(item);
+      }
+    });
+  });
+
+  return groups;
+};
+
+const buildSkillCategories = (skillLines = [], allLines = []) => {
+  const explicitGroups = extractSkillCategoriesFromLines([
+    ...(Array.isArray(skillLines) ? skillLines : []),
+    ...(Array.isArray(allLines) ? allLines : []),
+  ]);
+
+  return explicitGroups.length ? explicitGroups : groupFlatSkillsByCategory(splitSkillTokensForCategories(skillLines));
+};
 
 const inferSummary = (lines = [], title = "") => {
   const longLine = lines.find(
@@ -605,7 +760,10 @@ const buildEducationItems = (lines = []) => {
         !isEducationScoreOnlyLine(cleaned) &&
         currentHasAnchor &&
         (current.degreeLine || current.institutionLine)) ||
-        (isInstitutionLine(cleaned) && current.institutionLine));
+        (isInstitutionLine(cleaned) && current.institutionLine) ||
+        (current.rawLines.some((rawLine) => isEducationDateLine(rawLine)) &&
+          hasEducationAnchorLine(cleaned) &&
+          !isEducationScoreOnlyLine(cleaned)));
 
     if (startsNewEntry) {
       pushCurrent();
@@ -776,13 +934,14 @@ export function buildImportedResumeData(resumeText = "", originalName = "", temp
   const title = inferProfessionalTitle(introLines, summarySectionLines);
   const summaryLines = filterFilled(sectionMap.summary || []).filter((line) => line.length > 25);
   const explicitSkillLines = collectExplicitSkillLines(lines);
-  const skills = splitSkillTokens(explicitSkillLines.length ? explicitSkillLines : sectionMap.skills || []);
+  const skillSourceLines = explicitSkillLines.length ? explicitSkillLines : sectionMap.skills || [];
+  const skills = buildSkillCategories(skillSourceLines, explicitSkillLines.length ? [] : lines);
   const experience = buildExperienceItems(sectionMap.experience || []);
   const sectionEducation = buildEducationItems(sectionMap.education || []);
   const fallbackEducation = buildEducationItems(collectEducationLinesFromDocument(lines));
   const looseSignalEducation = buildEducationItemsFromLooseSignals(collectEducationLinesFromDocument(lines));
   const education = postProcessEducationItems(
-    sectionEducation.length && !sectionEducation.every((item) => isLowConfidenceEducationItem(item))
+    sectionEducation.length && (hasParsedEducationDate(sectionEducation) || !sectionEducation.every((item) => isLowConfidenceEducationItem(item)))
       ? sectionEducation
       : looseSignalEducation.length && !looseSignalEducation.every((item) => isLowConfidenceEducationItem(item))
         ? looseSignalEducation

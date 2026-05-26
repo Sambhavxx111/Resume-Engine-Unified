@@ -5,11 +5,12 @@ const {
   optimizeResume
 } = require('../services/gemini.service');
 const resumeModel = require('../models/resume.model');
+const { sanitizeResumePayload } = require('../utils/sanitizeResume');
 
 const generateSummaryController = async (req, res) => {
   try {
     const userId = req.user?.userId || null;
-    const { resumeData } = req.body;
+    const resumeData = sanitizeResumePayload(req.body.resumeData);
 
     // Validate input
     if (!resumeData || typeof resumeData !== 'object') {
@@ -33,7 +34,8 @@ const generateSummaryController = async (req, res) => {
 const suggestSkillsController = async (req, res) => {
   try {
     const userId = req.user?.userId || null;
-    const { existingSkills = [], resumeData } = req.body;
+    const existingSkills = sanitizeResumePayload(req.body.existingSkills || []);
+    const resumeData = sanitizeResumePayload(req.body.resumeData);
 
     // Validate input
     if (!resumeData || typeof resumeData !== 'object') {
@@ -61,9 +63,8 @@ const suggestSkillsController = async (req, res) => {
 const optimizeResumeController = async (req, res) => {
   try {
     const userId = req.user?.userId || null;
-    const { resumeData, jobDescription } = req.body;
-
-    console.log('Optimize request:', { resumeData, jobDescription });
+    const resumeData = sanitizeResumePayload(req.body.resumeData);
+    const jobDescription = sanitizeResumePayload(req.body.jobDescription || null);
 
     // Validate input
     if (!resumeData || typeof resumeData !== 'object') {
@@ -93,7 +94,7 @@ const optimizeResumeController = async (req, res) => {
 const diagnoseResumeController = async (req, res) => {
   try {
     const userId = req.user?.userId || null;
-    const { resumeData } = req.body;
+    const resumeData = sanitizeResumePayload(req.body.resumeData);
 
     // Validate input
     if (!resumeData || typeof resumeData !== 'object') {

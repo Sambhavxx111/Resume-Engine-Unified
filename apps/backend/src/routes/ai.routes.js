@@ -1,23 +1,14 @@
 const express = require('express');
-const rateLimit = require('express-rate-limit');
 const aiController = require('../controllers/ai.controller');
 const authMiddleware = require('../middleware/auth.middleware');
 const { validateBody } = require('../middleware/validate.middleware');
 const { resumeDataSchema, suggestSkillsSchema, optimizeSchema } = require('../validators/ai.validator');
+const { aiLimiter } = require('../middleware/rateLimit.middleware');
 
 const router = express.Router();
 
 // Allow guests to use AI tools while still attaching auth when available.
 router.use(authMiddleware.optionalAuthMiddleware);
-
-// Apply strict rate limiting to AI routes only
-const aiLimiter = rateLimit({
-	windowMs: 60 * 1000, // 1 minute
-	max: parseInt(process.env.AI_RATE_LIMIT_MAX || '10', 10),
-	standardHeaders: true,
-	legacyHeaders: false,
-	message: { error: 'Too many requests to AI endpoints. Please try again later.' }
-});
 
 router.use(aiLimiter);
 

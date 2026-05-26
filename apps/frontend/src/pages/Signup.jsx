@@ -21,7 +21,14 @@ function Signup() {
     setInfo("");
 
     try {
-      await signup(formState);
+      const data = await signup(formState);
+      if (data.authenticated === false) {
+        navigate("/login", {
+          replace: true,
+          state: { email: formState.email, authPrompt: data.message },
+        });
+        return;
+      }
       navigate("/dashboard", { replace: true });
     } catch (requestError) {
       if (!requestError.response) {
@@ -62,7 +69,7 @@ function Signup() {
         <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
           <input className="field" type="text" name="name" placeholder="Full name" value={formState.name} onChange={handleChange} required />
           <input className="field" type="email" name="email" placeholder="Email address" value={formState.email} onChange={handleChange} required />
-          <input className="field" type="password" name="password" placeholder="Password" minLength={6} value={formState.password} onChange={handleChange} required />
+          <input className="field" type="password" name="password" placeholder="Password" minLength={10} value={formState.password} onChange={handleChange} required />
 
           {error ? (
             <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-[0_10px_24px_rgba(244,63,94,0.08)]">

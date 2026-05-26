@@ -1,6 +1,8 @@
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/user.model');
+const { logSecurityEvent, logApiError } = require('../utils/securityLogger');
 
 const getJwtSecret = () => {
   if (!process.env.JWT_SECRET) {
@@ -33,7 +35,33 @@ const sanitizeUser = (user) => {
     id: user.id,
     name: user.name,
     email: user.email,
+    emailVerified: Boolean(user.email_verified_at),
   };
+};
+
+const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+const createSecureToken = () => {
+  const token = crypto.randomBytes(32).toString('hex');
+  return { token, tokenHash: hashToken(token) };
+};
+
+const getDateAfterMinutes = (minutes) => new Date(Date.now() + minutes * 60 * 1000);
+
+const getJwtExpiry = () => process.env.JWT_EXPIRY || '2h';
+
+const isEmailVerificationRequired = () => process.env.REQUIRE_EMAIL_VERIFICATION !== 'false';
+
+const emitAccountEmail = (type, email, token) => {
+  const publicBaseUrl = (process.env.PUBLIC_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+  const route = type === 'verify' ? '/verify-email' : '/reset-password';
+  const url = `${publicBaseUrl}${route}?token=${token}`;
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`${type === 'verify' ? 'Email verification' : 'Password reset'} link for local development: ${url}`);
+  }
+
+  return url;
 };
 
 const attachAuthCookie = (res, token) => {
@@ -86,32 +114,40 @@ const signup = async (req, res) => {
     }
 
     // Hash password using configurable salt rounds
-    const saltRounds = parseInt(process.env.SALT_ROUNDS || '10', 10);
+    const saltRounds = parseInt(process.env.SALT_ROUNDS || '12', 10);
     const passwordHash = await bcrypt.hash(password, saltRounds);
+    const { token, tokenHash } = createSecureToken();
+    const verificationExpiresAt = getDateAfterMinutes(parseInt(process.env.EMAIL_VERIFY_EXPIRY_MINUTES || '1440', 10));
 
     // Create user
-    const result = await userModel.createUser(name, email, passwordHash);
+    const result = await userModel.createUser(name, email, passwordHash, tokenHash, verificationExpiresAt);
+    emitAccountEmail('verify', email, token);
+    logSecurityEvent('signup_created', req, { userId: result.insertId });
 
-    // Generate JWT token for auto-login after signup
-    const token = jwt.sign(
-      { userId: result.insertId },
-      getJwtSecret(),
-      { expiresIn: process.env.JWT_EXPIRY || '7d' }
-    );
-    attachAuthCookie(res, token);
+    if (!isEmailVerificationRequired()) {
+      const authToken = jwt.sign(
+        { userId: result.insertId },
+        getJwtSecret(),
+        { expiresIn: getJwtExpiry() }
+      );
+      attachAuthCookie(res, authToken);
+    }
 
     return res.status(201).json({
-      message: 'User registered successfully',
-      token,
+      message: isEmailVerificationRequired()
+        ? 'User registered successfully. Please verify your email before signing in.'
+        : 'User registered successfully',
       userId: result.insertId,
       user: {
         id: result.insertId,
         name,
         email,
-      }
+        emailVerified: false,
+      },
+      authenticated: !isEmailVerificationRequired(),
     });
   } catch (error) {
-    console.error('Signup error:', error.message);
+    logApiError('signup_failed', req, error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -128,31 +164,110 @@ const login = async (req, res) => {
     // Find user by email
     const user = await userModel.findUserByEmail(email);
     if (!user) {
+      logSecurityEvent('login_failed_unknown_email', req, { email });
       return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    if (user.locked_until && new Date(user.locked_until).getTime() > Date.now()) {
+      logSecurityEvent('login_blocked_locked_account', req, { userId: user.id });
+      return res.status(423).json({ error: 'Account is temporarily locked. Please try again later.' });
     }
 
     // Compare passwords
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {
+      await userModel.recordFailedLogin(
+        user.id,
+        parseInt(process.env.LOGIN_LOCK_MAX_ATTEMPTS || '5', 10),
+        parseInt(process.env.LOGIN_LOCK_MINUTES || '15', 10),
+      );
+      logSecurityEvent('login_failed_bad_password', req, { userId: user.id });
       return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    if (isEmailVerificationRequired() && !user.email_verified_at) {
+      logSecurityEvent('login_blocked_unverified_email', req, { userId: user.id });
+      return res.status(403).json({ error: 'Please verify your email before signing in.' });
     }
 
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id },
       getJwtSecret(),
-      { expiresIn: process.env.JWT_EXPIRY || '7d' }
+      { expiresIn: getJwtExpiry() }
     );
     attachAuthCookie(res, token);
+    await userModel.recordSuccessfulLogin(user.id);
+    logSecurityEvent('login_success', req, { userId: user.id });
 
     return res.status(200).json({
       message: 'Login successful',
-      token,
       user: sanitizeUser(user),
       userId: user.id,
+      authenticated: true,
     });
   } catch (error) {
-    console.error('Login error:', error.message);
+    logApiError('login_failed', req, error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const verifyEmail = async (req, res) => {
+  try {
+    const result = await userModel.markEmailVerified(hashToken(req.body.token));
+    if (!result.affectedRows) {
+      logSecurityEvent('email_verify_failed', req);
+      return res.status(400).json({ error: 'Verification link is invalid or expired.' });
+    }
+
+    logSecurityEvent('email_verified', req);
+    return res.status(200).json({ message: 'Email verified successfully. You can now sign in.' });
+  } catch (error) {
+    logApiError('email_verify_error', req, error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await userModel.findUserByEmail(email);
+
+    if (user) {
+      const { token, tokenHash } = createSecureToken();
+      const expiresAt = getDateAfterMinutes(parseInt(process.env.PASSWORD_RESET_EXPIRY_MINUTES || '30', 10));
+      await userModel.storePasswordResetToken(email, tokenHash, expiresAt);
+      emitAccountEmail('reset', email, token);
+      logSecurityEvent('password_reset_requested', req, { userId: user.id });
+    } else {
+      logSecurityEvent('password_reset_requested_unknown_email', req, { email });
+    }
+
+    return res.status(200).json({
+      message: 'If this email exists, a password reset link has been sent.',
+    });
+  } catch (error) {
+    logApiError('password_reset_request_failed', req, error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const saltRounds = parseInt(process.env.SALT_ROUNDS || '12', 10);
+    const passwordHash = await bcrypt.hash(req.body.password, saltRounds);
+    const result = await userModel.resetPasswordByToken(hashToken(req.body.token), passwordHash);
+
+    if (!result.affectedRows) {
+      logSecurityEvent('password_reset_failed', req);
+      return res.status(400).json({ error: 'Password reset link is invalid or expired.' });
+    }
+
+    clearAuthCookie(res);
+    logSecurityEvent('password_reset_success', req);
+    return res.status(200).json({ message: 'Password reset successfully. Please sign in again.' });
+  } catch (error) {
+    logApiError('password_reset_failed', req, error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -183,6 +298,9 @@ const logout = async (req, res) => {
 module.exports = {
   signup,
   login,
+  verifyEmail,
+  forgotPassword,
+  resetPassword,
   me,
   logout,
 };

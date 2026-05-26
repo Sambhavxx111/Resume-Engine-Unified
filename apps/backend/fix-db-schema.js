@@ -1,12 +1,13 @@
 const mysql = require('mysql2/promise');
+require('dotenv').config();
 
 const fixDatabase = async () => {
   try {
     const connection = await mysql.createConnection({
-      host: 'localhost',
-      user: 'root',
-      password: 'Deepika11@',
-      port: 3306,
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      port: process.env.DB_PORT || 3306,
     });
     console.log('✓ Connected to MySQL server');
     
@@ -30,6 +31,14 @@ const fixDatabase = async () => {
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
+        email_verified_at DATETIME NULL,
+        email_verification_token_hash VARCHAR(255) NULL,
+        email_verification_expires_at DATETIME NULL,
+        password_reset_token_hash VARCHAR(255) NULL,
+        password_reset_expires_at DATETIME NULL,
+        failed_login_attempts INT NOT NULL DEFAULT 0,
+        locked_until DATETIME NULL,
+        last_login_at DATETIME NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
