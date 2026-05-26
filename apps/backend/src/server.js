@@ -2,12 +2,15 @@ require('dotenv').config();
 const app = require('./App');
 const pool = require('./config/db');
 const userModel = require('./models/user.model');
+const { ensureDatabaseSchema } = require('./services/schema.service');
 
 const PORT = process.env.PORT || 3000;
 let server;
 
 const startServer = async () => {
   try {
+    await ensureDatabaseSchema();
+    console.log('Database schema verified');
     await userModel.ensureAuthSchema();
     console.log('Auth schema verified');
   } catch (error) {
