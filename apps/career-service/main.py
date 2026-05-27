@@ -1,9 +1,12 @@
 ﻿import os
+import time
+from collections import defaultdict, deque
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 
@@ -68,6 +71,44 @@ app.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+_rate_limit_buckets = defaultdict(deque)
+
+
+@app.middleware('http')
+async def security_headers_and_rate_limit(request: Request, call_next):
+    client_host = request.client.host if request.client else 'unknown'
+    route_key = '/'.join(request.url.path.split('/')[1:3]) or 'root'
+    limit = int(os.getenv('CAREER_SERVICE_RATE_LIMIT_MAX', '120'))
+    window_seconds = int(os.getenv('CAREER_SERVICE_RATE_LIMIT_WINDOW_SECONDS', '900'))
+
+    if request.url.path.startswith('/api/chatbot'):
+        limit = int(os.getenv('CAREER_SERVICE_AI_RATE_LIMIT_MAX', '30'))
+    elif request.url.path.startswith('/api/resume'):
+        limit = int(os.getenv('CAREER_SERVICE_UPLOAD_RATE_LIMIT_MAX', '20'))
+
+    now = time.time()
+    bucket_key = f'{client_host}:{route_key}'
+    bucket = _rate_limit_buckets[bucket_key]
+    while bucket and bucket[0] <= now - window_seconds:
+        bucket.popleft()
+
+    if len(bucket) >= limit:
+        return JSONResponse(
+            status_code=429,
+            content={'detail': 'Too many requests. Please slow down and try again later.'},
+        )
+
+    bucket.append(now)
+    response = await call_next(request)
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Content-Security-Policy'] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    if os.getenv('NODE_ENV') == 'production' or os.getenv('ENVIRONMENT') == 'production':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
 
 app.include_router(resume.router, prefix='/api/resume', tags=['Resume'])
 app.include_router(jobs.router, prefix='/api/jobs', tags=['Jobs'])

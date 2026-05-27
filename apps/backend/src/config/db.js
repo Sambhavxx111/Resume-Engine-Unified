@@ -33,9 +33,11 @@ const testConnection = async () => {
   } catch (error) {
     console.error('✗ Database connection failed');
     console.error('Error Code:', error.code);
-    console.error('Error Message:', error.message);
-    console.error('SQL Error:', error.sqlMessage);
-    console.error('SQL State:', error.sqlState);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Error Message:', error.message);
+      console.error('SQL Error:', error.sqlMessage);
+      console.error('SQL State:', error.sqlState);
+    }
     process.exit(1);
   }
 };

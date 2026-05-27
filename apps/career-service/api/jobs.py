@@ -13,8 +13,8 @@ def get_job_matcher() -> JobMatcher:
 
 
 class ResumeSkillsInput(BaseModel):
-    skills: List[str] = Field(..., min_items=1)
-    location: str = Field(default='')
+    skills: List[str] = Field(..., min_items=1, max_items=100)
+    location: str = Field(default='', max_length=120)
     limit: int = Field(default=10, ge=1, le=50)
 
 
@@ -66,6 +66,8 @@ async def match_jobs(
 ):
     if not resume_input.skills:
         raise HTTPException(status_code=400, detail='Skills list cannot be empty')
+    if any(not isinstance(skill, str) or len(skill.strip()) > 120 for skill in resume_input.skills):
+        raise HTTPException(status_code=400, detail='Skills must be text values no longer than 120 characters.')
 
     try:
         ranked_jobs = await job_matcher.find_best_matches(

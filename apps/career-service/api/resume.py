@@ -4,6 +4,62 @@ from typing import List
 
 from services.resume_service import ResumeService
 
+MAX_RESUME_UPLOAD_BYTES = 5 * 1024 * 1024
+DANGEROUS_INNER_EXTENSIONS = {
+    ".ade",
+    ".adp",
+    ".apk",
+    ".app",
+    ".bat",
+    ".bin",
+    ".cmd",
+    ".com",
+    ".cpl",
+    ".dll",
+    ".dmg",
+    ".exe",
+    ".hta",
+    ".jar",
+    ".js",
+    ".jse",
+    ".lnk",
+    ".msi",
+    ".ps1",
+    ".scr",
+    ".sh",
+    ".vbe",
+    ".vbs",
+    ".wsf",
+}
+
+
+def has_dangerous_double_extension(filename: str) -> bool:
+    parts = filename.lower().split("/")[-1].split("\\")[-1].split(".")
+    if len(parts) <= 2:
+        return False
+    return any(f".{part}" in DANGEROUS_INNER_EXTENSIONS for part in parts[1:-1])
+
+
+def content_matches_extension(filename: str, content_type: str, content: bytes) -> bool:
+    lower_name = filename.lower()
+    if not content or len(content) > MAX_RESUME_UPLOAD_BYTES:
+        return False
+
+    if lower_name.endswith(".pdf") and content_type in {"application/pdf", "application/x-pdf"}:
+        return content.startswith(b"%PDF")
+
+    if lower_name.endswith(".docx") and content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        return content.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"))
+
+    if lower_name.endswith(".txt") and content_type == "text/plain":
+        sample = content[:4096]
+        if b"\x00" in sample:
+            return False
+        suspicious = sum(1 for byte in sample if byte < 9 or 13 < byte < 32)
+        return suspicious / max(len(sample), 1) < 0.02
+
+    return False
+
 
 # Response Models
 class ResumeUploadResponse(BaseModel):
@@ -79,13 +135,24 @@ async def upload_resume(file: UploadFile = File(...)) -> ResumeUploadResponse:
         )
     
     try:
-        # Read file
         content = await file.read()
         
         if not content:
             raise HTTPException(
                 status_code=400,
                 detail="Uploaded file is empty.",
+            )
+
+        if len(content) > MAX_RESUME_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail="Uploaded file is too large.",
+            )
+
+        if has_dangerous_double_extension(file.filename) or not content_matches_extension(file.filename, file.content_type, content):
+            raise HTTPException(
+                status_code=400,
+                detail="Uploaded file content does not match the declared resume type.",
             )
         
         # Extract text based on file type

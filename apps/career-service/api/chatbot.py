@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 class ChatQuery(BaseModel):
     message: str = Field(..., min_length=1, max_length=500)
-    context: Optional[str] = Field(default="")
-    skills: List[str] = Field(default=[])
-    matched_jobs: List[Dict[str, Any]] = Field(default=[])
+    context: Optional[str] = Field(default="", max_length=4000)
+    skills: List[str] = Field(default=[], max_length=100)
+    matched_jobs: List[Dict[str, Any]] = Field(default=[], max_length=10)
 
 
 class ChatResponse(BaseModel):

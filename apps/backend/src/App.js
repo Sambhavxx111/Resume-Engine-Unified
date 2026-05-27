@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { generalApiLimiter } = require('./middleware/rateLimit.middleware');
+const csrfProtection = require('./middleware/csrf.middleware');
 const { logApiError, logSecurityEvent } = require('./utils/securityLogger');
 
 // Import route files
@@ -73,6 +74,7 @@ app.use((error, req, res, next) => {
 
   return next(error);
 });
+app.use(csrfProtection);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

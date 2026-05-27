@@ -1,6 +1,7 @@
 const resumeModel = require('../models/resume.model');
 const { sanitizeResumePayload } = require('../utils/sanitizeResume');
 const { parseResumeForBuilder } = require('../services/gemini.service');
+const { withOptionalDetails } = require('../utils/safeError');
 const { PDFParse } = require('pdf-parse');
 const mammoth = require('mammoth');
 
@@ -148,10 +149,9 @@ const importResumeFromFile = async (req, res) => {
     });
   } catch (error) {
     console.error('Import resume from file error:', error.message);
-    return res.status(500).json({
+    return res.status(500).json(withOptionalDetails({
       error: 'Unable to parse the uploaded resume right now.',
-      details: error.message,
-    });
+    }, error));
   }
 };
 

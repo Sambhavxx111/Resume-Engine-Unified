@@ -4,7 +4,26 @@ target role alignment, relevant skills, measurable achievements, project or expe
 education, readable section headings, action verbs, keyword coverage, and ATS-friendly formatting.
 `;
 
-const RAG_BASE_URL = String(process.env.RAG_SERVICE_URL || 'http://127.0.0.1:8010/api/v1').replace(/\/+$/, '');
+const isPrivateHostname = (hostname = '') =>
+  /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[0-1])\.|::1$)/i.test(hostname);
+
+const resolveRagBaseUrl = () => {
+  const baseUrl = String(process.env.RAG_SERVICE_URL || 'http://127.0.0.1:8010/api/v1').replace(/\/+$/, '');
+  const parsed = new URL(baseUrl);
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (isProduction && parsed.protocol !== 'https:') {
+    throw new Error('RAG_SERVICE_URL must use HTTPS in production.');
+  }
+
+  if (isProduction && isPrivateHostname(parsed.hostname)) {
+    throw new Error('RAG_SERVICE_URL cannot point to a private host in production.');
+  }
+
+  return baseUrl;
+};
+
+const getRagBaseUrl = () => resolveRagBaseUrl();
 
 const buildPayload = ({ resumeText, parsedResume, jobDescription, role, indexResume = false }) => ({
   resume_text: resumeText || undefined,
@@ -23,7 +42,7 @@ const postToRag = async (path, payload) => {
   const timeout = setTimeout(() => controller.abort(), Number(process.env.RAG_SERVICE_TIMEOUT_MS || 25000));
 
   try {
-    const response = await fetch(`${RAG_BASE_URL}${path}`, {
+    const response = await fetch(`${getRagBaseUrl()}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

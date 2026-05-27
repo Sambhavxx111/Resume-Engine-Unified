@@ -4,13 +4,13 @@ const authMiddleware = require('../middleware/auth.middleware');
 const { validateBody } = require('../middleware/validate.middleware');
 const { resumeSchema } = require('../validators/resume.validator');
 const { uploadLimiter, aiLimiter } = require('../middleware/rateLimit.middleware');
-const { createResumeUpload, handleUploadErrors } = require('../middleware/upload.middleware');
+const { createResumeUpload, handleUploadErrors, validateResumeUploadContent } = require('../middleware/upload.middleware');
 
 const router = express.Router();
 const uploadFile = createResumeUpload('file');
 
 // POST /resume/import-file - Parse uploaded resume into builder structure
-router.post('/import-file', uploadLimiter, aiLimiter, uploadFile, handleUploadErrors, resumeController.importResumeFromFile);
+router.post('/import-file', uploadLimiter, aiLimiter, uploadFile, handleUploadErrors, validateResumeUploadContent, resumeController.importResumeFromFile);
 
 // Protect saved-resume routes with auth middleware
 router.use(authMiddleware);

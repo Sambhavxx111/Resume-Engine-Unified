@@ -10,6 +10,7 @@ const {
   optimizeResumeWithRag,
 } = require('../services/rag.service');
 const { normalizeSkillTextList, buildResumeTextFromData } = require('../utils/resumeHeuristics');
+const { withOptionalDetails } = require('../utils/safeError');
 const { PDFParse } = require('pdf-parse');
 const mammoth = require('mammoth');
 
@@ -22,23 +23,20 @@ const sendGeminiAwareError = (res, error, fallbackMessage) => {
     /GEMINI_API_KEY is missing|api key/i.test(message);
 
   if (isQuotaOrRateLimit) {
-    return res.status(429).json({
+    return res.status(429).json(withOptionalDetails({
       error: 'Gemini quota or rate limit reached. Please wait and try again, or update your Gemini plan/key.',
-      details: message,
-    });
+    }, error));
   }
 
   if (isGeminiConfigError) {
-    return res.status(503).json({
+    return res.status(503).json(withOptionalDetails({
       error: 'Gemini is not configured correctly on the server. Please add a valid Gemini API key and try again.',
-      details: message,
-    });
+    }, error));
   }
 
-  return res.status(500).json({
+  return res.status(500).json(withOptionalDetails({
     error: fallbackMessage,
-    details: message,
-  });
+  }, error));
 };
 
 const sanitizeExtractedResumeText = (text = '', originalName = '') => {

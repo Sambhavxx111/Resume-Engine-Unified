@@ -6,6 +6,7 @@ const {
 } = require('../services/gemini.service');
 const resumeModel = require('../models/resume.model');
 const { sanitizeResumePayload } = require('../utils/sanitizeResume');
+const { withOptionalDetails } = require('../utils/safeError');
 
 const generateSummaryController = async (req, res) => {
   try {
@@ -83,11 +84,9 @@ const optimizeResumeController = async (req, res) => {
     });
   } catch (error) {
     console.error('Optimize resume error:', error);
-    console.error('Error stack:', error.stack);
-    return res.status(500).json({ 
+    return res.status(500).json(withOptionalDetails({
       error: 'Error optimizing resume',
-      details: error.message
-    });
+    }, error));
   }
 };
 
