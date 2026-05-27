@@ -52,6 +52,16 @@ const getDateAfterMinutes = (minutes) => new Date(Date.now() + minutes * 60 * 10
 const getJwtExpiry = () => process.env.JWT_EXPIRY || '2h';
 
 const isEmailVerificationRequired = () => process.env.REQUIRE_EMAIL_VERIFICATION !== 'false';
+const getEmailVerificationExpiryMinutes = () =>
+  parseInt(process.env.EMAIL_VERIFY_EXPIRY_MINUTES || '1440', 10);
+
+const refreshVerificationEmail = async ({ userId, email, req }) => {
+  const { token, tokenHash } = createSecureToken();
+  const verificationExpiresAt = getDateAfterMinutes(getEmailVerificationExpiryMinutes());
+  await userModel.storeEmailVerificationToken(email, tokenHash, verificationExpiresAt);
+  await sendAccountEmail({ type: 'verify', email, token, req });
+  logSecurityEvent('verification_email_resent', req, { userId });
+};
 
 const attachAuthCookie = (res, token) => {
   const options = buildAuthCookieOptions();
@@ -99,6 +109,12 @@ const signup = async (req, res) => {
     // Check if user already exists
     const existingUser = await userModel.findUserByEmail(email);
     if (existingUser) {
+      if (isEmailVerificationRequired() && !existingUser.email_verified_at) {
+        await refreshVerificationEmail({ userId: existingUser.id, email, req });
+        return res.status(409).json({
+          error: 'Email already registered but not verified. We sent a fresh verification email.',
+        });
+      }
       return res.status(409).json({ error: 'Email already registered' });
     }
 
@@ -106,7 +122,7 @@ const signup = async (req, res) => {
     const saltRounds = parseInt(process.env.SALT_ROUNDS || '12', 10);
     const passwordHash = await bcrypt.hash(password, saltRounds);
     const { token, tokenHash } = createSecureToken();
-    const verificationExpiresAt = getDateAfterMinutes(parseInt(process.env.EMAIL_VERIFY_EXPIRY_MINUTES || '1440', 10));
+    const verificationExpiresAt = getDateAfterMinutes(getEmailVerificationExpiryMinutes());
 
     // Create user
     const result = await userModel.createUser(name, email, passwordHash, tokenHash, verificationExpiresAt);
@@ -175,8 +191,9 @@ const login = async (req, res) => {
     }
 
     if (isEmailVerificationRequired() && !user.email_verified_at) {
+      await refreshVerificationEmail({ userId: user.id, email: user.email, req });
       logSecurityEvent('login_blocked_unverified_email', req, { userId: user.id });
-      return res.status(403).json({ error: 'Please verify your email before signing in.' });
+      return res.status(403).json({ error: 'Please verify your email before signing in. We sent a fresh verification email.' });
     }
 
     // Generate JWT token

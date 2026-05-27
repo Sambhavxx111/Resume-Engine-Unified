@@ -84,6 +84,21 @@ const markEmailVerified = async (tokenHash) => {
   }
 };
 
+const storeEmailVerificationToken = async (email, tokenHash, expiresAt) => {
+  try {
+    const query = `
+      UPDATE users
+      SET email_verification_token_hash = ?, email_verification_expires_at = ?
+      WHERE email = ?
+        AND email_verified_at IS NULL
+    `;
+    const [result] = await pool.execute(query, [tokenHash, expiresAt, email]);
+    return result;
+  } catch (error) {
+    throw new Error(`Error storing email verification token: ${error.message}`);
+  }
+};
+
 const storePasswordResetToken = async (email, tokenHash, expiresAt) => {
   try {
     const query = `
@@ -155,6 +170,7 @@ module.exports = {
   findUserByEmail,
   findUserById,
   markEmailVerified,
+  storeEmailVerificationToken,
   storePasswordResetToken,
   resetPasswordByToken,
   recordFailedLogin,
