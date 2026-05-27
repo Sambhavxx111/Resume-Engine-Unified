@@ -9,8 +9,10 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const JDMatcher = lazy(() => import('./pages/JDMatcher'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Login = lazy(() => import('./pages/Login'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const ResumeBuilder = lazy(() => import('./pages/ResumeBuilder'));
 const Signup = lazy(() => import('./pages/Signup'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 
 function App() {
   const location = useLocation();
@@ -20,7 +22,12 @@ function App() {
     if (location.pathname === "/jd-match") return "tone-jd";
     if (location.pathname === "/career-guidance") return "tone-career";
     if (location.pathname === "/dashboard") return "tone-dashboard";
-    if (location.pathname === "/login" || location.pathname === "/signup") return "tone-auth";
+    if (
+      location.pathname === "/login" ||
+      location.pathname === "/signup" ||
+      location.pathname === "/verify-email" ||
+      location.pathname === "/reset-password"
+    ) return "tone-auth";
     return "tone-landing";
   })();
 
@@ -44,6 +51,8 @@ function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/resume" element={<ResumeBuilder />} />
             <Route path="/ats" element={<ATSAnalysis />} />

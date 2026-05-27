@@ -1,6 +1,8 @@
 export const API = {
   login: "/api/auth/login",
   signup: "/api/auth/signup",
+  verifyEmail: "/api/auth/verify-email",
+  resetPassword: "/api/auth/reset-password",
   me: "/api/auth/me",
   logout: "/api/auth/logout",
   getResume: "/api/resume",

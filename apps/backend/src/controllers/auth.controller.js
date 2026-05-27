@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/user.model');
 const { logSecurityEvent, logApiError } = require('../utils/securityLogger');
+const { sendAccountEmail } = require('../services/email.service');
 
 const getJwtSecret = () => {
   if (!process.env.JWT_SECRET) {
@@ -51,18 +52,6 @@ const getDateAfterMinutes = (minutes) => new Date(Date.now() + minutes * 60 * 10
 const getJwtExpiry = () => process.env.JWT_EXPIRY || '2h';
 
 const isEmailVerificationRequired = () => process.env.REQUIRE_EMAIL_VERIFICATION !== 'false';
-
-const emitAccountEmail = (type, email, token) => {
-  const publicBaseUrl = (process.env.PUBLIC_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-  const route = type === 'verify' ? '/verify-email' : '/reset-password';
-  const url = `${publicBaseUrl}${route}?token=${token}`;
-
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`${type === 'verify' ? 'Email verification' : 'Password reset'} link for local development: ${url}`);
-  }
-
-  return url;
-};
 
 const attachAuthCookie = (res, token) => {
   const options = buildAuthCookieOptions();
@@ -121,7 +110,7 @@ const signup = async (req, res) => {
 
     // Create user
     const result = await userModel.createUser(name, email, passwordHash, tokenHash, verificationExpiresAt);
-    emitAccountEmail('verify', email, token);
+    await sendAccountEmail({ type: 'verify', email, token, req });
     logSecurityEvent('signup_created', req, { userId: result.insertId });
 
     if (!isEmailVerificationRequired()) {
@@ -237,7 +226,7 @@ const forgotPassword = async (req, res) => {
       const { token, tokenHash } = createSecureToken();
       const expiresAt = getDateAfterMinutes(parseInt(process.env.PASSWORD_RESET_EXPIRY_MINUTES || '30', 10));
       await userModel.storePasswordResetToken(email, tokenHash, expiresAt);
-      emitAccountEmail('reset', email, token);
+      await sendAccountEmail({ type: 'reset', email, token, req });
       logSecurityEvent('password_reset_requested', req, { userId: user.id });
     } else {
       logSecurityEvent('password_reset_requested_unknown_email', req, { email });
