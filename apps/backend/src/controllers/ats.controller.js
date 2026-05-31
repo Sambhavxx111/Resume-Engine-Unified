@@ -834,8 +834,17 @@ const matchWithJD = async (req, res) => {
         text = await extractUploadedText(req.file);
       } catch (extractError) {
         console.error('Uploaded resume extraction warning:', extractError.message);
-        text = req.file.originalname || 'uploaded resume';
+        return res.status(400).json({
+          error: 'Unable to extract readable resume text for JD matching. Please upload a selectable-text PDF, DOCX, or TXT resume.',
+        });
       }
+
+      if (!text || String(text).replace(/\s+/g, ' ').trim().length < 80) {
+        return res.status(400).json({
+          error: 'This resume does not contain enough readable text for JD matching. Please upload the original PDF, DOCX, or TXT resume.',
+        });
+      }
+
       resumeJson = repairUploadedResumeJson(buildUploadedResumeJson(text, req.file.originalname), text, req.file.originalname);
       fileName = req.file.originalname || 'uploaded_resume';
     } else {

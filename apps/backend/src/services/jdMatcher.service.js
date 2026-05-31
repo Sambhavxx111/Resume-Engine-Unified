@@ -9,8 +9,49 @@ const STOP_WORDS = new Set([
   'our', 'your', 'their', 'what', 'which', 'who', 'when', 'where', 'why',
   'how', 'all', 'each', 'every', 'both', 'few', 'more', 'most', 'no', 'not',
   'only', 'same', 'so', 'than', 'too', 'very', 'as', 'if', 'also', 'as',
-  'job', 'position', 'role', 'team', 'company', 'work', 'working', 'works'
+  'job', 'position', 'role', 'team', 'company', 'work', 'working', 'works',
+  'hiring', 'hire', 'candidate', 'candidates', 'requirement', 'requirements',
+  'required', 'preferred', 'responsibility', 'responsibilities', 'experience',
+  'years', 'year', 'ability', 'including', 'using', 'based', 'strong'
 ]);
+
+const PHRASE_KEYWORDS = [
+  'power bi',
+  'machine learning',
+  'data analysis',
+  'data analyst',
+  'data visualization',
+  'stakeholder communication',
+  'dashboard development',
+  'business intelligence',
+  'project management',
+  'customer service',
+  'digital marketing',
+  'social media',
+  'content writing',
+  'financial analysis',
+  'deep learning',
+  'natural language processing',
+  'node.js',
+  'react.js',
+  'next.js',
+  'tailwind css',
+  'rest api',
+  'rest apis',
+  'sql server',
+  'postgresql',
+  'mysql',
+  'mongodb',
+  'python',
+  'excel',
+  'tableau',
+  'javascript',
+  'typescript',
+  'react',
+  'django',
+  'fastapi',
+  'flask',
+];
 
 const JD_MATCH_PROMPT = (resumeJson, jobDescription) => `
 Compare the following resume against the provided job description and return a concise ATS-style match analysis.
@@ -89,6 +130,9 @@ const extractKeywords = (text) => {
     return [];
   }
 
+  const normalizedText = text.toLowerCase().replace(/\s+/g, ' ');
+  const phraseMatches = PHRASE_KEYWORDS.filter((phrase) => normalizedText.includes(phrase));
+
   // Extract words and tech terms
   const words = text.match(/\b[a-z+#.\-]{2,}\b/gi) || [];
   
@@ -111,7 +155,7 @@ const extractKeywords = (text) => {
     .slice(0, 30)
     .map(([keyword]) => keyword);
 
-  return sortedKeywords;
+  return Array.from(new Set([...phraseMatches, ...sortedKeywords])).slice(0, 35);
 };
 
 // Calculate keyword overlap and matching

@@ -101,10 +101,10 @@ function JDMatcher() {
           <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <label className="glass-card block p-5">
               <span className="block text-[11px] uppercase tracking-[0.22em] text-slate-500">Resume Upload</span>
-              <span className="mt-3 block text-sm text-slate-500">PDF, DOC, or DOCX resume</span>
+              <span className="mt-3 block text-sm text-slate-500">PDF, DOCX, or TXT resume with selectable text</span>
               <input
                 type="file"
-                accept=".pdf,.doc,.docx"
+                accept=".pdf,.docx,.txt"
                 className="mt-5 block w-full text-sm text-slate-300 file:mr-4 file:rounded-full file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-medium file:text-slate-950"
                 onChange={(event) => setResumeFile(event.target.files?.[0] || null)}
               />
