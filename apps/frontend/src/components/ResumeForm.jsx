@@ -1609,8 +1609,8 @@ function ResumeForm({
           </div>
         </div>
 
-        <div ref={editorSectionRef} className="grid gap-8 xl:max-h-[calc(100vh-8rem)] xl:grid-cols-[0.7fr_0.665fr_1.635fr] xl:overflow-hidden">
-          <div className="space-y-8 xl:max-h-full xl:overflow-y-auto xl:pr-2">
+        <div ref={editorSectionRef} className="grid gap-8 xl:h-[calc(100vh-9.5rem)] xl:min-h-[38rem] xl:grid-cols-[0.7fr_0.665fr_1.635fr] xl:items-stretch">
+          <div className="space-y-8 xl:h-full xl:min-h-0 xl:overflow-y-auto xl:pr-2">
             <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <h3 className="mb-4 text-lg font-semibold text-slate-900">Personal Info</h3>
               <div className="grid gap-4 md:grid-cols-2">
@@ -1800,7 +1800,7 @@ function ResumeForm({
             </div>
           </div>
 
-          <aside className="space-y-6 xl:max-h-full xl:overflow-y-auto xl:pr-2">
+          <aside className="space-y-6 xl:h-full xl:min-h-0 xl:overflow-y-auto xl:pr-2">
             <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -2129,7 +2129,7 @@ function ResumeForm({
             ) : null}
           </aside>
 
-          <aside className="space-y-6 xl:max-h-full xl:overflow-y-auto xl:pr-2">
+          <aside className="space-y-6 xl:h-full xl:min-h-0 xl:overflow-y-auto xl:pr-2">
             <div className="rounded-[28px] border border-slate-200 bg-white/92 p-5 shadow-[0_22px_50px_rgba(148,163,184,0.14)]">
               <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Live Preview</p>
               <p className="mt-2 text-[11px] uppercase tracking-[0.22em] text-slate-400">
