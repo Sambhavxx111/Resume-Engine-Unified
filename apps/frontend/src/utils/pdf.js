@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
-import { flattenSkillCategories } from "./skills";
+import { flattenSkillCategories, normalizeSkillCategories } from "./skills";
 
 const PAGE_WIDTH = 210;
 const PAGE_HEIGHT = 297;
@@ -2805,6 +2805,78 @@ const addCanvasToPdf = (doc, canvas, breakpoints = [], links = [], canvasScale =
   }
 };
 
+const buildSearchableResumeText = (formData = {}) => {
+  const personalInfo = formData.personalInfo || {};
+  const sections = [
+    [
+      personalInfo.fullName,
+      personalInfo.title,
+      personalInfo.email,
+      personalInfo.phone,
+      personalInfo.location,
+      personalInfo.portfolio,
+      personalInfo.github,
+    ],
+    ["Professional Summary", formData.summary],
+    [
+      "Education",
+      ...(Array.isArray(formData.education) ? formData.education : []).map((item) =>
+        [item.degree, item.fieldOfStudy, item.institution, item.location, item.score, item.startDate, item.endDate]
+          .filter(Boolean)
+          .join(" "),
+      ),
+    ],
+    [
+      "Experience",
+      ...(Array.isArray(formData.experience) ? formData.experience : []).map((item) =>
+        [item.role, item.company, item.startDate, item.endDate, item.description].filter(Boolean).join(" "),
+      ),
+    ],
+    [
+      "Projects",
+      ...(Array.isArray(formData.projects) ? formData.projects : []).map((item) =>
+        [item.name, item.description, ...(Array.isArray(item.bullets) ? item.bullets : [])].filter(Boolean).join(" "),
+      ),
+    ],
+    [
+      "Skills",
+      ...normalizeSkillCategories(formData.skills || []).map((group) =>
+        [group.category, ...(Array.isArray(group.items) ? group.items : [])].filter(Boolean).join(": "),
+      ),
+    ],
+    ...(Array.isArray(formData.customSections) ? formData.customSections : []).map((section) => [
+      section.title,
+      ...(Array.isArray(section.items) ? section.items : []),
+    ]),
+  ];
+
+  return sections
+    .flat()
+    .map((value) => String(value || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+};
+
+const addSearchableTextLayer = (doc, formData = {}) => {
+  const text = buildSearchableResumeText(formData);
+  if (!text) {
+    return;
+  }
+
+  const currentPage = doc.getCurrentPageInfo?.().pageNumber || 1;
+  doc.setPage(1);
+  doc.setFontSize(1);
+  doc.setTextColor(255, 255, 255);
+  doc.text(doc.splitTextToSize(text, PAGE_WIDTH - 8).slice(0, 180), 2, 2);
+  doc.setTextColor(0, 0, 0);
+  doc.setPage(currentPage);
+  doc.setProperties({
+    title: formData.personalInfo?.fullName ? `${formData.personalInfo.fullName} Resume` : "Resume",
+    subject: "Resume Engine export with searchable resume text",
+    creator: "Resume Engine",
+  });
+};
+
 const isEmeraldColumnsPreview = (previewElement) =>
   previewElement?.getAttribute?.("data-resume-template") === "enhancv-columns" ||
   !!previewElement?.querySelector?.('[data-emerald-columns-body="true"]');
@@ -3035,6 +3107,7 @@ const exportEmeraldColumnsPreviewPdf = async (previewElement, fileName, options 
       });
     }
 
+    addSearchableTextLayer(doc, options.resumeData);
     doc.save(fileName);
   } finally {
     cleanup();
@@ -3085,6 +3158,7 @@ const exportPreviewElementPdf = async (previewElement, fileName, options = {}) =
     });
 
     addCanvasToPdf(doc, canvas, breakpoints, links, canvasScale);
+    addSearchableTextLayer(doc, options.resumeData);
     doc.save(fileName);
   } finally {
     cleanup();
@@ -3098,6 +3172,7 @@ export async function exportResumePdf(formData, options = {}) {
   if (options.previewElement) {
     await exportPreviewElementPdf(options.previewElement, fileName, {
       fullLinkText: Boolean(options.hardCopyMode),
+      resumeData: formData,
     });
     return;
   }

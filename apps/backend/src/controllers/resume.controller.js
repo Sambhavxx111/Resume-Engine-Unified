@@ -5,7 +5,7 @@ const { withOptionalDetails } = require('../utils/safeError');
 const { PDFParse } = require('pdf-parse');
 const mammoth = require('mammoth');
 
-const sanitizeExtractedResumeText = (text = '', originalName = '') => {
+const sanitizeExtractedResumeText = (text = '') => {
   const normalized = String(text || '')
     .replace(/\r/g, '\n')
     .split('\n')
@@ -22,14 +22,7 @@ const sanitizeExtractedResumeText = (text = '', originalName = '') => {
     .map((line) => line.replace(/\s+/g, ' ').trim());
 
   const cleaned = normalized.join('\n').trim();
-  if (cleaned.length >= 80) {
-    return cleaned;
-  }
-
-  return originalName
-    .replace(/\.[^/.]+$/, '')
-    .replace(/[_-]+/g, ' ')
-    .trim();
+  return cleaned.length >= 80 ? cleaned : '';
 };
 
 const extractUploadedText = async (file) => {
@@ -47,7 +40,6 @@ const extractUploadedText = async (file) => {
       text = pdfData?.text || '';
     } catch (pdfError) {
       console.error('PDF parsing warning:', pdfError.message);
-      text = file.originalname || 'uploaded resume';
     } finally {
       if (parser && typeof parser.destroy === 'function') {
         await parser.destroy().catch(() => {});
@@ -67,11 +59,19 @@ const extractUploadedText = async (file) => {
     throw new Error('Unsupported resume file type. Please upload PDF, DOCX, or TXT.');
   }
 
-  if (!text.trim()) {
-    text = file.originalname || 'uploaded resume';
+  const cleanedText = sanitizeExtractedResumeText(text);
+  if (!cleanedText) {
+    throw new Error(
+      'This resume does not contain enough selectable text to import reliably. Please upload the original PDF/DOCX/TXT resume instead of a scanned image or screenshot-style PDF.',
+    );
   }
 
-  return sanitizeExtractedResumeText(text, file.originalname || 'uploaded resume');
+  return cleanedText;
+};
+
+const getResumeIdParam = (req) => {
+  const resumeId = Number(req.params.resumeId);
+  return Number.isInteger(resumeId) && resumeId > 0 ? resumeId : null;
 };
 
 const saveResume = async (req, res) => {
@@ -83,27 +83,62 @@ const saveResume = async (req, res) => {
       return res.status(400).json({ error: 'Resume data is required' });
     }
 
-    // Check if resume exists
     const existingResume = await resumeModel.getResumeByUserId(userId);
 
     if (existingResume) {
-      // Update existing resume
       await resumeModel.updateResume(userId, resumeJson);
       return res.status(200).json({
         message: 'Resume updated successfully',
         userId,
-      });
-    } else {
-      // Create new resume
-      const result = await resumeModel.createResume(userId, resumeJson);
-      return res.status(201).json({
-        message: 'Resume created successfully',
-        userId,
-        resumeId: result.insertId,
+        resumeId: existingResume.id,
       });
     }
+
+    const result = await resumeModel.createResume(userId, resumeJson, { isActive: true });
+    return res.status(201).json({
+      message: 'Resume created successfully',
+      userId,
+      resumeId: result.insertId,
+    });
   } catch (error) {
     console.error('Save resume error:', error.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const listResumeDrafts = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const drafts = await resumeModel.listResumesByUserId(userId);
+
+    return res.status(200).json({
+      message: 'Resume drafts fetched successfully',
+      resumes: drafts,
+    });
+  } catch (error) {
+    console.error('List resume drafts error:', error.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const createResumeDraft = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const resumeJson = sanitizeResumePayload(req.body);
+
+    if (!resumeJson || Object.keys(resumeJson).length === 0) {
+      return res.status(400).json({ error: 'Resume data is required' });
+    }
+
+    const result = await resumeModel.createResume(userId, resumeJson, { status: 'draft', isActive: false });
+
+    return res.status(201).json({
+      message: 'Draft saved successfully',
+      userId,
+      resumeId: result.insertId,
+    });
+  } catch (error) {
+    console.error('Create resume draft error:', error.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -111,8 +146,6 @@ const saveResume = async (req, res) => {
 const getResume = async (req, res) => {
   try {
     const userId = req.user.userId;
-
-    // Fetch resume
     const resume = await resumeModel.getResumeByUserId(userId);
 
     if (!resume) {
@@ -121,6 +154,7 @@ const getResume = async (req, res) => {
 
     return res.status(200).json({
       message: 'Resume fetched successfully',
+      resumeId: resume.id,
       resume: resume.resume_json,
       atsScore: resume.ats_score,
       createdAt: resume.created_at,
@@ -128,6 +162,91 @@ const getResume = async (req, res) => {
     });
   } catch (error) {
     console.error('Get resume error:', error.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const getResumeDraft = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const resumeId = getResumeIdParam(req);
+
+    if (!resumeId) {
+      return res.status(400).json({ error: 'Valid resume id is required' });
+    }
+
+    const resume = await resumeModel.getResumeByIdForUser(userId, resumeId);
+
+    if (!resume) {
+      return res.status(404).json({ error: 'Resume not found' });
+    }
+
+    await resumeModel.setActiveResumeForUser(userId, resumeId);
+
+    return res.status(200).json({
+      message: 'Resume draft fetched successfully',
+      resumeId: resume.id,
+      resume: resume.resume_json,
+      atsScore: resume.ats_score,
+      createdAt: resume.created_at,
+      updatedAt: resume.updated_at,
+    });
+  } catch (error) {
+    console.error('Get resume draft error:', error.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const updateResumeDraft = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const resumeId = getResumeIdParam(req);
+    const resumeJson = sanitizeResumePayload(req.body);
+
+    if (!resumeId) {
+      return res.status(400).json({ error: 'Valid resume id is required' });
+    }
+
+    if (!resumeJson || Object.keys(resumeJson).length === 0) {
+      return res.status(400).json({ error: 'Resume data is required' });
+    }
+
+    const result = await resumeModel.updateResumeByIdForUser(userId, resumeId, resumeJson, { status: 'draft' });
+    if (!result.affectedRows) {
+      return res.status(404).json({ error: 'Resume not found' });
+    }
+
+    return res.status(200).json({
+      message: 'Draft saved successfully',
+      userId,
+      resumeId,
+    });
+  } catch (error) {
+    console.error('Update resume draft error:', error.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const discardResumeDraft = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const resumeId = getResumeIdParam(req);
+
+    if (!resumeId) {
+      return res.status(400).json({ error: 'Valid resume id is required' });
+    }
+
+    const result = await resumeModel.discardResumeByIdForUser(userId, resumeId);
+    if (!result.affectedRows) {
+      return res.status(404).json({ error: 'Resume not found' });
+    }
+
+    return res.status(200).json({
+      message: 'Resume discarded successfully',
+      resumeId,
+    });
+  } catch (error) {
+    console.error('Discard resume draft error:', error.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -149,6 +268,10 @@ const importResumeFromFile = async (req, res) => {
     });
   } catch (error) {
     console.error('Import resume from file error:', error.message);
+    if (/does not contain enough selectable text/i.test(error.message)) {
+      return res.status(400).json({ error: error.message });
+    }
+
     return res.status(500).json(withOptionalDetails({
       error: 'Unable to parse the uploaded resume right now.',
     }, error));
@@ -158,5 +281,10 @@ const importResumeFromFile = async (req, res) => {
 module.exports = {
   saveResume,
   getResume,
+  listResumeDrafts,
+  createResumeDraft,
+  getResumeDraft,
+  updateResumeDraft,
+  discardResumeDraft,
   importResumeFromFile,
 };

@@ -232,12 +232,67 @@ const defaultResumePhotoCrop = {
 const defaultResumePhotoFrameScale = 1;
 const MIN_SAVE_FEEDBACK_MS = 700;
 
+const normalizeResumeForBuilder = (resume = {}, fallbackTemplate = defaultResumeState.template, source = {}) => ({
+  ...defaultResumeState,
+  ...resume,
+  personalInfo: {
+    ...defaultResumeState.personalInfo,
+    ...(resume.personalInfo || {}),
+    fullName: resolveResumeFullName(
+      resume.personalInfo,
+      source.resumeText || resume.raw_text || resume.rawText || "",
+      source.fileName || "",
+    ),
+  },
+  education:
+    Array.isArray(resume.education) && resume.education.length
+      ? resume.education.map((item) => ({
+          ...defaultResumeState.education[0],
+          ...(item || {}),
+        }))
+      : defaultResumeState.education,
+  experience:
+    Array.isArray(resume.experience) && resume.experience.length
+      ? resume.experience
+      : defaultResumeState.experience,
+  projects:
+    normalizeProjectItems(resume.projects, resume.customSections),
+  skills: normalizeSkillsForStorage(resume.skills),
+  customSections: normalizeCustomSections(resume.customSections, resume.experience),
+  template: normalizeTemplateId(resume.template || fallbackTemplate) || defaultResumeState.template,
+});
+
+const serializeResumeState = (resume = {}) =>
+  JSON.stringify({
+    ...resume,
+    skills: normalizeSkillsForStorage(resume.skills),
+  });
+
+const formatDraftTimestamp = (value) => {
+  if (!value) {
+    return "Recently saved";
+  }
+
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return "Recently saved";
+  }
+};
+
 function ResumeBuilder() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const [formData, setFormData] = useState(defaultResumeState);
   const [loadingResume, setLoadingResume] = useState(true);
+  const [drafts, setDrafts] = useState([]);
+  const [activeResumeId, setActiveResumeId] = useState(null);
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState(() => serializeResumeState(defaultResumeState));
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saveAction, setSaveAction] = useState("");
   const [aiLoading, setAiLoading] = useState("");
   const [importingResume, setImportingResume] = useState(false);
@@ -251,7 +306,7 @@ function ResumeBuilder() {
   const previewRef = useRef(null);
 
   useEffect(() => {
-    const fetchResume = async () => {
+    const fetchResumeDrafts = async () => {
       if (!isAuthenticated) {
         setLoadingResume(false);
         return;
@@ -261,50 +316,60 @@ function ResumeBuilder() {
       setError("");
 
       try {
-        const { data } = await axiosInstance.get(API.getResume);
-        if (data.resume) {
-          setFormData({
-            ...defaultResumeState,
-            ...data.resume,
-            personalInfo: {
-              ...defaultResumeState.personalInfo,
-              ...(data.resume.personalInfo || {}),
-              fullName: resolveResumeFullName(
-                data.resume.personalInfo,
-                data.resume.raw_text || data.resume.rawText || "",
-                "",
-              ),
-            },
-            education:
-              Array.isArray(data.resume.education) && data.resume.education.length
-                ? data.resume.education.map((item) => ({
-                    ...defaultResumeState.education[0],
-                    ...(item || {}),
-                  }))
-                : defaultResumeState.education,
-            experience:
-              Array.isArray(data.resume.experience) && data.resume.experience.length
-                ? data.resume.experience
-                : defaultResumeState.experience,
-            projects:
-              normalizeProjectItems(data.resume.projects, data.resume.customSections),
-            skills: normalizeSkillsForStorage(data.resume.skills),
-            customSections: normalizeCustomSections(data.resume.customSections, data.resume.experience),
-            template: normalizeTemplateId(data.resume.template) || defaultResumeState.template,
-          });
-        }
+        const { data } = await axiosInstance.get(API.listResumeDrafts);
+        setDrafts(Array.isArray(data.resumes) ? data.resumes : []);
+        const blankResume = normalizeResumeForBuilder(defaultResumeState);
+        setFormData(blankResume);
+        setActiveResumeId(null);
+        setLastSavedSnapshot(serializeResumeState(blankResume));
       } catch (requestError) {
         setError(
           requestError.response?.data?.message ||
-            "Unable to fetch resume right now. You can still start from a blank draft.",
+            "Unable to fetch saved drafts right now. You can still start from a blank draft.",
         );
       } finally {
         setLoadingResume(false);
       }
     };
 
-    fetchResume();
+    fetchResumeDrafts();
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    setHasUnsavedChanges(serializeResumeState(formData) !== lastSavedSnapshot);
+  }, [formData, lastSavedSnapshot]);
+
+  useEffect(() => {
+    const warnBeforeUnload = (event) => {
+      if (!hasUnsavedChanges) {
+        return undefined;
+      }
+
+      event.preventDefault();
+      event.returnValue = "";
+      return "";
+    };
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const refreshDrafts = async () => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    const { data } = await axiosInstance.get(API.listResumeDrafts);
+    setDrafts(Array.isArray(data.resumes) ? data.resumes : []);
+  };
+
+  const confirmUnsavedChanges = () => {
+    if (!hasUnsavedChanges) {
+      return true;
+    }
+
+    return window.confirm("You have unsaved resume changes. Discard those changes and continue?");
+  };
 
   const redirectToLogin = (authPrompt) => {
     navigate("/login", {
@@ -330,15 +395,20 @@ function ResumeBuilder() {
     setExportError("");
     setSuccessMessage("");
     const saveStartedAt = Date.now();
-    let saveResponse = null;
 
     try {
       const resumeForSave = {
         ...formData,
         skills: normalizeSkillsForStorage(formData.skills),
       };
-      const { data } = await axiosInstance.post(API.saveResume, resumeForSave);
-      saveResponse = data;
+      const { data } = activeResumeId
+        ? await axiosInstance.put(API.updateResumeDraft(activeResumeId), resumeForSave)
+        : await axiosInstance.post(API.createResumeDraft, resumeForSave);
+      if (data.resumeId) {
+        setActiveResumeId(data.resumeId);
+      }
+      setLastSavedSnapshot(serializeResumeState(resumeForSave));
+      await refreshDrafts();
       setSuccessMessage(
         mode === "draft"
           ? "Draft saved successfully"
@@ -491,6 +561,10 @@ function ResumeBuilder() {
       return;
     }
 
+    if (!confirmUnsavedChanges()) {
+      return;
+    }
+
     setImportingResume(true);
     setError("");
     setSuccessMessage("");
@@ -503,41 +577,17 @@ function ResumeBuilder() {
       const { data } = await axiosInstance.post(API.importResumeFile, payload, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      const importedResume = {
-        ...defaultResumeState,
-        ...(data.resume || {}),
-        personalInfo: {
-          ...defaultResumeState.personalInfo,
-          ...(data.resume?.personalInfo || {}),
-          fullName: resolveResumeFullName(
-            data.resume?.personalInfo,
-            data.extractedText || data.resume?.raw_text || data.resume?.rawText || "",
-            data.fileName || resumeImportFile.name,
-          ),
-        },
-        education:
-          Array.isArray(data.resume?.education) && data.resume.education.length
-            ? data.resume.education.map((item) => ({
-                ...defaultResumeState.education[0],
-                ...(item || {}),
-              }))
-            : defaultResumeState.education,
-        experience:
-          Array.isArray(data.resume?.experience) && data.resume.experience.length
-            ? data.resume.experience
-            : defaultResumeState.experience,
-        projects:
-          normalizeProjectItems(data.resume?.projects, data.resume?.customSections),
-        skills: normalizeSkillsForStorage(data.resume?.skills),
-        customSections: normalizeCustomSections(data.resume?.customSections, data.resume?.experience),
-        template: formData.template || defaultResumeState.template,
-      };
+      const importedResume = normalizeResumeForBuilder(data.resume || {}, formData.template, {
+        resumeText: data.extractedText,
+        fileName: data.fileName || resumeImportFile.name,
+      });
 
       setFormData((prev) => ({
         ...defaultResumeState,
         ...importedResume,
         template: prev.template || importedResume.template || defaultResumeState.template,
       }));
+      setActiveResumeId(null);
       setSuccessMessage(
         "Resume imported into the builder. Review the extracted sections, then use the AI tools or save your upgraded draft.",
       );
@@ -554,16 +604,98 @@ function ResumeBuilder() {
   };
 
   const handleBeginFromScratch = () => {
-    setFormData((prev) => ({
+    if (!confirmUnsavedChanges()) {
+      return;
+    }
+
+    const blankResume = {
       ...defaultResumeState,
-      template: prev.template || defaultResumeState.template,
-    }));
+      template: formData.template || defaultResumeState.template,
+    };
+    setFormData(blankResume);
+    setActiveResumeId(null);
+    setLastSavedSnapshot(serializeResumeState(blankResume));
     setResumePhoto(null);
     setResumeImportFile(null);
     setError("");
     setSuccessMessage("");
     setSummaryUpdateSuccess(false);
     setAiInsights(null);
+  };
+
+  const handleOpenDraft = async (resumeId) => {
+    if (!isAuthenticated) {
+      redirectToLogin("Please log in to open your saved resume drafts.");
+      return;
+    }
+
+    if (!confirmUnsavedChanges()) {
+      return;
+    }
+
+    setSaveAction(`open-${resumeId}`);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      const { data } = await axiosInstance.get(API.getResumeDraft(resumeId));
+      const loadedResume = normalizeResumeForBuilder(data.resume || {});
+      setFormData(loadedResume);
+      setActiveResumeId(data.resumeId || resumeId);
+      setLastSavedSnapshot(serializeResumeState(loadedResume));
+      setResumeImportFile(null);
+      setResumePhoto(null);
+      setSuccessMessage("Draft opened. Continue editing from where you left off.");
+      await refreshDrafts();
+    } catch (requestError) {
+      setError(
+        requestError.response?.data?.message ||
+          requestError.response?.data?.error ||
+          "Unable to open this draft right now.",
+      );
+    } finally {
+      setSaveAction("");
+    }
+  };
+
+  const handleDiscardResume = async () => {
+    const confirmed = window.confirm(
+      activeResumeId
+        ? "Discard this saved resume draft? This removes it from your draft list."
+        : "Discard this unsaved resume and reset the builder?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSaveAction("discard");
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      if (activeResumeId && isAuthenticated) {
+        await axiosInstance.delete(API.discardResumeDraft(activeResumeId));
+        await refreshDrafts();
+      }
+
+      const blankResume = normalizeResumeForBuilder(defaultResumeState);
+      setFormData(blankResume);
+      setActiveResumeId(null);
+      setLastSavedSnapshot(serializeResumeState(blankResume));
+      setResumePhoto(null);
+      setResumeImportFile(null);
+      setAiInsights(null);
+      setSuccessMessage("Resume discarded. The builder is ready for a new resume.");
+    } catch (requestError) {
+      setError(
+        requestError.response?.data?.message ||
+          requestError.response?.data?.error ||
+          "Unable to discard this resume right now.",
+      );
+    } finally {
+      setSaveAction("");
+    }
   };
 
   const deriveSkillSeed = () => {
@@ -668,7 +800,73 @@ function ResumeBuilder() {
           <Loader label="Fetching your resume..." />
         </div>
       ) : (
-        <div className="reveal-up delay-1">
+        <div className="reveal-up delay-1 space-y-6">
+          <section className="glass-card p-5 sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.26em] text-cyan-300">Resume Drafts</p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">
+                  {activeResumeId ? "Editing a saved draft" : "New resume workspace"}
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                  The builder starts blank every visit. Save a draft to keep it, or open an existing draft when you want to continue.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded-[18px] border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={handleBeginFromScratch}
+                  disabled={Boolean(saveAction)}
+                >
+                  Start New Resume
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded-[18px] border border-rose-300/40 bg-rose-500/10 px-4 py-2.5 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={handleDiscardResume}
+                  disabled={Boolean(saveAction)}
+                >
+                  {saveAction === "discard" ? <Loader label="Discarding..." /> : "Discard Resume"}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {drafts.length ? (
+                drafts.map((draft) => (
+                  <button
+                    key={draft.id}
+                    type="button"
+                    className={`rounded-[20px] border p-4 text-left transition ${
+                      activeResumeId === draft.id
+                        ? "border-cyan-300 bg-cyan-300/10 text-white"
+                        : "border-white/10 bg-white/10 text-slate-200 hover:border-white/20 hover:bg-white/15"
+                    }`}
+                    onClick={() => handleOpenDraft(draft.id)}
+                    disabled={Boolean(saveAction)}
+                  >
+                    <span className="block truncate text-sm font-semibold">
+                      {draft.title || "Untitled resume"}
+                    </span>
+                    <span className="mt-2 block text-xs text-slate-400">
+                      {saveAction === `open-${draft.id}` ? "Opening..." : `Updated ${formatDraftTimestamp(draft.updated_at)}`}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-[20px] border border-dashed border-white/15 bg-white/10 px-4 py-5 text-sm text-slate-300 md:col-span-2 xl:col-span-3">
+                  No saved drafts yet. Build a resume and click Save Draft when you want it available here.
+                </div>
+              )}
+            </div>
+
+            {hasUnsavedChanges ? (
+              <p className="mt-4 rounded-[18px] border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100">
+                You have unsaved changes. Save Draft before leaving, or discard the resume if you do not want to keep it.
+              </p>
+            ) : null}
+          </section>
           <ResumeForm
             formData={formData}
             setFormData={setFormData}
