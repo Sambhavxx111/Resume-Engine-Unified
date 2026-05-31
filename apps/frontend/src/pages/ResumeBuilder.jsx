@@ -815,19 +815,11 @@ function ResumeBuilder() {
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center rounded-[18px] border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_14px_24px_rgba(15,23,42,0.14)] transition hover:bg-slate-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={handleBeginFromScratch}
                   disabled={Boolean(saveAction)}
                 >
                   Start New Resume
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-[18px] border border-rose-300/40 bg-rose-500/10 px-4 py-2.5 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={handleDiscardResume}
-                  disabled={Boolean(saveAction)}
-                >
-                  {saveAction === "discard" ? <Loader label="Discarding..." /> : "Discard Resume"}
                 </button>
               </div>
             </div>
@@ -876,6 +868,7 @@ function ResumeBuilder() {
             onAIAction={handleAIAction}
             onImportResume={handleImportResume}
             onBeginFromScratch={handleBeginFromScratch}
+            onDiscardResume={handleDiscardResume}
             onImportFileChange={setResumeImportFile}
             importFile={resumeImportFile}
             importLoading={importingResume}

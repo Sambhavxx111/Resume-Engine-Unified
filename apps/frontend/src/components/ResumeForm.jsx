@@ -836,6 +836,7 @@ function ResumeForm({
   onAIAction,
   onImportResume,
   onBeginFromScratch,
+  onDiscardResume,
   onImportFileChange,
   importFile,
   importLoading,
@@ -1608,8 +1609,8 @@ function ResumeForm({
           </div>
         </div>
 
-        <div ref={editorSectionRef} className="grid gap-8 xl:grid-cols-[0.7fr_0.665fr_1.635fr]">
-          <div className="space-y-8">
+        <div ref={editorSectionRef} className="grid gap-8 xl:max-h-[calc(100vh-8rem)] xl:grid-cols-[0.7fr_0.665fr_1.635fr] xl:overflow-hidden">
+          <div className="space-y-8 xl:max-h-full xl:overflow-y-auto xl:pr-2">
             <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <h3 className="mb-4 text-lg font-semibold text-slate-900">Personal Info</h3>
               <div className="grid gap-4 md:grid-cols-2">
@@ -1799,7 +1800,7 @@ function ResumeForm({
             </div>
           </div>
 
-          <aside className="space-y-6">
+          <aside className="space-y-6 xl:max-h-full xl:overflow-y-auto xl:pr-2">
             <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -2081,6 +2082,14 @@ function ResumeForm({
               >
                 {saveAction === "hard-copy" ? <Loader label="Preparing hard copy..." /> : "Save Hard Copy Mode"}
               </button>
+              <button
+                type="button"
+                className="mt-3 inline-flex w-full items-center justify-center rounded-[18px] border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 shadow-[0_12px_22px_rgba(244,63,94,0.08)] transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={Boolean(saveAction)}
+                onClick={onDiscardResume}
+              >
+                {saveAction === "discard" ? <Loader label="Discarding resume..." /> : "Discard Resume"}
+              </button>
               {draftSaveConfirmation ? (
                 <div className="mt-4 rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
                   {successMessage}
@@ -2120,7 +2129,7 @@ function ResumeForm({
             ) : null}
           </aside>
 
-          <aside className="space-y-6">
+          <aside className="space-y-6 xl:max-h-full xl:overflow-y-auto xl:pr-2">
             <div className="rounded-[28px] border border-slate-200 bg-white/92 p-5 shadow-[0_22px_50px_rgba(148,163,184,0.14)]">
               <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Live Preview</p>
               <p className="mt-2 text-[11px] uppercase tracking-[0.22em] text-slate-400">
