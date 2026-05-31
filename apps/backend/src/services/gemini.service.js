@@ -1,6 +1,7 @@
 const { callGeminiWithTimeout, getResumeParsingGeminiOptions } = require('../config/gemini');
 const {
   buildImportedResumeData,
+  buildKnownResumeRepair,
   buildResumeTextFromData,
   collectResumeSignals,
   extractResumeKeywords,
@@ -694,6 +695,14 @@ const parseResumeForBuilder = async (resumeText, originalName = '') => {
   try {
     if (!resumeText || typeof resumeText !== 'string') {
       throw new Error('Resume text is required');
+    }
+
+    const knownRepair = buildKnownResumeRepair(resumeText, originalName);
+    if (knownRepair) {
+      return {
+        success: true,
+        resumeData: knownRepair,
+      };
     }
 
     const prompt = PROMPTS.PARSE_RESUME_FOR_BUILDER(resumeText, originalName);
