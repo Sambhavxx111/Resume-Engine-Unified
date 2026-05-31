@@ -1583,6 +1583,9 @@ function ResumeForm({
               >
                 {importLoading ? <Loader label="Importing your resume..." /> : "Import Into Builder"}
               </button>
+              <p className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+                Import note: parsing may not be 100% accurate for every resume format. Please manually review the imported sections before saving or downloading.
+              </p>
             </div>
           </div>
 

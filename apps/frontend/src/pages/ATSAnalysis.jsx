@@ -154,6 +154,9 @@ function ATSAnalysis() {
             >
               {optimizing ? <Loader label="Optimizing & downloading..." /> : "Optimize Uploaded Resume & Download"}
             </button>
+            <p className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+              Beta note: resume optimization is still in development. The generated draft may not be perfect, so review and edit it manually before using it.
+            </p>
           </form>
         </div>
 
