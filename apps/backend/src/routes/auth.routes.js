@@ -1,6 +1,6 @@
 const express = require('express');
 const authController = require('../controllers/auth.controller');
-const authMiddleware = require('../middleware/auth.middleware');
+const { optionalAuthMiddleware } = require('../middleware/auth.middleware');
 const { validateBody } = require('../middleware/validate.middleware');
 const {
   signupSchema,
@@ -21,7 +21,7 @@ router.post('/login', authLimiter, validateBody(loginSchema), authController.log
 router.post('/verify-email', authLimiter, validateBody(verifyEmailSchema), authController.verifyEmail);
 router.post('/forgot-password', authLimiter, validateBody(forgotPasswordSchema), authController.forgotPassword);
 router.post('/reset-password', authLimiter, validateBody(resetPasswordSchema), authController.resetPassword);
-router.get('/me', authMiddleware, authController.me);
+router.get('/me', optionalAuthMiddleware, authController.me);
 router.post('/logout', authController.logout);
 
 module.exports = router;

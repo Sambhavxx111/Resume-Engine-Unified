@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+Disallow: /api
+Disallow: /admin
+Disallow: /.env
+
+Sitemap: https://resume-engine-unified-virid.vercel.app/sitemap.xml

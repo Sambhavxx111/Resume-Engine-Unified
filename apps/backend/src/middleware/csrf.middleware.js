@@ -9,6 +9,19 @@ const parseOrigins = () =>
     .filter(Boolean);
 
 const localOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(:\d+)?$/i;
+const getAllowedOrigins = () => {
+  const configuredOrigins = parseOrigins();
+  if (process.env.NODE_ENV !== 'production') {
+    return configuredOrigins;
+  }
+
+  return configuredOrigins.length
+    ? configuredOrigins
+    : [
+        'https://resume-engine-unified-virid.vercel.app',
+        'https://resume-engine-unified.vercel.app',
+      ];
+};
 
 const hasAuthCookie = (cookieHeader = '') =>
   String(cookieHeader)
@@ -26,7 +39,7 @@ const originFromReferer = (referer = '') => {
 
 const isAllowedOrigin = (origin) => {
   if (!origin) return false;
-  return parseOrigins().includes(origin) || localOriginPattern.test(origin);
+  return getAllowedOrigins().includes(origin) || (process.env.NODE_ENV !== 'production' && localOriginPattern.test(origin));
 };
 
 const csrfProtection = (req, res, next) => {

@@ -49,7 +49,17 @@ app = FastAPI(
     openapi_url='/openapi.json',
 )
 
-allowed_origins = [
+is_production = os.getenv('NODE_ENV') == 'production' or os.getenv('ENVIRONMENT') == 'production'
+configured_origins = [
+    origin.strip()
+    for origin in os.getenv('CAREER_SERVICE_CORS_ORIGINS', '').split(',')
+    if origin.strip()
+]
+production_origins = configured_origins or [
+    'https://resume-engine-unified-virid.vercel.app',
+    'https://resume-engine-unified.vercel.app',
+]
+local_origins = [
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:3002',
@@ -59,14 +69,16 @@ allowed_origins = [
     'http://127.0.0.1:3002',
     'http://127.0.0.1:5173',
 ]
-
-configured_origins = os.getenv('CAREER_SERVICE_CORS_ORIGINS', '')
-allowed_origins.extend(origin.strip() for origin in configured_origins.split(',') if origin.strip())
+local_origin_regex = (
+    r"https?://(localhost|127\.0\.0\.1|10(?:\.\d{1,3}){3}|"
+    r"192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[0-1])"
+    r"(?:\.\d{1,3}){2})(:\d+)?$"
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(:\d+)?$",
+    allow_origins=production_origins if is_production else [*local_origins, *configured_origins],
+    allow_origin_regex=None if is_production else local_origin_regex,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
@@ -104,9 +116,14 @@ async def security_headers_and_rate_limit(request: Request, call_next):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Referrer-Policy'] = 'no-referrer'
-    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Permissions-Policy'] = (
+        'accelerometer=(), ambient-light-sensor=(), autoplay=(), camera=(), '
+        'display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), '
+        'gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), '
+        'picture-in-picture=(), usb=(), xr-spatial-tracking=()'
+    )
     response.headers['Content-Security-Policy'] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
-    if os.getenv('NODE_ENV') == 'production' or os.getenv('ENVIRONMENT') == 'production':
+    if is_production:
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
 

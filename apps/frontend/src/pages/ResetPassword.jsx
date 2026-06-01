@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import axiosInstance from "../api/axios";
 import Loader from "../components/Loader";
+import PasswordField from "../components/PasswordField";
 import { API } from "../api/services";
 
 function ResetPassword() {
@@ -64,9 +65,7 @@ function ResetPassword() {
         </p>
 
         <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-          <input
-            className="field"
-            type="password"
+          <PasswordField
             name="password"
             placeholder="New password"
             minLength={10}
@@ -74,9 +73,7 @@ function ResetPassword() {
             onChange={(event) => setPassword(event.target.value)}
             required
           />
-          <input
-            className="field"
-            type="password"
+          <PasswordField
             name="confirmPassword"
             placeholder="Confirm new password"
             minLength={10}

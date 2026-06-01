@@ -18,6 +18,12 @@ const configuredOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
+const productionOrigins = configuredOrigins.length
+  ? configuredOrigins
+  : [
+      'https://resume-engine-unified-virid.vercel.app',
+      'https://resume-engine-unified.vercel.app',
+    ];
 const localOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(:\d+)?$/i;
 
 // Middleware
@@ -41,7 +47,10 @@ app.use(cors({
       return callback(null, true);
     }
 
-    if (configuredOrigins.includes(origin) || localOriginPattern.test(origin)) {
+    const allowedOrigins = process.env.NODE_ENV === 'production' ? productionOrigins : configuredOrigins;
+    const allowLocalDevelopmentOrigin = process.env.NODE_ENV !== 'production' && localOriginPattern.test(origin);
+
+    if (allowedOrigins.includes(origin) || allowLocalDevelopmentOrigin) {
       return callback(null, true);
     }
 
@@ -57,7 +66,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Permissions-Policy', 'accelerometer=(), ambient-light-sensor=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), usb=(), xr-spatial-tracking=()');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
   if (process.env.NODE_ENV === 'production') {

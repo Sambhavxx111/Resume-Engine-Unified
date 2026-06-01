@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://resume-engine-unified-virid.vercel.app/</loc>
+  </url>
+  <url>
+    <loc>https://resume-engine-unified-virid.vercel.app/dashboard</loc>
+  </url>
+  <url>
+    <loc>https://resume-engine-unified-virid.vercel.app/resume</loc>
+  </url>
+  <url>
+    <loc>https://resume-engine-unified-virid.vercel.app/ats</loc>
+  </url>
+  <url>
+    <loc>https://resume-engine-unified-virid.vercel.app/jd-match</loc>
+  </url>
+  <url>
+    <loc>https://resume-engine-unified-virid.vercel.app/career-guidance</loc>
+  </url>
+</urlset>

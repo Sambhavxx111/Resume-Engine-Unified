@@ -280,6 +280,13 @@ const resetPassword = async (req, res) => {
 
 const me = async (req, res) => {
   try {
+    if (!req.user?.userId) {
+      return res.status(200).json({
+        authenticated: false,
+        user: null,
+      });
+    }
+
     const user = await userModel.findUserById(req.user.userId);
 
     if (!user) {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
+import PasswordField from "../components/PasswordField";
 import { useAuth } from "../context/AuthContext";
 
 function Login() {
@@ -65,7 +66,7 @@ function Login() {
         </p>
         <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
           <input className="field" type="email" name="email" placeholder="Email address" value={formState.email} onChange={handleChange} required />
-          <input className="field" type="password" name="password" placeholder="Password" value={formState.password} onChange={handleChange} required />
+          <PasswordField name="password" placeholder="Password" value={formState.password} onChange={handleChange} required />
 
           {error ? (
             <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-[0_10px_24px_rgba(244,63,94,0.08)]">
