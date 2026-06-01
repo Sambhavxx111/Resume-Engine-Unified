@@ -1040,11 +1040,13 @@ const buildEducationItems = (lines = []) => {
       current.rawLines.length > 0 &&
       ((isDegreeLine(cleaned) &&
         !isEducationScoreOnlyLine(cleaned) &&
+        current.degreeLine &&
         currentHasAnchor &&
         (current.degreeLine || current.institutionLine)) ||
         (isInstitutionLine(cleaned) && current.institutionLine) ||
         (current.rawLines.some((rawLine) => isEducationDateLine(rawLine)) &&
           hasEducationAnchorLine(cleaned) &&
+          !(isDegreeLine(cleaned) && !current.degreeLine) &&
           !isEducationScoreOnlyLine(cleaned)));
 
     if (startsNewEntry) {
@@ -1052,12 +1054,12 @@ const buildEducationItems = (lines = []) => {
     }
 
     current.rawLines.push(cleaned);
-    if (isDegreeLine(cleaned) && !current.degreeLine) {
-      current.degreeLine = cleaned;
-      return;
-    }
     if (isInstitutionLine(cleaned) && !current.institutionLine) {
       current.institutionLine = cleaned;
+      return;
+    }
+    if (isDegreeLine(cleaned) && !current.degreeLine) {
+      current.degreeLine = cleaned;
       return;
     }
     current.extraLines.push(cleaned);
