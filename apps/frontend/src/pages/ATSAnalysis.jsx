@@ -4,6 +4,28 @@ import { API } from "../api/services";
 import Loader from "../components/Loader";
 import { exportOptimizedUploadPdf } from "../utils/pdf";
 
+const getUploadErrorMessage = (requestError, fallback) => {
+  const rawMessage =
+    requestError.response?.data?.message ||
+    requestError.response?.data?.error ||
+    requestError.message ||
+    "";
+
+  if (/file too large|too large|limit/i.test(rawMessage)) {
+    return "That file is too large. Please upload a resume under the allowed size limit.";
+  }
+
+  if (/unsupported|type|declared resume type|content does not match/i.test(rawMessage)) {
+    return "Unsupported file. Please upload a clean PDF, DOCX, or TXT resume.";
+  }
+
+  if (/extract|readable|selectable|scan|scanned|quality/i.test(rawMessage)) {
+    return "We could not read enough text from this resume. Please upload the original text-based PDF, DOCX, or TXT file instead of a scan or screenshot.";
+  }
+
+  return rawMessage || fallback;
+};
+
 function ATSAnalysis() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -17,7 +39,7 @@ function ATSAnalysis() {
     event.preventDefault();
 
     if (!file) {
-      setError("Please upload a PDF or DOC resume file.");
+      setError("Please choose a resume file first. PDF, DOCX, or TXT works best.");
       return;
     }
 
@@ -40,11 +62,7 @@ function ATSAnalysis() {
       });
       setResult(data);
     } catch (requestError) {
-      setError(
-        requestError.response?.data?.message ||
-          requestError.response?.data?.error ||
-          "ATS analysis failed. Please try again with another file.",
-      );
+      setError(getUploadErrorMessage(requestError, "ATS analysis failed. Please try again with another file."));
     } finally {
       setLoading(false);
     }
@@ -52,7 +70,7 @@ function ATSAnalysis() {
 
   const handleOptimizeUploadedResume = async () => {
     if (!file) {
-      setError("Upload a resume file first so it can be optimized.");
+      setError("Please choose a resume file first so it can be optimized.");
       return;
     }
 
@@ -86,11 +104,7 @@ function ATSAnalysis() {
         setError("Resume optimized successfully, but the automatic PDF download failed.");
       }
     } catch (requestError) {
-      setError(
-        requestError.response?.data?.message ||
-          requestError.response?.data?.error ||
-          "Unable to optimize the uploaded resume right now.",
-      );
+      setError(getUploadErrorMessage(requestError, "Unable to optimize the uploaded resume right now."));
     } finally {
       setOptimizing(false);
     }
@@ -113,10 +127,13 @@ function ATSAnalysis() {
           </p>
           <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <label className="glass-card block p-5">
-              <span className="block text-sm font-medium text-slate-600">Select PDF or DOC file</span>
+              <span className="block text-sm font-medium text-slate-600">Select PDF, DOCX, or TXT file</span>
+              <span className="mt-2 block text-xs leading-5 text-slate-500">
+                Privacy: your resume is used only for this ATS analysis and optimization request.
+              </span>
               <input
                 type="file"
-                accept=".pdf,.doc,.docx"
+                accept=".pdf,.docx,.txt"
                 className="mt-4 block w-full text-sm text-slate-300 file:mr-4 file:rounded-full file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-medium file:text-slate-950"
                 onChange={(event) => setFile(event.target.files?.[0] || null)}
               />
@@ -141,9 +158,9 @@ function ATSAnalysis() {
             <button
               type="submit"
               className="inline-flex w-full items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={loading}
+              disabled={!file || loading || optimizing}
             >
-              {loading ? <Loader label="Analyzing resume..." /> : "Run ATS Analysis"}
+              {loading ? <Loader label="Analyzing resume..." /> : file ? "Run ATS Analysis" : "Choose a Resume to Analyze"}
             </button>
 
             <button
@@ -152,7 +169,7 @@ function ATSAnalysis() {
               disabled={!file || optimizing || loading}
               onClick={handleOptimizeUploadedResume}
             >
-              {optimizing ? <Loader label="Optimizing & downloading..." /> : "Optimize Uploaded Resume & Download"}
+              {optimizing ? <Loader label="Optimizing & downloading..." /> : file ? "Optimize Uploaded Resume & Download" : "Choose a Resume to Optimize"}
             </button>
             <p className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
               Beta note: resume optimization is still in development. The generated draft may not be perfect, so review and edit it manually before using it.
@@ -173,6 +190,7 @@ function ATSAnalysis() {
           {loading ? (
             <div className="mt-6">
               <Loader label="Preparing ATS insight report..." />
+              <p className="mt-3 text-sm text-slate-500">Reading the resume, checking ATS sections, and comparing job-description signals.</p>
             </div>
           ) : null}
 

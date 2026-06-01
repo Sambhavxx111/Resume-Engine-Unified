@@ -1,5 +1,5 @@
 ﻿import { Suspense, lazy } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import Loader from './components/Loader';
 import Navbar from './components/Navbar';
 
@@ -9,6 +9,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const JDMatcher = lazy(() => import('./pages/JDMatcher'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Login = lazy(() => import('./pages/Login'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const ResumeBuilder = lazy(() => import('./pages/ResumeBuilder'));
 const Signup = lazy(() => import('./pages/Signup'));
@@ -58,7 +59,7 @@ function App() {
             <Route path="/ats" element={<ATSAnalysis />} />
             <Route path="/jd-match" element={<JDMatcher />} />
             <Route path="/career-guidance" element={<CareerGuidance />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </div>

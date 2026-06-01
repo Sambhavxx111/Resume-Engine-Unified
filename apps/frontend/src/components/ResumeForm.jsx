@@ -1578,11 +1578,14 @@ function ResumeForm({
               <button
                 type="button"
                 className="mt-auto inline-flex w-full items-center justify-center rounded-[16px] border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_14px_24px_rgba(15,23,42,0.14)] transition hover:bg-slate-800 hover:!text-white"
-                disabled={importLoading}
+                disabled={!importFile || importLoading}
                 onClick={onImportResume}
               >
-                {importLoading ? <Loader label="Importing your resume..." /> : "Import Into Builder"}
+                {importLoading ? <Loader label="Importing your resume..." /> : importFile ? "Import Into Builder" : "Choose a Resume to Import"}
               </button>
+              <p className="text-xs leading-5 text-slate-500">
+                Privacy: your resume is used only to parse content into this builder.
+              </p>
               <p className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
                 Import note: parsing may not be 100% accurate for every resume format. Please manually review the imported sections before saving or downloading.
               </p>
@@ -1610,6 +1613,22 @@ function ResumeForm({
               </button>
             </div>
           </div>
+        </div>
+
+        <div className="mb-6 grid gap-3 sm:grid-cols-4">
+          {[
+            ["1", "Import or start"],
+            ["2", "Fill details"],
+            ["3", "Review preview"],
+            ["4", "Save or export"],
+          ].map(([step, label]) => (
+            <div key={step} className="rounded-[18px] border border-slate-200 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs text-white">
+                {step}
+              </span>
+              {label}
+            </div>
+          ))}
         </div>
 
         <div ref={editorSectionRef} className="grid gap-8 xl:h-[calc(100vh-9.5rem)] xl:min-h-[38rem] xl:grid-cols-[0.7fr_0.665fr_1.635fr] xl:items-stretch">

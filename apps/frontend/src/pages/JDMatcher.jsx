@@ -21,6 +21,29 @@ const formatMatchPercentage = (value, fallbackScore) => {
   return "--";
 };
 
+const getUploadErrorMessage = (requestError) => {
+  const rawMessage =
+    requestError.response?.data?.details ||
+    requestError.response?.data?.error ||
+    requestError.response?.data?.message ||
+    requestError.message ||
+    "";
+
+  if (/file too large|too large|limit/i.test(rawMessage)) {
+    return "That resume file is too large. Please upload a smaller PDF, DOCX, or TXT file.";
+  }
+
+  if (/unsupported|type|declared resume type|content does not match/i.test(rawMessage)) {
+    return "Unsupported file. Please upload a clean PDF, DOCX, or TXT resume.";
+  }
+
+  if (/extract|readable|selectable|scan|scanned|quality/i.test(rawMessage)) {
+    return "We could not read enough resume text. Please upload the original text-based resume instead of a scan or screenshot.";
+  }
+
+  return rawMessage || "Unable to calculate the job description match right now.";
+};
+
 function JDMatcher() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -70,14 +93,7 @@ function JDMatcher() {
       });
       setResult(data);
     } catch (requestError) {
-      const details = requestError.response?.data?.details;
-      setError(
-        details
-          ? `${requestError.response?.data?.error || "JD matching failed"}: ${details}`
-          : requestError.response?.data?.error ||
-            requestError.response?.data?.message ||
-            "Unable to calculate the job description match right now.",
-      );
+      setError(getUploadErrorMessage(requestError));
     } finally {
       setLoading(false);
     }
@@ -102,6 +118,9 @@ function JDMatcher() {
             <label className="glass-card block p-5">
               <span className="block text-[11px] uppercase tracking-[0.22em] text-slate-500">Resume Upload</span>
               <span className="mt-3 block text-sm text-slate-500">PDF, DOCX, or TXT resume with selectable text</span>
+              <span className="mt-2 block text-xs leading-5 text-slate-500">
+                Privacy: your resume is used only to calculate this job-description match.
+              </span>
               <input
                 type="file"
                 accept=".pdf,.docx,.txt"
@@ -127,9 +146,9 @@ function JDMatcher() {
             <button
               type="submit"
               className="inline-flex w-full items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={loading}
+              disabled={!resumeFile || !jobDescription.trim() || loading}
             >
-              {loading ? <Loader label="Matching..." /> : "Analyze Resume Against JD"}
+              {loading ? <Loader label="Matching..." /> : resumeFile ? "Analyze Resume Against JD" : "Choose a Resume to Match"}
             </button>
           </form>
         </div>
@@ -147,6 +166,7 @@ function JDMatcher() {
           {loading ? (
             <div className="mt-6">
               <Loader label="Scoring your job match..." />
+              <p className="mt-3 text-sm text-slate-500">Extracting resume keywords and comparing them with the pasted job description.</p>
             </div>
           ) : null}
 

@@ -237,7 +237,16 @@ function CareerGuidance() {
       });
       setResumeResult(data);
     } catch (error) {
-      setResumeError(error.response?.data?.detail || "Unable to extract resume skills right now.");
+      const rawMessage = error.response?.data?.detail || error.response?.data?.error || error.message || "";
+      if (/too large|limit|size/i.test(rawMessage)) {
+        setResumeError("That file is too large. Please upload a smaller PDF, DOCX, or TXT resume.");
+      } else if (/unsupported|type|content/i.test(rawMessage)) {
+        setResumeError("Unsupported file. Please upload a clean PDF, DOCX, or TXT resume.");
+      } else if (/extract|readable|scan|scanned|quality/i.test(rawMessage)) {
+        setResumeError("We could not read enough text from this resume. Please upload the original text-based file instead of a scan.");
+      } else {
+        setResumeError(rawMessage || "Unable to extract resume skills right now.");
+      }
     } finally {
       setResumeLoading(false);
     }
@@ -417,6 +426,9 @@ function CareerGuidance() {
             <form className="mt-6 space-y-5" onSubmit={uploadResume}>
               <label className="glass-card block p-5">
                 <span className="block text-sm text-slate-300">Choose the resume you want to work from</span>
+                <span className="mt-2 block text-xs leading-5 text-slate-400">
+                  Privacy: your resume is used only to extract career guidance signals for this session.
+                </span>
                 <input
                   type="file"
                   accept=".pdf,.docx,.txt"
@@ -431,8 +443,8 @@ function CareerGuidance() {
                 </div>
               ) : null}
 
-              <button type="submit" className="button-primary w-full" disabled={resumeLoading}>
-                {resumeLoading ? <Loader label="Reading your resume..." /> : "Analyze Resume Profile"}
+              <button type="submit" className="button-primary w-full" disabled={!resumeFile || resumeLoading}>
+                {resumeLoading ? <Loader label="Reading your resume..." /> : resumeFile ? "Analyze Resume Profile" : "Choose a Resume to Analyze"}
               </button>
             </form>
 

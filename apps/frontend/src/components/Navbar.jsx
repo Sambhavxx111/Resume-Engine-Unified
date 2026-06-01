@@ -55,16 +55,16 @@ function Navbar() {
   };
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
+    <header className="fixed inset-x-0 top-0 z-50 px-2 pt-3 sm:px-6 sm:pt-4 lg:px-8">
       <div
-        className={`nav-shell mx-auto grid w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[26px] px-4 py-3 backdrop-blur-2xl sm:px-6 ${
+        className={`nav-shell mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-[22px] px-3 py-3 backdrop-blur-2xl sm:grid-cols-[auto_1fr_auto] sm:gap-4 sm:rounded-[26px] sm:px-6 ${
           useDarkCareerNavbar
             ? "border border-slate-600/70 bg-slate-900/82 shadow-[0_20px_60px_rgba(2,6,23,0.42)]"
             : "border border-slate-200/90 bg-white/82 shadow-[0_20px_60px_rgba(148,163,184,0.15)]"
         }`}
       >
-        <Link to="/" className="flex flex-shrink-0 items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-slate-900 shadow-sm transition duration-200 hover:scale-[1.03]">
+        <Link to="/" className="flex min-w-0 flex-shrink items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-slate-900 shadow-sm transition duration-200 hover:scale-[1.03] sm:h-11 sm:w-11">
             <svg viewBox="0 0 64 64" className="h-8 w-8 drop-shadow-[0_6px_16px_rgba(34,211,238,0.18)]" aria-hidden="true">
               <defs>
                 <linearGradient id="resume-engine-gear" x1="12%" y1="12%" x2="88%" y2="88%">
@@ -93,9 +93,9 @@ function Navbar() {
               </g>
             </svg>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className={`text-[11px] font-semibold uppercase tracking-[0.28em] ${useDarkCareerNavbar ? "text-slate-400" : "text-slate-500"}`}>Resume Engine</p>
-            <p className={`text-sm font-bold ${useDarkCareerNavbar ? "text-white" : "text-slate-900"}`}>Resume Builder + ATS + Career Guidance</p>
+            <p className={`truncate text-xs font-bold sm:text-sm ${useDarkCareerNavbar ? "text-white" : "text-slate-900"}`}>Resume Builder + ATS + Career Guidance</p>
           </div>
         </Link>
 
@@ -119,7 +119,7 @@ function Navbar() {
             ))}
         </nav>
 
-        <div className="relative flex flex-shrink-0 items-center justify-end gap-3 justify-self-end">
+        <div className="relative flex min-w-0 flex-shrink-0 items-center justify-end gap-2 justify-self-end sm:gap-3">
           {authLoading ? (
             <div className={`h-11 w-[8.5rem] rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.88)] ${useDarkCareerNavbar ? "border-slate-700 bg-slate-950/70" : "border-slate-200 bg-white/70"}`} />
           ) : isAuthenticated ? (
@@ -133,7 +133,7 @@ function Navbar() {
                 onClick={handleGuestAccess}
                 aria-expanded={showGuestNotice}
                 aria-controls="guest-mode-notice"
-                className={`rounded-full px-3 py-2 text-xs font-medium uppercase tracking-[0.2em] transition ${
+                className={`rounded-full px-3 py-2 text-[10px] font-medium uppercase tracking-[0.14em] transition sm:text-xs sm:tracking-[0.2em] ${
                   guestModeActive
                     ? useDarkCareerNavbar
                       ? "border border-cyan-400/70 bg-cyan-400/20 text-cyan-100 shadow-[0_0_0_1px_rgba(34,211,238,0.18)]"
@@ -143,9 +143,10 @@ function Navbar() {
                       : "border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"
                 }`}
               >
-                Continue as Guest
+                <span className="hidden sm:inline">Continue as Guest</span>
+                <span className="sm:hidden">Guest</span>
               </button>
-              <Link to="/login" className={useDarkCareerNavbar ? "button-secondary border-white/15 bg-white/10 text-white hover:bg-white/15" : "button-secondary"}>Login</Link>
+              <Link to="/login" className={useDarkCareerNavbar ? "button-secondary border-white/15 bg-white/10 px-4 py-2 text-white hover:bg-white/15" : "button-secondary px-4 py-2"}>Login</Link>
               <Link to="/signup" className="button-primary hidden sm:inline-flex">Get Started</Link>
               {showGuestNotice ? (
                 <div
@@ -179,8 +180,16 @@ function Navbar() {
                   <p className={`mt-2 text-sm leading-6 ${
                     useDarkCareerNavbar ? "text-slate-200" : "text-slate-600"
                   }`}>
-                    You are in guest mode right now. To use all features, please login or register with your email ID.
+                    Guest mode is temporary. You can try public upload tools in this browser session, but drafts, saved resumes, history, and gated analysis require signup or login.
                   </p>
+                  <div className={`mt-3 space-y-1 rounded-[18px] border px-3 py-3 text-xs leading-5 ${
+                    useDarkCareerNavbar
+                      ? "border-slate-700 bg-slate-950/40 text-slate-300"
+                      : "border-slate-200 bg-slate-50 text-slate-600"
+                  }`}>
+                    <p>Temporary: uploads and unsaved edits.</p>
+                    <p>Saved after login: resume drafts, account workspace, and protected analysis.</p>
+                  </div>
                   <div className="mt-4 flex flex-wrap gap-3">
                     <Link to="/login" className="button-primary">
                       Login

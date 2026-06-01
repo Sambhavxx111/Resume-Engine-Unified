@@ -16,6 +16,8 @@
   html {
     scroll-behavior: smooth;
     scrollbar-gutter: stable;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   body {
@@ -28,6 +30,14 @@
       radial-gradient(circle at 50% 100%, rgba(209, 250, 229, 0.68), transparent 28%),
       linear-gradient(180deg, #fafaf9 0%, #f8fafc 42%, #f8fafc 100%);
     position: relative;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   body::before,
@@ -70,6 +80,7 @@
 @layer components {
   .page-shell {
     @apply relative mx-auto w-full max-w-7xl px-4 pb-20 pt-28 sm:px-6 lg:px-8;
+    min-width: 0;
   }
 
   .glass-card {
@@ -219,6 +230,9 @@
 .app-shell {
   position: relative;
   isolation: isolate;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
   --vibe-a: rgba(186, 230, 253, 0.88);
   --vibe-b: rgba(221, 214, 254, 0.62);
   --vibe-c: rgba(209, 250, 229, 0.56);
