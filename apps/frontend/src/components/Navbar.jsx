@@ -146,8 +146,22 @@ function Navbar() {
                 <span className="hidden sm:inline">Continue as Guest</span>
                 <span className="sm:hidden">Guest</span>
               </button>
-              <Link to="/login" className={useDarkCareerNavbar ? "button-secondary border-white/15 bg-white/10 px-4 py-2 text-white hover:bg-white/15" : "button-secondary px-4 py-2"}>Login</Link>
-              <Link to="/signup" className="button-primary hidden sm:inline-flex">Get Started</Link>
+              <Link
+                to="/login"
+                className={`inline-flex items-center justify-center rounded-[18px] border px-4 py-2 text-sm font-semibold shadow-[0_14px_26px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 ${
+                  useDarkCareerNavbar
+                    ? "border-white/15 bg-white/10 !text-white [color:#ffffff] hover:bg-white/15"
+                    : "border-slate-200 bg-white !text-slate-700 [color:#334155] hover:bg-slate-50"
+                }`}
+              >
+                Login
+              </Link>
+              <Link
+                to="/signup"
+                className="hidden items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:-translate-y-0.5 hover:bg-slate-800 hover:!text-white sm:inline-flex"
+              >
+                Get Started
+              </Link>
               {showGuestNotice ? (
                 <div
                   id="guest-mode-notice"
