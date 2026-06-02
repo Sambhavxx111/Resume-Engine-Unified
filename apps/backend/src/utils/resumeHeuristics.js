@@ -100,10 +100,28 @@ const hasEnoughGrounding = (value = '', sourceText = '') => {
   return tokens.length === 1 ? matched === 1 : ratio >= 0.7;
 };
 
+const BULLET_PREFIX_PATTERN = /^[\s\-*•·●▪▫‣⁃◦\u2022\u00b7\u25cf\u25aa\u25ab\u2023\u2043\u25e6\uF0B7\uF0A7\uF0D8\uF0FC]+/u;
+
 const cleanField = (value = '') =>
   String(value || '')
+    .replace(/[\uF000-\uF8FF]/gu, '')
+    .replace(BULLET_PREFIX_PATTERN, '')
     .replace(/\s+/g, ' ')
     .trim();
+
+const hasBulletPrefix = (line = '') => BULLET_PREFIX_PATTERN.test(String(line || '').trimStart());
+
+const cleanBulletLine = (line = '') => cleanField(String(line || '').replace(BULLET_PREFIX_PATTERN, ''));
+
+const appendContinuation = (items = [], continuation = '') => {
+  const cleaned = cleanField(continuation);
+  if (!cleaned) return items;
+  if (!items.length) return [cleaned];
+
+  const next = [...items];
+  next[next.length - 1] = cleanField(`${next[next.length - 1]} ${cleaned}`);
+  return next;
+};
 
 const SKILL_REJECTION_PATTERN =
   /@|\d{4}|^\d+(?:\.\d+)?$|%|university|college|school|academy|certificate|certification|bachelor|master|dehradun|alwar|pilani|june|july|august|september|october|november|december|january|february|march|april|may|intern|managed|maintaining|created|published|content updates|brand voice|online presence|curriculum vitae|resume/i;
@@ -861,14 +879,31 @@ const isExperienceHeadingLine = (line = '') => {
   const cleaned = cleanField(line);
   if (!cleaned || cleaned.length > 90) return false;
   if (cleaned.endsWith('.')) return false;
-  if (/@|\d{4}/.test(cleaned)) return false;
+  if (/@/.test(cleaned)) return false;
 
   const words = cleaned.split(/\s+/).filter(Boolean);
-  if (words.length > 8) return false;
+  if (words.length > 12) return false;
 
   return /(engineer|developer|analyst|intern|manager|designer|specialist|consultant|architect|associate|executive|scientist|lead|trainee|coordinator)/i.test(
     cleaned,
   );
+};
+
+const splitExperienceHeading = (heading = '') => {
+  const cleaned = cleanField(heading);
+  const dateMatch = cleaned.match(
+    /\b((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}|\d{4})\s*(?:-|to|until|through|–|—)\s*((?:present|current)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}|\d{4})\b/i,
+  );
+
+  if (!dateMatch) {
+    return { role: cleaned, startDate: '', endDate: '' };
+  }
+
+  return {
+    role: cleanField(cleaned.slice(0, dateMatch.index)),
+    startDate: cleanField(dateMatch[1]),
+    endDate: cleanField(dateMatch[2]),
+  };
 };
 
 const buildExperienceItems = (lines = []) => {
@@ -878,14 +913,19 @@ const buildExperienceItems = (lines = []) => {
   let current = null;
 
   lines.forEach((line) => {
-    const cleaned = line.replace(/^[-*]\s*/, '').trim();
+    const cleaned = cleanBulletLine(line);
     if (!cleaned) return;
 
-    const looksLikeHeading = !line.startsWith('-') && !line.startsWith('*') && isExperienceHeadingLine(cleaned);
+    const looksLikeHeading = !hasBulletPrefix(line) && isExperienceHeadingLine(cleaned);
 
     if (!current || looksLikeHeading) {
       if (current) groups.push(current);
       current = { heading: cleaned, details: [] };
+      return;
+    }
+
+    if (!hasBulletPrefix(line) && current.details.length && /^[a-z(]/.test(cleaned)) {
+      current.details = appendContinuation(current.details, cleaned);
       return;
     }
 
@@ -895,6 +935,7 @@ const buildExperienceItems = (lines = []) => {
   if (current) groups.push(current);
 
   return groups.map((group) => {
+    const headingParts = splitExperienceHeading(group.heading);
     const metaLine = group.details.find((item) => looksLikeDateRangeOrLocationMeta(item)) || '';
     const companyLine =
       group.details.find((item) => !looksLikeDateRangeOrLocationMeta(item) && item.length < 80 && !item.endsWith('.')) || '';
@@ -902,9 +943,9 @@ const buildExperienceItems = (lines = []) => {
 
     return {
       company: companyLine,
-      role: group.heading,
-      startDate: '',
-      endDate: metaLine,
+      role: headingParts.role || group.heading,
+      startDate: headingParts.startDate,
+      endDate: headingParts.endDate || metaLine,
       description: detailLines.join(' ').trim(),
     };
   });
@@ -917,12 +958,12 @@ const buildProjectItems = (lines = []) => {
   let current = null;
 
   lines.forEach((line) => {
-    const cleaned = cleanField(line.replace(/^[-*]\s*/, ''));
+    const cleaned = cleanBulletLine(line);
     if (!cleaned) return;
 
     const looksLikeProjectName =
-      !line.trim().startsWith('-') &&
-      !line.trim().startsWith('*') &&
+      !hasBulletPrefix(line) &&
+      /^[A-Z0-9]/.test(cleaned) &&
       cleaned.length <= 90 &&
       !cleaned.endsWith('.') &&
       !/^https?:\/\//i.test(cleaned);
@@ -930,6 +971,11 @@ const buildProjectItems = (lines = []) => {
     if (!current || looksLikeProjectName) {
       if (current) groups.push(current);
       current = { name: cleaned, bullets: [] };
+      return;
+    }
+
+    if (!hasBulletPrefix(line) && current.bullets.length) {
+      current.bullets = appendContinuation(current.bullets, cleaned);
       return;
     }
 
@@ -1018,6 +1064,16 @@ const removeRedundantInternshipCustomSections = (customSections = [], experience
       !(isCustomSectionDuplicatedInExperience(section, experience) && !String(section?.title || '').trim()),
   );
 };
+
+const normalizeCustomSectionItems = (items = []) =>
+  (Array.isArray(items) ? items : []).reduce((acc, item) => {
+    const cleaned = cleanBulletLine(item);
+    if (!cleaned) return acc;
+    if (!hasBulletPrefix(item) && acc.length && /^[a-z(]/.test(cleaned)) {
+      return appendContinuation(acc, cleaned);
+    }
+    return [...acc, cleaned];
+  }, []);
 
 const buildEducationItems = (lines = []) => {
   if (!lines.length) return [];
@@ -1263,7 +1319,7 @@ const buildImportedResumeData = (resumeText = '', originalName = '', template = 
       .filter(([key, values]) => !['summary', 'skills', 'experience', 'education', 'projects', 'contact'].includes(key) && values.length)
       .map(([key, values]) => ({
         title: toTitleCase(key),
-        items: filterFilled(values).filter(
+        items: normalizeCustomSectionItems(values).filter(
           (item) =>
             /[A-Za-z]/.test(item) &&
             !/powered by|enhancv\.com/i.test(item) &&

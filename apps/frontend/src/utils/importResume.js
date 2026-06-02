@@ -30,6 +30,29 @@ const normalizeWhitespace = (value = "") =>
     .filter((line) => !/^--\s*\d+\s+of\s+\d+\s*--$/i.test(line))
     .map((line) => line.replace(/\s+/g, " ").trim());
 
+const BULLET_PREFIX_PATTERN = /^[\s\-*•·●▪▫‣⁃◦\u2022\u00b7\u25cf\u25aa\u25ab\u2023\u2043\u25e6\uF0B7\uF0A7\uF0D8\uF0FC]+/u;
+
+const cleanTextField = (value = "") =>
+  String(value || "")
+    .replace(/[\uF000-\uF8FF]/gu, "")
+    .replace(BULLET_PREFIX_PATTERN, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const hasBulletPrefix = (line = "") => BULLET_PREFIX_PATTERN.test(String(line || "").trimStart());
+
+const cleanBulletLine = (line = "") => cleanTextField(String(line || "").replace(BULLET_PREFIX_PATTERN, ""));
+
+const appendContinuation = (items = [], continuation = "") => {
+  const cleaned = cleanTextField(continuation);
+  if (!cleaned) return items;
+  if (!items.length) return [cleaned];
+
+  const next = [...items];
+  next[next.length - 1] = cleanTextField(`${next[next.length - 1]} ${cleaned}`);
+  return next;
+};
+
 const normalizeSectionName = (line = "") =>
   line.toLowerCase().replace(/[^\w\s]/g, "").trim().replace(/\s+/g, "_");
 
@@ -547,17 +570,34 @@ const hasEducationAnchor = (entry = {}) =>
   entry.rawLines.some((line) => isInstitutionLine(line) || isEducationDateLine(line) || extractEducationLocation(line));
 
 const isExperienceHeadingLine = (line = "") => {
-  const cleaned = String(line || "").replace(/\s+/g, " ").trim();
+  const cleaned = cleanTextField(line);
   if (!cleaned || cleaned.length > 90) return false;
   if (cleaned.endsWith(".")) return false;
-  if (/@|\d{4}/.test(cleaned)) return false;
+  if (/@/.test(cleaned)) return false;
 
   const words = cleaned.split(/\s+/).filter(Boolean);
-  if (words.length > 8) return false;
+  if (words.length > 12) return false;
 
   return /(engineer|developer|analyst|intern|manager|designer|specialist|consultant|architect|associate|executive|scientist|lead|trainee|coordinator)/i.test(
     cleaned,
   );
+};
+
+const splitExperienceHeading = (heading = "") => {
+  const cleaned = cleanTextField(heading);
+  const dateMatch = cleaned.match(
+    /\b((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}|\d{4})\s*(?:-|to|until|through|–|—)\s*((?:present|current)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}|\d{4})\b/i,
+  );
+
+  if (!dateMatch) {
+    return { role: cleaned, startDate: "", endDate: "" };
+  }
+
+  return {
+    role: cleanTextField(cleaned.slice(0, dateMatch.index)),
+    startDate: cleanTextField(dateMatch[1]),
+    endDate: cleanTextField(dateMatch[2]),
+  };
 };
 
 const splitSkillTokens = (lines = []) =>
@@ -705,14 +745,19 @@ const buildExperienceItems = (lines = []) => {
   let current = null;
 
   lines.forEach((line) => {
-    const cleaned = line.replace(/^[-*]\s*/, "").trim();
+    const cleaned = cleanBulletLine(line);
     if (!cleaned) return;
 
-    const looksLikeHeading = !line.startsWith("-") && !line.startsWith("*") && isExperienceHeadingLine(cleaned);
+    const looksLikeHeading = !hasBulletPrefix(line) && isExperienceHeadingLine(cleaned);
 
     if (!current || looksLikeHeading) {
       if (current) groups.push(current);
       current = { heading: cleaned, details: [] };
+      return;
+    }
+
+    if (!hasBulletPrefix(line) && current.details.length && /^[a-z(]/.test(cleaned)) {
+      current.details = appendContinuation(current.details, cleaned);
       return;
     }
 
@@ -722,6 +767,7 @@ const buildExperienceItems = (lines = []) => {
   if (current) groups.push(current);
 
   return groups.map((group) => {
+    const headingParts = splitExperienceHeading(group.heading);
     const metaLine = group.details.find((item) => looksLikeDateOrMeta(item)) || "";
     const companyLine =
       group.details.find((item) => !looksLikeDateOrMeta(item) && item.length < 80) || "";
@@ -729,13 +775,64 @@ const buildExperienceItems = (lines = []) => {
 
     return {
       company: companyLine,
-      role: group.heading,
-      startDate: "",
-      endDate: metaLine,
+      role: headingParts.role || group.heading,
+      startDate: headingParts.startDate,
+      endDate: headingParts.endDate || metaLine,
       description: detailLines.join(" ").trim(),
     };
   });
 };
+
+const buildProjectItems = (lines = []) => {
+  if (!lines.length) return [];
+
+  const groups = [];
+  let current = null;
+
+  lines.forEach((line) => {
+    const cleaned = cleanBulletLine(line);
+    if (!cleaned) return;
+
+    const looksLikeProjectName =
+      !hasBulletPrefix(line) &&
+      /^[A-Z0-9]/.test(cleaned) &&
+      cleaned.length <= 90 &&
+      !cleaned.endsWith(".") &&
+      !/^https?:\/\//i.test(cleaned);
+
+    if (!current || looksLikeProjectName) {
+      if (current) groups.push(current);
+      current = { name: cleaned, bullets: [] };
+      return;
+    }
+
+    if (!hasBulletPrefix(line) && current.bullets.length) {
+      current.bullets = appendContinuation(current.bullets, cleaned);
+      return;
+    }
+
+    current.bullets.push(cleaned);
+  });
+
+  if (current) groups.push(current);
+
+  return groups
+    .map((project, index) => ({
+      name: project.name || `Project ${index + 1}`,
+      bullets: project.bullets.map((item) => cleanTextField(item)).filter(Boolean),
+    }))
+    .filter((project) => project.name || project.bullets.length);
+};
+
+const normalizeCustomSectionItems = (items = []) =>
+  (Array.isArray(items) ? items : []).reduce((acc, item) => {
+    const cleaned = cleanBulletLine(item);
+    if (!cleaned) return acc;
+    if (!hasBulletPrefix(item) && acc.length && /^[a-z(]/.test(cleaned)) {
+      return appendContinuation(acc, cleaned);
+    }
+    return [...acc, cleaned];
+  }, []);
 
 const buildEducationItems = (lines = []) => {
   if (!lines.length) return [];
@@ -939,6 +1036,7 @@ export function buildImportedResumeData(resumeText = "", originalName = "", temp
   const skillSourceLines = explicitSkillLines.length ? explicitSkillLines : sectionMap.skills || [];
   const skills = buildSkillCategories(skillSourceLines, explicitSkillLines.length ? [] : lines);
   const experience = buildExperienceItems(sectionMap.experience || []);
+  const projects = buildProjectItems(sectionMap.projects || []);
   const sectionEducation = buildEducationItems(sectionMap.education || []);
   const fallbackEducation = buildEducationItems(collectEducationLinesFromDocument(lines));
   const looseSignalEducation = buildEducationItemsFromLooseSignals(collectEducationLinesFromDocument(lines));
@@ -986,13 +1084,14 @@ export function buildImportedResumeData(resumeText = "", originalName = "", temp
             description: "",
           },
         ],
+    projects: projects.length ? projects : [{ name: "", bullets: [""] }],
     skills,
     summary: summaryLines.join(" ").trim() || inferSummary(lines, title),
     customSections: Object.entries(sectionMap)
-      .filter(([key, values]) => !["summary", "skills", "experience", "education", "contact"].includes(key) && values.length)
+      .filter(([key, values]) => !["summary", "skills", "experience", "education", "projects", "contact"].includes(key) && values.length)
       .map(([key, values]) => ({
         title: toTitleCase(key),
-        items: filterFilled(values),
+        items: normalizeCustomSectionItems(values),
       })),
     raw_text: resumeText,
   };
