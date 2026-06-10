@@ -124,7 +124,7 @@ const appendContinuation = (items = [], continuation = '') => {
 };
 
 const SKILL_REJECTION_PATTERN =
-  /@|\d{4}|^\d+(?:\.\d+)?$|%|university|college|school|academy|certificate|certification|bachelor|master|dehradun|alwar|pilani|june|july|august|september|october|november|december|january|february|march|april|may|intern|managed|maintaining|created|published|content updates|brand voice|online presence|curriculum vitae|resume/i;
+  /@|\d{4}|^\d+(?:\.\d+)?$|%|university|college|school|academy|certificate|certification|bachelor|master|\b(?:dehradun|alwar|pilani|june|july|august|september|october|november|december|january|february|march|april|may)\b|intern|managed|maintaining|created|published|content updates|brand voice|online presence|curriculum vitae|resume/i;
 
 const isLikelySkillValue = (value = '') => {
   const cleaned = cleanField(value);
@@ -201,6 +201,10 @@ const SKILL_CATEGORY_RULES = [
 
 const normalizeSkillCategoryName = (value = '') =>
   cleanField(value)
+    .replace(/^programming\s+s\s+technical$/i, 'Programming Languages')
+    .replace(/^programming\s*(?:&|and)?\s*technical$/i, 'Programming Languages')
+    .replace(/^skills?$/i, 'Soft Skills')
+    .replace(/^cyber secu?rity$/i, 'Cyber Security Tools')
     .replace(/^cyber secutrity tools?$/i, 'Cyber Security Tools')
     .replace(/^cyber secu?rity tools?$/i, 'Cyber Security Tools')
     .replace(/^web technologies?$/i, 'Web Technologies')
@@ -558,10 +562,10 @@ const collectExplicitSkillLines = (lines = []) =>
   );
 
 const SKILL_CATEGORY_LINE_PATTERN =
-  /^(programming languages?|languages?|frontend|front end|backend|back end|web technologies?|databases?|database technologies|data visualization|data analysis|data analysis & manipulation|machine learning|statistics|reporting & tools|reporting|technical skills|cyber secu?rity tools?|cyber secutrity tools?|security tools?|tools\s*&\s*technologies|tools|frameworks|libraries|soft skills|core skills|cloud|devops|cloud & devops)\s*:/i;
+  /^(programming\s+s\s+technical|programming\s*(?:&|and)?\s*technical|programming languages?|languages?|frontend|front end|backend|back end|web technologies?|databases?|database technologies|data visualization|data analysis|data analysis & manipulation|machine learning|statistics|reporting & tools|reporting|technical skills|cyber secu?rity|cyber secu?rity tools?|cyber secutrity tools?|security tools?|tools\s*&\s*technologies|tools|frameworks|libraries|soft skills|core skills|skills?|cloud|devops|cloud & devops)\s*:/i;
 
 const SKILL_CATEGORY_HEADING_PATTERN =
-  /^(programming languages?|languages?|frontend|front end|backend|back end|web technologies?|databases?|database technologies|data visualization|data analysis|data analysis & manipulation|machine learning|statistics|reporting & tools|reporting|technical skills|cyber secu?rity tools?|cyber secutrity tools?|security tools?|tools\s*&\s*technologies|tools|frameworks|libraries|soft skills|core skills|cloud|devops|cloud & devops)$/i;
+  /^(programming\s+s\s+technical|programming\s*(?:&|and)?\s*technical|programming languages?|languages?|frontend|front end|backend|back end|web technologies?|databases?|database technologies|data visualization|data analysis|data analysis & manipulation|machine learning|statistics|reporting & tools|reporting|technical skills|cyber secu?rity|cyber secu?rity tools?|cyber secutrity tools?|security tools?|tools\s*&\s*technologies|tools|frameworks|libraries|soft skills|core skills|skills?|cloud|devops|cloud & devops)$/i;
 
 const splitSkillTokens = (lines = []) =>
   Array.from(
@@ -734,6 +738,53 @@ const normalizeEducationDateSource = (line = '') =>
     .replace(new RegExp(`(?<=[A-Za-z0-9/%])(?=${EDUCATION_MONTH_PATTERN}\\s*,?\\s*\\d{2,4}\\b)`, 'gi'), ' ')
     .replace(/\btilldate\b/gi, 'Till date')
     .trim();
+
+const normalizeEducationDateValue = (value = '') =>
+  cleanField(
+    normalizeEducationDateSource(value).replace(
+      new RegExp(`\\b(${EDUCATION_MONTH_PATTERN})(\\d{4})\\b`, 'gi'),
+      '$1 $2',
+    ),
+  );
+
+const normalizeEducationComparison = (value = '') =>
+  cleanField(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const cleanupEducationItem = (item = {}) => {
+  const cleaned = {
+    ...item,
+    institution: cleanField(item.institution),
+    degree: cleanField(item.degree),
+    fieldOfStudy: cleanField(item.fieldOfStudy),
+    startDate: normalizeEducationDateValue(item.startDate),
+    endDate: normalizeEducationDateValue(item.endDate),
+    location: cleanField(item.location),
+    score: cleanField(item.score),
+  };
+
+  const institutionKey = normalizeEducationComparison(cleaned.institution);
+  const degreeKey = normalizeEducationComparison(cleaned.degree);
+  const fieldKey = normalizeEducationComparison(cleaned.fieldOfStudy);
+
+  if (institutionKey && degreeKey && institutionKey === degreeKey) {
+    if (isInstitutionLine(cleaned.degree) && !/^(master|bachelor|ssc|hsc|bca|mca|bsc|msc|b\.|m\.)\b/i.test(cleaned.degree)) {
+      cleaned.institution = cleaned.degree;
+      cleaned.degree = '';
+    } else {
+      cleaned.institution = '';
+    }
+  }
+
+  if (fieldKey && (fieldKey === degreeKey || fieldKey === institutionKey)) {
+    cleaned.fieldOfStudy = '';
+  }
+
+  return cleaned;
+};
 
 const extractEducationDateRange = (line = '') => {
   const cleaned = normalizeEducationDateSource(line);
@@ -1102,6 +1153,7 @@ const buildEducationItems = (lines = []) => {
         (isInstitutionLine(cleaned) && current.institutionLine) ||
         (current.rawLines.some((rawLine) => isEducationDateLine(rawLine)) &&
           hasEducationAnchorLine(cleaned) &&
+          !(isInstitutionLine(cleaned) && !current.institutionLine) &&
           !(isDegreeLine(cleaned) && !current.degreeLine) &&
           !isEducationScoreOnlyLine(cleaned)));
 
@@ -1150,6 +1202,7 @@ const buildEducationItems = (lines = []) => {
       entry.rawLines.find((line) => line !== institutionLine && line !== degreeLine && isEducationMetaLine(line)) || '';
     const dateSource =
       dateLine ||
+      [institutionLine, degreeLine, metaLine].find((line) => isEducationDateLine(line)) ||
       institutionLine ||
       degreeLine ||
       metaLine;
@@ -1293,7 +1346,7 @@ const buildImportedResumeData = (resumeText = '', originalName = '', template = 
         : fallbackEducation.length && !fallbackEducation.every((item) => isLowConfidenceEducationItem(item))
           ? fallbackEducation
           : looseSignalEducation,
-  );
+  ).map(cleanupEducationItem);
 
   return {
     template,
@@ -1419,7 +1472,7 @@ const groundImportedResumeData = (resumeData = {}, resumeText = '', originalName
       resumeData?.education,
       fallback.education,
       ['institution', 'degree', 'fieldOfStudy', 'startDate', 'endDate', 'location', 'score'],
-    ),
+    ).map(cleanupEducationItem),
     experience: groundedExperience,
     projects: groundedProjects.length ? groundedProjects : fallbackProjects,
     skills: normalizeSkillCategories(fallback.skills)

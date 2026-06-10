@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { buildImportedResumeData } = require('./src/utils/resumeHeuristics');
+const { buildImportedResumeData, groundImportedResumeData } = require('./src/utils/resumeHeuristics');
 
 const resumeText = `
 Kushagra Pitre
@@ -70,5 +70,68 @@ assert.deepEqual(customSections[0].items, [
   'CS406: Information Security - Saylor Academy',
   'Kali Linux Penetration Testing - Infosys Springboard',
 ]);
+
+const dayanshText = `
+Dayansh Joshi
+EDUCATION
+Master of Computer Applications - Cybersecurity July 2025 - May2027
+University of Petroleum and Energy Studies Dehradun
+SKILLS
+Programming s Technical: MySQL, Python, C, Java, Data Structures, Operating Systems
+Web Technologies: HTML, CSS
+Cyber Security: Network Security, Pentesting Basics, Malware analysis
+Skills: Leadership, Communication, Teamwork
+`;
+
+const dayanshParsed = buildImportedResumeData(dayanshText, 'dayansh resume.pdf');
+const dayanshGrounded = groundImportedResumeData(
+  {
+    education: [
+      {
+        institution: 'Master of Computer Applications - Cybersecurity',
+        degree: 'Master of Computer Applications - Cybersecurity',
+        endDate: 'May2027',
+      },
+    ],
+  },
+  dayanshText,
+  'dayansh resume.pdf',
+);
+
+assert.equal(dayanshParsed.education.length, 1);
+assert.equal(dayanshParsed.education[0].institution, 'University of Petroleum and Energy Studies Dehradun');
+assert.equal(dayanshParsed.education[0].degree, 'Master of Computer Applications - Cybersecurity');
+assert.equal(dayanshParsed.education[0].endDate, 'May 2027');
+assert.equal(dayanshGrounded.education[0].institution, '');
+assert.equal(dayanshGrounded.education[0].endDate, 'May 2027');
+assert.ok(
+  dayanshParsed.skills.some(
+    (group) =>
+      group.category === 'Programming Languages' &&
+      group.items.includes('MySQL') &&
+      group.items.includes('Python') &&
+      group.items.includes('Data Structures') &&
+      group.items.includes('Operating Systems'),
+  ),
+);
+assert.ok(dayanshParsed.skills.some((group) => group.category === 'Web Technologies' && group.items.includes('HTML')));
+assert.ok(
+  dayanshParsed.skills.some(
+    (group) =>
+      group.category === 'Cyber Security Tools' &&
+      group.items.includes('Network Security') &&
+      group.items.includes('Pentesting Basics') &&
+      group.items.includes('Malware analysis'),
+  ),
+);
+assert.ok(
+  dayanshParsed.skills.some(
+    (group) =>
+      group.category === 'Soft Skills' &&
+      group.items.includes('Leadership') &&
+      group.items.includes('Communication') &&
+      group.items.includes('Teamwork'),
+  ),
+);
 
 console.log('Resume section parser regression passed');

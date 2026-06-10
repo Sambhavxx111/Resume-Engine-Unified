@@ -744,14 +744,16 @@ const getPreviewSections = (formData) => {
             .filter(hasEducationContent)
             .map((item, index) => {
               const educationMetaItems = getEducationMetaItems(item);
+              const educationTitle = item.degree || item.institution || "Education";
+              const showInstitution = item.institution && item.institution !== educationTitle;
 
               return (
                 <div key={`education-preview-${index}`}>
                   <p className="font-semibold text-slate-900">
-                    {item.degree || "Degree"}
+                    {educationTitle}
                     {item.fieldOfStudy ? `, ${item.fieldOfStudy}` : ""}
                   </p>
-                  <p className="text-slate-700">{item.institution || "Institution"}</p>
+                  {showInstitution ? <p className="text-slate-700">{item.institution}</p> : null}
                   {educationMetaItems.length ? (
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                       {educationMetaItems.join(" | ")}
