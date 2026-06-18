@@ -93,7 +93,7 @@ function ATSAnalysis() {
 
       setOptimizedUpload(data);
       try {
-        exportOptimizedUploadPdf(
+        await exportOptimizedUploadPdf(
           data.fileName,
           data.headline,
           data.optimizedResumeText,

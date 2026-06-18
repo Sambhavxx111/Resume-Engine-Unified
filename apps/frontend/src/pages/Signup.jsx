@@ -6,10 +6,11 @@ import { useAuth } from "../context/AuthContext";
 
 function Signup() {
   const navigate = useNavigate();
-  const { signup, authLoading } = useAuth();
+  const { signup } = useAuth();
   const [formState, setFormState] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -20,6 +21,7 @@ function Signup() {
     event.preventDefault();
     setError("");
     setInfo("");
+    setSubmitting(true);
 
     try {
       const data = await signup(formState);
@@ -56,6 +58,8 @@ function Signup() {
       }
 
       setError(apiMessage);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -87,9 +91,9 @@ function Signup() {
           <button
             type="submit"
             className="inline-flex w-full items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={authLoading}
+            disabled={submitting}
           >
-            {authLoading ? <Loader label="Creating account..." /> : "Signup"}
+            {submitting ? <Loader label="Creating account..." /> : "Signup"}
           </button>
         </form>
 

@@ -105,9 +105,7 @@ function Landing() {
             </div>
           </div>
           <div className="reveal-up delay-3 flex flex-wrap gap-4">
-            {authLoading ? (
-              <div className="h-12 w-40 rounded-[18px] border border-slate-200 bg-white/80 shadow-sm" />
-            ) : isAuthenticated ? (
+            {isAuthenticated && !authLoading ? (
               <>
                 <Link to="/dashboard" className="button-primary">
                   Open Dashboard

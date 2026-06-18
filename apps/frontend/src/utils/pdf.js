@@ -1,6 +1,22 @@
-import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
 import { flattenSkillCategories, normalizeSkillCategories } from "./skills";
+
+let jsPDF;
+let html2canvas;
+let pdfDependencyPromise;
+
+const loadPdfDependencies = async () => {
+  if (!pdfDependencyPromise) {
+    pdfDependencyPromise = Promise.all([
+      import("jspdf"),
+      import("html2canvas"),
+    ]).then(([jspdfModule, html2canvasModule]) => {
+      jsPDF = jspdfModule.jsPDF;
+      html2canvas = html2canvasModule.default;
+    });
+  }
+
+  await pdfDependencyPromise;
+};
 
 const PAGE_WIDTH = 210;
 const PAGE_HEIGHT = 297;
@@ -3166,6 +3182,8 @@ const exportPreviewElementPdf = async (previewElement, fileName, options = {}) =
 };
 
 export async function exportResumePdf(formData, options = {}) {
+  await loadPdfDependencies();
+
   const template = normalizeTemplateId(formData.template);
   const fileName = getResumeFileName(formData, template, options.hardCopyMode ? "_hard-copy" : "");
 
@@ -3185,12 +3203,14 @@ export async function exportResumePdf(formData, options = {}) {
   doc.save(fileName);
 }
 
-export function exportOptimizedUploadPdf(
+export async function exportOptimizedUploadPdf(
   fileName,
   headline,
   optimizedResumeText,
   optimizedResumeData = null,
 ) {
+  await loadPdfDependencies();
+
   const safeName = (fileName || "optimized_resume").replace(/\.[^/.]+$/, "").replace(/\s+/g, "_");
   const doc = new jsPDF();
   const optimizedResume = sanitizeOptimizedResumeData(

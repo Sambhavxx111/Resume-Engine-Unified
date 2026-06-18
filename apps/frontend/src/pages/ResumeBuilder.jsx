@@ -230,7 +230,7 @@ const defaultResumePhotoCrop = {
 };
 
 const defaultResumePhotoFrameScale = 1;
-const MIN_SAVE_FEEDBACK_MS = 700;
+const MIN_SAVE_FEEDBACK_MS = 180;
 
 const normalizeResumeForBuilder = (resume = {}, fallbackTemplate = defaultResumeState.template, source = {}) => ({
   ...defaultResumeState,
@@ -288,7 +288,7 @@ function ResumeBuilder() {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const [formData, setFormData] = useState(defaultResumeState);
-  const [loadingResume, setLoadingResume] = useState(true);
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
   const [drafts, setDrafts] = useState([]);
   const [activeResumeId, setActiveResumeId] = useState(null);
   const [lastSavedSnapshot, setLastSavedSnapshot] = useState(() => serializeResumeState(defaultResumeState));
@@ -308,11 +308,11 @@ function ResumeBuilder() {
   useEffect(() => {
     const fetchResumeDrafts = async () => {
       if (!isAuthenticated) {
-        setLoadingResume(false);
+        setLoadingDrafts(false);
         return;
       }
 
-      setLoadingResume(true);
+      setLoadingDrafts(true);
       setError("");
 
       try {
@@ -328,7 +328,7 @@ function ResumeBuilder() {
             "Unable to fetch saved drafts right now. You can still start from a blank draft.",
         );
       } finally {
-        setLoadingResume(false);
+        setLoadingDrafts(false);
       }
     };
 
@@ -795,11 +795,6 @@ function ResumeBuilder() {
 
   return (
     <main className="page-shell max-w-[96rem]">
-      {loadingResume ? (
-        <div className="glass-card reveal-soft flex min-h-[300px] items-center justify-center p-8">
-          <Loader label="Fetching your resume..." />
-        </div>
-      ) : (
         <div className="reveal-up delay-1 space-y-6">
           <section className="glass-card p-5 sm:p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -825,7 +820,11 @@ function ResumeBuilder() {
             </div>
 
             <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {drafts.length ? (
+              {loadingDrafts ? (
+                <div className="rounded-[20px] border border-white/10 bg-white/10 px-4 py-5 text-sm text-slate-300 md:col-span-2 xl:col-span-3">
+                  <Loader label="Loading saved drafts..." />
+                </div>
+              ) : drafts.length ? (
                 drafts.map((draft) => (
                   <button
                     key={draft.id}
@@ -889,7 +888,6 @@ function ResumeBuilder() {
             previewRef={previewRef}
           />
         </div>
-      )}
     </main>
   );
 }

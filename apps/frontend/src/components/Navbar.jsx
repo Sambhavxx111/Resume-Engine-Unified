@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { preloadPrimaryRoutes, preloadRoute } from '../utils/routePreload';
 
 const navLinks = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -38,6 +39,10 @@ function Navbar() {
     setShowGuestNotice(Boolean(location.state?.guestModeNotice));
     setGuestModeActive(Boolean(location.state?.guestModeNotice));
   }, [location.pathname, location.state]);
+
+  useEffect(() => {
+    preloadPrimaryRoutes();
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -104,6 +109,8 @@ function Navbar() {
               <NavLink
                 key={link.to}
                 to={link.to}
+                onMouseEnter={() => preloadRoute(link.to)}
+                onFocus={() => preloadRoute(link.to)}
                 className={({ isActive }) =>
                   `rounded-full px-4 py-2 text-[14px] font-semibold transition ${
                     isActive
@@ -120,9 +127,7 @@ function Navbar() {
         </nav>
 
         <div className="relative flex min-w-0 flex-shrink-0 items-center justify-end gap-2 justify-self-end sm:gap-3">
-          {authLoading ? (
-            <div className={`h-11 w-[8.5rem] rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.88)] ${useDarkCareerNavbar ? "border-slate-700 bg-slate-950/70" : "border-slate-200 bg-white/70"}`} />
-          ) : isAuthenticated ? (
+          {isAuthenticated && !authLoading ? (
             <button type="button" className="button-secondary" onClick={handleLogout}>
               Logout
             </button>
