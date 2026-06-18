@@ -705,6 +705,13 @@ const parseResumeForBuilder = async (resumeText, originalName = '') => {
       };
     }
 
+    if (process.env.ENABLE_GEMINI_RESUME_IMPORT !== 'true') {
+      return {
+        success: true,
+        resumeData: groundImportedResumeData(buildImportedResumeData(resumeText, originalName), resumeText, originalName),
+      };
+    }
+
     const prompt = PROMPTS.PARSE_RESUME_FOR_BUILDER(resumeText, originalName);
 
     try {

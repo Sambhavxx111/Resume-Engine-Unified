@@ -39,7 +39,7 @@ const postToRag = async (path, payload) => {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.RAG_SERVICE_TIMEOUT_MS || 25000));
+  const timeout = setTimeout(() => controller.abort(), Number(process.env.RAG_SERVICE_TIMEOUT_MS || 9000));
 
   try {
     const response = await fetch(`${getRagBaseUrl()}${path}`, {
