@@ -4,14 +4,21 @@ export function getCareerServiceBaseUrl() {
   const configuredUrl = import.meta.env.VITE_CAREER_SERVICE_URL?.trim();
   const browserHostname =
     typeof window !== 'undefined' ? window.location.hostname?.trim() : '';
+  const browserIsLocal = ['localhost', '127.0.0.1'].includes(browserHostname);
 
   if (!configuredUrl) {
-    return browserHostname ? `http://${browserHostname}:8000` : 'http://localhost:8000';
+    if (browserIsLocal || !browserHostname) {
+      return 'http://localhost:8000';
+    }
+
+    if (typeof console !== 'undefined') {
+      console.warn('VITE_CAREER_SERVICE_URL is not set. Career service requests require a configured production URL.');
+    }
+    return '';
   }
 
   try {
     const url = new URL(configuredUrl);
-    const browserIsLocal = ['localhost', '127.0.0.1'].includes(browserHostname);
     const configuredIsLocal = ['localhost', '127.0.0.1'].includes(url.hostname);
 
     // Only normalize localhost variants in local development. In production,

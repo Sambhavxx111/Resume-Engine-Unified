@@ -2,6 +2,7 @@ const multer = require('multer');
 const { logSecurityEvent } = require('../utils/securityLogger');
 
 const MAX_UPLOAD_SIZE_BYTES = parseInt(process.env.MAX_RESUME_UPLOAD_BYTES || `${5 * 1024 * 1024}`, 10);
+const MAX_UPLOAD_SIZE_MB = Math.max(1, Math.round((Number.isFinite(MAX_UPLOAD_SIZE_BYTES) ? MAX_UPLOAD_SIZE_BYTES : 5 * 1024 * 1024) / (1024 * 1024)));
 const RESUME_MIME_TYPES = new Set([
   'application/pdf',
   'text/plain',
@@ -140,9 +141,17 @@ const createResumeUpload = (fieldName) => {
 const handleUploadErrors = (error, req, res, next) => {
   if (!error) return next();
 
-  if (error instanceof multer.MulterError || /Unsupported resume file type/i.test(error.message)) {
+  if (error instanceof multer.MulterError) {
     logSecurityEvent('blocked_upload', req, { reason: error.message });
-    return res.status(400).json({ error: error.message });
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: `Resume file is too large. Please upload a file up to ${MAX_UPLOAD_SIZE_MB} MB.` });
+    }
+    return res.status(400).json({ error: 'Resume upload failed. Please check the file and try again.' });
+  }
+
+  if (/Unsupported resume file type/i.test(error.message)) {
+    logSecurityEvent('blocked_upload', req, { reason: error.message });
+    return res.status(400).json({ error: 'Unsupported resume file type. Please upload a PDF, DOCX, DOC, or TXT file.' });
   }
 
   return next(error);

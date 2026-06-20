@@ -8,7 +8,7 @@ const router = express.Router();
 const uploadResume = createResumeUpload('resume');
 
 // POST /ats/score-file - Score uploaded resume
-router.post('/score-file', uploadLimiter, uploadResume, handleUploadErrors, validateResumeUploadContent, atsController.scoreUploadedResume);
+router.post('/score-file', uploadLimiter, aiLimiter, uploadResume, handleUploadErrors, validateResumeUploadContent, atsController.scoreUploadedResume);
 
 // POST /ats/optimize-file - Optimize uploaded resume
 router.post('/optimize-file', uploadLimiter, aiLimiter, uploadResume, handleUploadErrors, validateResumeUploadContent, atsController.optimizeUploadedResume);

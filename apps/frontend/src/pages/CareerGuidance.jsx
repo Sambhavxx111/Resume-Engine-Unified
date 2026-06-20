@@ -195,6 +195,7 @@ function CareerGuidance() {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const baseURL = useMemo(() => getCareerServiceBaseUrl(), []);
+  const careerServiceUnavailableMessage = 'Career guidance is not configured for this deployment yet. Please try again later.';
   const [resumeFile, setResumeFile] = useState(null);
   const [resumeResult, setResumeResult] = useState(null);
   const [resumeLoading, setResumeLoading] = useState(false);
@@ -219,6 +220,11 @@ function CareerGuidance() {
     event.preventDefault();
     if (!resumeFile) {
       setResumeError("Please upload a PDF, DOCX, or TXT resume first.");
+      return;
+    }
+
+    if (!baseURL) {
+      setResumeError(careerServiceUnavailableMessage);
       return;
     }
 
@@ -258,6 +264,11 @@ function CareerGuidance() {
       return;
     }
 
+    if (!baseURL) {
+      setJobsError(careerServiceUnavailableMessage);
+      return;
+    }
+
     if (!isAuthenticated) {
       navigate("/login", {
         state: {
@@ -290,6 +301,17 @@ function CareerGuidance() {
     event.preventDefault();
     if (!chatMessage.trim()) {
       setChatError("Please enter a question for the career coach.");
+      return;
+    }
+
+    if (!baseURL) {
+      setChatError(careerServiceUnavailableMessage);
+      setChatResult(buildLocalCoachFallback({
+        message: chatMessage,
+        context: chatContext,
+        skills: resumeResult?.skills || [],
+        jobs: jobsResult.slice(0, 3),
+      }));
       return;
     }
 
@@ -484,8 +506,8 @@ function CareerGuidance() {
                   Use the skill profile from your resume to surface relevant openings and understand where you are already competitive.
                 </p>
               </div>
-              <button type="button" className="button-secondary" onClick={findJobs} disabled={jobsLoading}>
-                {jobsLoading ? <Loader label="Finding roles..." /> : "Find Matching Roles"}
+              <button type="button" className="button-secondary" onClick={findJobs} disabled={!resumeResult || jobsLoading}>
+                {jobsLoading ? <Loader label="Finding roles..." /> : resumeResult ? "Find Matching Roles" : "Analyze Resume First"}
               </button>
             </div>
 
@@ -812,3 +834,4 @@ function CareerGuidance() {
 }
 
 export default CareerGuidance;
+
