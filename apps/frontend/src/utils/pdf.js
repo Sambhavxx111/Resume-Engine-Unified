@@ -2688,7 +2688,8 @@ const addPdfLink = (doc, link, scaleX, scaleY) => {
 };
 
 const isMostlyWhiteCanvasRow = (context, width, y) => {
-  const { data } = context.getImageData(0, y, width, 1);
+  const safeY = Math.max(0, Math.min(context.canvas.height - 1, Math.round(y)));
+  const { data } = context.getImageData(0, safeY, width, 1);
   let whitePixels = 0;
 
   for (let index = 0; index < data.length; index += 4) {
@@ -2700,20 +2701,38 @@ const isMostlyWhiteCanvasRow = (context, width, y) => {
   return whitePixels / width > 0.985;
 };
 
+const isMostlyWhiteCanvasBand = (context, width, y, radius = 14) => {
+  for (let offset = -radius; offset <= radius; offset += 4) {
+    if (!isMostlyWhiteCanvasRow(context, width, y + offset)) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const findWhitespaceBreakNear = (context, width, preferredY, minY, maxY, searchRadius = 180) => {
+  const clampedPreferredY = Math.max(minY, Math.min(maxY, Math.round(preferredY)));
+
+  for (let offset = 0; offset <= searchRadius; offset += 3) {
+    const upwardY = clampedPreferredY - offset;
+    if (upwardY > minY && isMostlyWhiteCanvasBand(context, width, upwardY)) {
+      return upwardY;
+    }
+
+    const downwardY = clampedPreferredY + offset;
+    if (offset > 0 && downwardY < maxY && isMostlyWhiteCanvasBand(context, width, downwardY)) {
+      return downwardY;
+    }
+  }
+
+  return null;
+};
+
 const getCanvasPageSliceHeight = (canvas, sourceY, targetPageHeightPx, breakpoints = []) => {
   const remainingHeight = canvas.height - sourceY;
   if (remainingHeight <= targetPageHeightPx) {
     return remainingHeight;
-  }
-
-  const idealBreakY = Math.min(sourceY + targetPageHeightPx, canvas.height - 1);
-  const minBreakY = sourceY + Math.floor(targetPageHeightPx * 0.72);
-  const preferredBreakpoint = [...breakpoints]
-    .reverse()
-    .find((breakpoint) => breakpoint < idealBreakY && breakpoint > minBreakY);
-
-  if (preferredBreakpoint) {
-    return preferredBreakpoint - sourceY;
   }
 
   const context = canvas.getContext("2d");
@@ -2721,21 +2740,23 @@ const getCanvasPageSliceHeight = (canvas, sourceY, targetPageHeightPx, breakpoin
     return Math.min(targetPageHeightPx, remainingHeight);
   }
 
-  const maxLookback = Math.min(260, idealBreakY - minBreakY);
+  const idealBreakY = Math.min(sourceY + targetPageHeightPx, canvas.height - 1);
+  const minBreakY = sourceY + Math.floor(targetPageHeightPx * 0.62);
+  const maxBreakY = Math.min(sourceY + targetPageHeightPx, canvas.height - 1);
+  const safeBreakpoints = [...breakpoints]
+    .reverse()
+    .filter((breakpoint) => breakpoint < maxBreakY && breakpoint > minBreakY);
 
-  for (let offset = 0; offset <= maxLookback; offset += 3) {
-    const candidateY = idealBreakY - offset;
-    if (candidateY <= minBreakY) {
-      break;
+  for (const breakpoint of safeBreakpoints) {
+    const whitespaceY = findWhitespaceBreakNear(context, canvas.width, breakpoint, minBreakY, maxBreakY, 72);
+    if (whitespaceY) {
+      return Math.max(1, whitespaceY - sourceY);
     }
+  }
 
-    if (
-      isMostlyWhiteCanvasRow(context, canvas.width, candidateY) &&
-      isMostlyWhiteCanvasRow(context, canvas.width, Math.max(sourceY, candidateY - 6)) &&
-      isMostlyWhiteCanvasRow(context, canvas.width, Math.min(canvas.height - 1, candidateY + 6))
-    ) {
-      return candidateY - sourceY;
-    }
+  const whitespaceY = findWhitespaceBreakNear(context, canvas.width, idealBreakY, minBreakY, maxBreakY, 280);
+  if (whitespaceY) {
+    return Math.max(1, whitespaceY - sourceY);
   }
 
   return Math.min(targetPageHeightPx, remainingHeight);
@@ -3244,3 +3265,4 @@ export async function exportOptimizedUploadPdf(
   renderTemplatePdf(doc, { ...optimizedResume, template: chosenTemplate }, config);
   doc.save(`${safeName}_ATS_Optimized_${chosenTemplate}.pdf`);
 }
+
