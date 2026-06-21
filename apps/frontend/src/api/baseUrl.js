@@ -6,21 +6,20 @@ export function getApiBaseUrl() {
     typeof window !== "undefined" ? window.location.hostname?.trim() : "";
   const browserIsLocal = ["localhost", "127.0.0.1"].includes(browserHostname);
 
+  if (!browserIsLocal && browserHostname) {
+    // Production uses the Vercel same-origin /api proxy so auth cookies are
+    // first-party on mobile and browsers that block third-party cookies.
+    return "";
+  }
+
   if (!configuredUrl) {
-    // In local development we default to the Node API on port 3000.
-    // In production the API base URL must be provided explicitly via env.
-    if (!browserIsLocal && browserHostname && typeof console !== "undefined") {
-      console.warn("VITE_API_BASE_URL is not set. API requests will use same-origin URLs.");
-    }
-    return browserIsLocal || !browserHostname ? "http://localhost:3000" : "";
+    return "http://localhost:3000";
   }
 
   try {
     const url = new URL(configuredUrl);
     const configuredIsLocal = ["localhost", "127.0.0.1"].includes(url.hostname);
 
-    // Only rewrite the hostname during local development so a shared env value
-    // like http://127.0.0.1:3000 still works from localhost in the browser.
     if (browserIsLocal && configuredIsLocal) {
       url.hostname = "localhost";
     }
