@@ -38,10 +38,17 @@ const ensureDatabaseSchema = async () => {
       failed_login_attempts INT NOT NULL DEFAULT 0,
       locked_until DATETIME NULL,
       last_login_at DATETIME NULL,
+      email_otp_hash VARCHAR(255) NULL,
+      email_otp_expires_at DATETIME NULL,
+      email_otp_attempts INT NOT NULL DEFAULT 0,
+      email_otp_last_sent_at DATETIME NULL,
+      google_id VARCHAR(255) NULL,
+      auth_provider VARCHAR(50) NOT NULL DEFAULT 'email',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_users_email (email),
       INDEX idx_users_verification_token (email_verification_token_hash),
-      INDEX idx_users_reset_token (password_reset_token_hash)
+      INDEX idx_users_reset_token (password_reset_token_hash),
+      INDEX idx_users_google_id (google_id)
     )
   `);
 
@@ -64,6 +71,13 @@ const ensureDatabaseSchema = async () => {
     )
   `);
 
+  await ensureColumn('users', 'email_otp_hash', 'VARCHAR(255) NULL');
+  await ensureColumn('users', 'email_otp_expires_at', 'DATETIME NULL');
+  await ensureColumn('users', 'email_otp_attempts', 'INT NOT NULL DEFAULT 0');
+  await ensureColumn('users', 'email_otp_last_sent_at', 'DATETIME NULL');
+  await ensureColumn('users', 'google_id', 'VARCHAR(255) NULL');
+  await ensureColumn('users', 'auth_provider', "VARCHAR(50) NOT NULL DEFAULT 'email'");
+
   await ensureColumn('resumes', 'title', 'VARCHAR(255) NULL');
   await ensureColumn('resumes', 'status', "VARCHAR(32) NOT NULL DEFAULT 'draft'");
   await ensureColumn('resumes', 'is_active', 'TINYINT(1) NOT NULL DEFAULT 0');
@@ -73,3 +87,4 @@ const ensureDatabaseSchema = async () => {
 module.exports = {
   ensureDatabaseSchema,
 };
+

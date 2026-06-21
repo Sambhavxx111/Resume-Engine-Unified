@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import Loader from "../components/Loader";
 import PasswordField from "../components/PasswordField";
+import { getApiBaseUrl } from "../api/baseUrl";
+import { API } from "../api/services";
 import { useAuth } from "../context/AuthContext";
 
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { login } = useAuth();
   const [formState, setFormState] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
@@ -18,6 +21,20 @@ function Login() {
       setFormState((prev) => ({ ...prev, email: location.state.email }));
     }
 
+    const oauthStatus = searchParams.get("oauth");
+    if (oauthStatus === "google_failed") {
+      setError("Google login could not be completed. Please try again.");
+      return;
+    }
+    if (oauthStatus === "google_config_error") {
+      setError("Google login is not configured yet.");
+      return;
+    }
+    if (oauthStatus === "google_unverified") {
+      setError("Google did not confirm this email address. Please use another Google account.");
+      return;
+    }
+
     if (location.state?.fromSignupDuplicate) {
       setInfo("This email is already registered. Please log in instead.");
       return;
@@ -26,11 +43,16 @@ function Login() {
     if (location.state?.authPrompt) {
       setInfo(location.state.authPrompt);
     }
-  }, [location.state]);
+  }, [location.state, searchParams]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormState((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleGoogleLogin = () => {
+    const baseURL = getApiBaseUrl();
+    window.location.href = `${baseURL}${API.googleLogin}`;
   };
 
   const handleSubmit = async (event) => {
@@ -44,17 +66,24 @@ function Login() {
       navigate(location.state?.from?.pathname || "/dashboard", { replace: true });
     } catch (requestError) {
       if (!requestError.response) {
-        setError(
-          "Cannot reach the backend right now. Make sure the API server is running and reachable.",
-        );
+        setError("Cannot reach the backend right now. Make sure the API server is running and reachable.");
         return;
       }
 
-      setError(
+      const apiMessage =
         requestError.response?.data?.message ||
-          requestError.response?.data?.error ||
-          "Unable to sign in. Please try again.",
-      );
+        requestError.response?.data?.error ||
+        "Unable to sign in. Please try again.";
+
+      if (requestError.response?.data?.requiresEmailVerification) {
+        navigate("/verify-email", {
+          replace: true,
+          state: { email: requestError.response.data.email || formState.email, message: apiMessage },
+        });
+        return;
+      }
+
+      setError(apiMessage);
     } finally {
       setSubmitting(false);
     }
@@ -68,7 +97,24 @@ function Login() {
         <p className="mt-3 text-sm text-slate-300">
           Access your saved resume, ATS reports, job-match insights, and gated downloads with your personal email login.
         </p>
-        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+
+        <div className="mt-8 space-y-3">
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="inline-flex w-full items-center justify-center gap-3 rounded-[18px] border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-[0_12px_24px_rgba(15,23,42,0.08)] transition hover:bg-slate-50"
+          >
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-base font-bold text-blue-600">G</span>
+            Continue with Google
+          </button>
+          <div className="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-slate-400">
+            <span className="h-px flex-1 bg-slate-200" />
+            or
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+        </div>
+
+        <form className="mt-5 space-y-5" onSubmit={handleSubmit}>
           <input className="field" type="email" name="email" placeholder="Email address" value={formState.email} onChange={handleChange} required />
           <PasswordField name="password" placeholder="Password" value={formState.password} onChange={handleChange} required />
 

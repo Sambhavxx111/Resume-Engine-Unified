@@ -18,6 +18,19 @@ const buildAccountUrl = (type, token) => {
   return `${getPublicAppUrl()}${route}?token=${encodeURIComponent(token)}`;
 };
 
+const buildOtpEmailContent = (otp) => ({
+  subject: 'Your Resume Engine verification code',
+  html: `
+    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a">
+      <h2 style="margin-bottom:12px">Verify your email</h2>
+      <p>Your Resume Engine verification code is:</p>
+      <p style="font-size:28px;font-weight:700;letter-spacing:8px;margin:20px 0;color:#0f172a">${otp}</p>
+      <p>This code expires in 10 minutes. If you did not request this, you can ignore this email.</p>
+    </div>
+  `,
+  text: `Your Resume Engine verification code is ${otp}. This code expires in 10 minutes.`,
+});
+
 const buildEmailContent = (type, url) => {
   if (type === 'verify') {
     return {
@@ -90,15 +103,13 @@ const sendWithResend = async ({ to, subject, html, text }) => {
   }
 };
 
-const sendAccountEmail = async ({ type, email, token, req }) => {
-  const url = buildAccountUrl(type, token);
-  const content = buildEmailContent(type, url);
+const sendGeneratedEmail = async ({ email, content, req, eventName }) => {
   const provider = getProvider();
 
   if (!provider) {
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`${type === 'verify' ? 'Email verification' : 'Password reset'} link for local development: ${url}`);
-      return { delivered: false, provider: 'console', url };
+      console.log(`${content.subject}: ${content.text}`);
+      return { delivered: false, provider: 'console' };
     }
     throw new Error('EMAIL_PROVIDER is missing');
   }
@@ -111,19 +122,32 @@ const sendAccountEmail = async ({ type, email, token, req }) => {
         html: content.html,
         text: content.text,
       });
-      return { delivered: true, provider, url };
+      return { delivered: true, provider };
     }
 
     throw new Error(`Unsupported EMAIL_PROVIDER: ${provider}`);
   } catch (error) {
     if (req) {
-      logApiError('email_send_failed', req, error);
+      logApiError(eventName, req, error);
     }
     throw error;
   }
 };
 
+const sendAccountEmail = async ({ type, email, token, req }) => {
+  const url = buildAccountUrl(type, token);
+  const content = buildEmailContent(type, url);
+  const result = await sendGeneratedEmail({ email, content, req, eventName: 'email_send_failed' });
+  return { ...result, url };
+};
+
+const sendVerificationOtpEmail = async ({ email, otp, req }) => {
+  const content = buildOtpEmailContent(otp);
+  return sendGeneratedEmail({ email, content, req, eventName: 'email_otp_send_failed' });
+};
+
 module.exports = {
   sendAccountEmail,
+  sendVerificationOtpEmail,
   buildAccountUrl,
 };

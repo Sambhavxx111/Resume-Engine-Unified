@@ -24,6 +24,17 @@ const verifyEmailSchema = Joi.object({
   token: Joi.string().length(64).hex().required(),
 });
 
+const verifyEmailOtpSchema = Joi.object({
+  email: Joi.string().trim().lowercase().email().required(),
+  otp: Joi.string().trim().pattern(/^\d{6}$/).required().messages({
+    'string.pattern.base': 'Verification code must be 6 digits.',
+  }),
+});
+
+const resendVerificationOtpSchema = Joi.object({
+  email: Joi.string().trim().lowercase().email().required(),
+});
+
 const forgotPasswordSchema = Joi.object({
   email: Joi.string().trim().lowercase().email().required(),
 });
@@ -37,6 +48,8 @@ module.exports = {
   signupSchema,
   loginSchema,
   verifyEmailSchema,
+  verifyEmailOtpSchema,
+  resendVerificationOtpSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
 };

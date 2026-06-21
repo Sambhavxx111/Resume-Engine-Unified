@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
 import PasswordField from "../components/PasswordField";
+import { getApiBaseUrl } from "../api/baseUrl";
+import { API } from "../api/services";
 import { useAuth } from "../context/AuthContext";
 
 function Signup() {
@@ -17,6 +19,11 @@ function Signup() {
     setFormState((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleGoogleLogin = () => {
+    const baseURL = getApiBaseUrl();
+    window.location.href = `${baseURL}${API.googleLogin}`;
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -25,19 +32,17 @@ function Signup() {
 
     try {
       const data = await signup(formState);
-      if (data.authenticated === false) {
-        navigate("/login", {
+      if (data.authenticated === false || data.requiresEmailVerification) {
+        navigate("/verify-email", {
           replace: true,
-          state: { email: formState.email, authPrompt: data.message },
+          state: { email: formState.email, message: data.message },
         });
         return;
       }
       navigate("/dashboard", { replace: true });
     } catch (requestError) {
       if (!requestError.response) {
-        setError(
-          "Cannot reach the backend right now. Make sure the API server is running and reachable.",
-        );
+        setError("Cannot reach the backend right now. Make sure the API server is running and reachable.");
         return;
       }
 
@@ -45,6 +50,14 @@ function Signup() {
         requestError.response?.data?.message ||
         requestError.response?.data?.error ||
         "Unable to create account. Please try again.";
+
+      if (requestError.response?.data?.requiresEmailVerification) {
+        navigate("/verify-email", {
+          replace: true,
+          state: { email: formState.email, message: apiMessage },
+        });
+        return;
+      }
 
       if (requestError.response?.status === 409) {
         setInfo("Account already found. Redirecting to login...");
@@ -71,7 +84,24 @@ function Signup() {
         <p className="mt-3 text-sm text-slate-300">
           Set up your account to start building resumes, checking ATS scores, and optimizing faster.
         </p>
-        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+
+        <div className="mt-8 space-y-3">
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="inline-flex w-full items-center justify-center gap-3 rounded-[18px] border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-[0_12px_24px_rgba(15,23,42,0.08)] transition hover:bg-slate-50"
+          >
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-base font-bold text-blue-600">G</span>
+            Continue with Google
+          </button>
+          <div className="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-slate-400">
+            <span className="h-px flex-1 bg-slate-200" />
+            or
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+        </div>
+
+        <form className="mt-5 space-y-5" onSubmit={handleSubmit}>
           <input className="field" type="text" name="name" placeholder="Full name" value={formState.name} onChange={handleChange} required />
           <input className="field" type="email" name="email" placeholder="Email address" value={formState.email} onChange={handleChange} required />
           <PasswordField name="password" placeholder="Password" minLength={10} value={formState.password} onChange={handleChange} required />

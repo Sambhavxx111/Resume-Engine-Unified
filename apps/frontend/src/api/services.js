@@ -2,6 +2,9 @@ export const API = {
   login: "/api/auth/login",
   signup: "/api/auth/signup",
   verifyEmail: "/api/auth/verify-email",
+  verifyEmailOtp: "/api/auth/verify-email-otp",
+  resendVerificationOtp: "/api/auth/resend-verification-otp",
+  googleLogin: "/api/auth/google",
   resetPassword: "/api/auth/reset-password",
   me: "/api/auth/me",
   logout: "/api/auth/logout",
@@ -184,4 +187,6 @@ export const API_CONTRACT = [
     },
   },
 ];
+
+
 
