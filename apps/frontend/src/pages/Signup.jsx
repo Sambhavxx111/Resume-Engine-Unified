@@ -13,13 +13,24 @@ function Signup() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormState((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
+    setError("");
+    setInfo("Preparing Google sign-in. This can take a moment if the backend is waking up.");
+    setGoogleLoading(true);
+
+    try {
+      await fetch("/health", { cache: "no-store" });
+    } catch {
+      // Continue anyway; the OAuth endpoint will show a proper error if the API is unavailable.
+    }
+
     const baseURL = getApiBaseUrl();
     window.location.href = `${baseURL}${API.googleLogin}`;
   };
@@ -89,10 +100,17 @@ function Signup() {
           <button
             type="button"
             onClick={handleGoogleLogin}
-            className="inline-flex w-full items-center justify-center gap-3 rounded-[18px] border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-[0_12px_24px_rgba(15,23,42,0.08)] transition hover:bg-slate-50"
+            disabled={googleLoading}
+            className="inline-flex w-full items-center justify-center gap-3 rounded-[18px] border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-[0_12px_24px_rgba(15,23,42,0.08)] transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-base font-bold text-blue-600">G</span>
-            Continue with Google
+            {googleLoading ? (
+              <Loader label="Preparing Google sign-in..." />
+            ) : (
+              <>
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-base font-bold text-blue-600">G</span>
+                Continue with Google
+              </>
+            )}
           </button>
           <div className="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-slate-400">
             <span className="h-px flex-1 bg-slate-200" />
