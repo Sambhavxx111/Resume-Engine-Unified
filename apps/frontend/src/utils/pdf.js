@@ -1050,7 +1050,11 @@ const renderSocsOfficialTemplate = (doc, formData, config) => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.text(title, marginX, y);
-    y += 5.2;
+    const dividerY = y + 2.1;
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.32);
+    doc.line(marginX, dividerY, marginX + contentWidth, dividerY);
+    y += 6.6;
   };
 
   const drawSocsParagraph = (text) => {
@@ -3267,4 +3271,3 @@ export async function exportOptimizedUploadPdf(
   renderTemplatePdf(doc, { ...optimizedResume, template: chosenTemplate }, config);
   doc.save(`${safeName}_ATS_Optimized_${chosenTemplate}.pdf`);
 }
-

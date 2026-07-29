@@ -1484,7 +1484,8 @@ function ResumeForm({
   const socsLeadershipItems = getSocsSectionItems(formData.customSections, /leadership|activity|activities|achievement|award/i);
   const socsOtherSections = getSocsOtherCustomSections(formData.customSections);
   const socsSummaryWords = String(formData.summary || "").trim().split(/\s+/).filter(Boolean).length;
-  const socsPhoneLooksValid = !formData.personalInfo.phone || /^\+91\s?\d{10}$/.test(String(formData.personalInfo.phone).replace(/[-()]/g, "").trim());
+  const socsPhoneNumberForValidation = [formData.personalInfo.countryCode, formData.personalInfo.phone].filter(Boolean).join(" ").replace(/[-()]/g, "").trim();
+  const socsPhoneLooksValid = !formData.personalInfo.phone || /^\+91\s?\d{10}$/.test(socsPhoneNumberForValidation);
   const socsLinkedInLooksValid = !formData.personalInfo.portfolio || /linkedin\.com\/in\/[A-Za-z0-9-]+\/?$/i.test(stripProtocol(formData.personalInfo.portfolio));
   const socsGithubLooksValid = !formData.personalInfo.github || /github\.com\/[A-Za-z0-9-]+\/?$/i.test(stripProtocol(formData.personalInfo.github));
 
@@ -1573,7 +1574,9 @@ function ResumeForm({
 
   const renderSocsSection = (title, isEmpty, content, placeholder) => (
     <section data-resume-section-empty={isEmpty ? "true" : undefined} className="mt-[14px] first:mt-0">
-      <h3 className="mb-[5px] text-[16px] font-bold leading-[1.15] text-black">{title}</h3>
+      <div className="mb-[6px] border-b-[1.5px] border-black pb-[2px]">
+        <h3 className="text-[16px] font-bold leading-[1.15] text-black">{title}</h3>
+      </div>
       {isEmpty ? <p className="text-[13.3px] leading-[1.15] text-slate-500">{placeholder}</p> : content}
     </section>
   );
@@ -1717,13 +1720,13 @@ function ResumeForm({
                 <input className="field" name="lastName" placeholder="Last name *" required value={formData.personalInfo.lastName || ""} onChange={updatePersonalInfo} />
                 <input className="field" name="title" placeholder="Professional title" value={formData.personalInfo.title} onChange={updatePersonalInfo} />
                 <input className="field" name="email" placeholder="Email" type="email" value={formData.personalInfo.email} onChange={updatePersonalInfo} />
-                                <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-3">
+                <div className="grid gap-3 md:col-span-2 sm:grid-cols-[7rem_minmax(12rem,1fr)]">
                   <select className="field" name="countryCode" value={formData.personalInfo.countryCode || "+91"} onChange={updatePersonalInfo} aria-label="Country code">
                     {COUNTRY_CODES.map((item) => (
                       <option key={item.code + item.country} value={item.code}>{item.flag} {item.code}</option>
                     ))}
                   </select>
-                  <input className="field" name="phone" placeholder="Phone number" value={formData.personalInfo.phone} onChange={updatePersonalInfo} />
+                  <input className="field min-w-0" name="phone" placeholder="Phone number" inputMode="tel" value={formData.personalInfo.phone} onChange={updatePersonalInfo} />
                 </div>
                 <input className="field" name="portfolio" placeholder="LinkedIn / Portfolio URL" value={formData.personalInfo.portfolio || ""} onChange={updatePersonalInfo} />
                 <input className="field" name="github" placeholder="GitHub URL" value={formData.personalInfo.github || ""} onChange={updatePersonalInfo} />
