@@ -6,7 +6,6 @@ import Navbar from './components/Navbar';
 const ATSAnalysis = lazy(() => import('./pages/ATSAnalysis'));
 const CareerGuidance = lazy(() => import('./pages/CareerGuidance'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const JDMatcher = lazy(() => import('./pages/JDMatcher'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Login = lazy(() => import('./pages/Login'));
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -20,7 +19,6 @@ function App() {
   const pageToneClass = (() => {
     if (location.pathname === "/resume") return "tone-resume";
     if (location.pathname === "/ats") return "tone-ats";
-    if (location.pathname === "/jd-match") return "tone-jd";
     if (location.pathname === "/career-guidance") return "tone-career";
     if (location.pathname === "/dashboard") return "tone-dashboard";
     if (
@@ -57,7 +55,6 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/resume" element={<ResumeBuilder />} />
             <Route path="/ats" element={<ATSAnalysis />} />
-            <Route path="/jd-match" element={<JDMatcher />} />
             <Route path="/career-guidance" element={<CareerGuidance />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

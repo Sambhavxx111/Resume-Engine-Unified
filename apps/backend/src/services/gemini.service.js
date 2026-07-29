@@ -172,7 +172,7 @@ const PROMPTS = {
     Put all project work in the top-level projects array. Do not duplicate projects inside customSections.
     Treat internship, internships, training, and industrial training sections as experience. Do not duplicate them inside customSections.
     If something is missing, return an empty string or empty array instead.
-    Convert bullet points into plain text strings joined naturally inside description fields.
+    Preserve bullet boundaries using newline-separated bullet-style strings inside description fields. Do not merge unrelated bullets into one sentence.
     Use only these top-level keys and no markdown.
 
     Original file name:
@@ -705,7 +705,7 @@ const parseResumeForBuilder = async (resumeText, originalName = '') => {
       };
     }
 
-    if (process.env.ENABLE_GEMINI_RESUME_IMPORT !== 'true') {
+    if (process.env.ENABLE_GEMINI_RESUME_IMPORT === 'false') {
       return {
         success: true,
         resumeData: groundImportedResumeData(buildImportedResumeData(resumeText, originalName), resumeText, originalName),

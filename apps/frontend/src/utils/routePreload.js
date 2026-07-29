@@ -3,7 +3,6 @@ const routeLoaders = {
   "/dashboard": () => import("../pages/Dashboard"),
   "/resume": () => import("../pages/ResumeBuilder"),
   "/ats": () => import("../pages/ATSAnalysis"),
-  "/jd-match": () => import("../pages/JDMatcher"),
   "/career-guidance": () => import("../pages/CareerGuidance"),
   "/login": () => import("../pages/Login"),
   "/signup": () => import("../pages/Signup"),

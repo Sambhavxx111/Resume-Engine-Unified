@@ -8,7 +8,6 @@ const navLinks = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/resume', label: 'Resume Builder' },
   { to: '/ats', label: 'ATS Analyzer' },
-  { to: '/jd-match', label: 'JD Matcher' },
   { to: '/career-guidance', label: 'Career Guidance' },
 ];
 
@@ -114,7 +113,7 @@ function Navbar() {
                 className={({ isActive }) =>
                   `rounded-full px-4 py-2 text-[14px] font-semibold transition ${
                     isActive
-                      ? 'bg-slate-900 text-white shadow-sm'
+                      ? 'bg-cyan-700 text-white shadow-sm'
                       : useDarkCareerNavbar
                         ? 'text-slate-300 hover:bg-white/10 hover:text-white'
                         : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'
@@ -144,7 +143,7 @@ function Navbar() {
                       ? "border border-cyan-400/70 bg-cyan-400/20 text-cyan-100 shadow-[0_0_0_1px_rgba(34,211,238,0.18)]"
                       : "border border-cyan-200 bg-cyan-50 text-cyan-700 shadow-[0_10px_25px_rgba(34,211,238,0.16)]"
                     : useDarkCareerNavbar
-                      ? "border border-slate-600 bg-slate-800/90 text-slate-300 hover:bg-slate-800"
+                      ? "border border-slate-600 bg-slate-800/90 text-slate-300 hover:bg-cyan-800"
                       : "border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"
                 }`}
               >
@@ -163,7 +162,7 @@ function Navbar() {
               </Link>
               <Link
                 to="/signup"
-                className="hidden items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:-translate-y-0.5 hover:bg-slate-800 hover:!text-white sm:inline-flex"
+                className="hidden items-center justify-center rounded-[18px] border border-cyan-700 bg-cyan-700 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(8,145,178,0.18)] transition hover:-translate-y-0.5 hover:bg-cyan-800 hover:!text-white sm:inline-flex"
               >
                 Get Started
               </Link>
@@ -187,7 +186,7 @@ function Navbar() {
                     onClick={() => setShowGuestNotice(false)}
                     className={`absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border transition ${
                       useDarkCareerNavbar
-                        ? "border-slate-700 text-slate-300 hover:bg-slate-800"
+                        ? "border-slate-700 text-slate-300 hover:bg-cyan-800"
                         : "border-slate-200 text-slate-500 hover:bg-slate-100"
                     }`}
                   >

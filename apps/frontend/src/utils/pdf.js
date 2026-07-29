@@ -1091,7 +1091,7 @@ const renderSocsOfficialTemplate = (doc, formData, config) => {
   doc.setFontSize(11);
   const contactParts = [
     { text: safeText(formData.personalInfo.email) },
-    { text: safeText(formData.personalInfo.phone) },
+    { text: [safeText(formData.personalInfo.countryCode), safeText(formData.personalInfo.phone)].filter(Boolean).join(" ") },
     formData.personalInfo.portfolio
       ? { text: stripProtocol(formData.personalInfo.portfolio), url: normalizeExternalHref(formData.personalInfo.portfolio) }
       : null,
@@ -1136,7 +1136,7 @@ const renderSocsOfficialTemplate = (doc, formData, config) => {
 
   const internshipItems = (formData.experience || []).filter((item) => item.company || item.role || item.description).sort(compareByEndDateDesc);
   if (internshipItems.length) {
-    drawSocsSectionTitle("Internships");
+    drawSocsSectionTitle("Work Experience");
     internshipItems.forEach((item) => {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
@@ -1160,7 +1160,9 @@ const renderSocsOfficialTemplate = (doc, formData, config) => {
     projectItems.forEach((project, index) => {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
-      y = drawWrappedTextPaginated(doc, safeText(project.name) || `Project ${index + 1}`, marginX, y, contentWidth, 4.1, config);
+      const projectRange = formatDateRange(project.startDate, project.endDate);
+      y = drawWrappedTextPaginated(doc, (safeText(project.name) || "Project " + (index + 1)) + (projectRange ? " " + projectRange : ""), marginX, y, contentWidth, 4.1, config);
+      drawSocsParagraph("Contributions:");
       drawSocsBullets(getProjectBullets(project));
     });
   }

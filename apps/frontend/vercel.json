@@ -33,11 +33,11 @@
   "rewrites": [
     { "source": "/health", "destination": "https://resume-engine-unified.onrender.com/health" },
     { "source": "/api/:path*", "destination": "https://resume-engine-unified.onrender.com/api/:path*" },
+    { "source": "/career-api/:path*", "destination": "https://resume-engine-career-service.onrender.com/:path*" },
     { "source": "/", "destination": "/index.html" },
     { "source": "/dashboard", "destination": "/index.html" },
     { "source": "/resume", "destination": "/index.html" },
     { "source": "/ats", "destination": "/index.html" },
-    { "source": "/jd-match", "destination": "/index.html" },
     { "source": "/career-guidance", "destination": "/index.html" },
     { "source": "/login", "destination": "/index.html" },
     { "source": "/signup", "destination": "/index.html" },

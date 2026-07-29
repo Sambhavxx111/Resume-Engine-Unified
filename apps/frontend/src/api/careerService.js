@@ -11,10 +11,7 @@ export function getCareerServiceBaseUrl() {
       return 'http://localhost:8000';
     }
 
-    if (typeof console !== 'undefined') {
-      console.warn('VITE_CAREER_SERVICE_URL is not set. Career service requests require a configured production URL.');
-    }
-    return '';
+    return '/career-api';
   }
 
   try {

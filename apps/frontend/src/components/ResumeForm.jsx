@@ -23,6 +23,8 @@ const blankExperience = {
 
 const blankProject = {
   name: "",
+  startDate: "",
+  endDate: "",
   description: "",
   bullets: [""],
 };
@@ -94,12 +96,52 @@ const TEMPLATE_OPTIONS = [
   },
 ];
 
+const COUNTRY_CODES = [
+  { code: "+91", country: "India", flag: "IN" },
+  { code: "+1", country: "United States / Canada", flag: "US" },
+  { code: "+44", country: "United Kingdom", flag: "GB" },
+  { code: "+61", country: "Australia", flag: "AU" },
+  { code: "+49", country: "Germany", flag: "DE" },
+  { code: "+33", country: "France", flag: "FR" },
+  { code: "+971", country: "United Arab Emirates", flag: "AE" },
+  { code: "+65", country: "Singapore", flag: "SG" },
+  { code: "+81", country: "Japan", flag: "JP" },
+  { code: "+86", country: "China", flag: "CN" },
+];
+
+const DEGREE_OPTIONS = [
+  "B.Tech", "B.E.", "B.Sc", "BCA", "BBA", "B.Com", "BA", "M.Tech", "M.E.", "M.Sc", "MCA", "MBA", "M.Com", "MA", "PhD", "Diploma", "Senior Secondary", "Secondary School Certificate"
+];
+
+const FIELD_OPTIONS = [
+  "Computer Science", "Computer Applications", "Information Technology", "Cybersecurity", "Data Science", "Artificial Intelligence", "Machine Learning", "Electronics and Communication", "Electrical Engineering", "Mechanical Engineering", "Civil Engineering", "Business Administration", "Commerce", "Economics", "Mathematics", "Physics", "Chemistry", "Arts", "Humanities"
+];
+
+const titleCaseNamePart = (value = "") =>
+  String(value || "")
+    .replace(/\s+/g, " ")
+    .trimStart()
+    .replace(/(^|[\s'-])([a-z])/g, (_, prefix, letter) => prefix + letter.toUpperCase());
+
+const buildFullName = (personalInfo = {}) =>
+  [personalInfo.firstName, personalInfo.middleName, personalInfo.lastName]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+const formatDateForInput = (value = "") => {
+  const cleaned = String(value || "").trim();
+  const monthYear = cleaned.match(/^(\d{4})-(\d{2})/);
+  return monthYear ? monthYear[1] + "-" + monthYear[2] : "";
+};
+
 const formatMonthYear = (value) => {
   if (!value) return "";
   const [year, month] = String(value).split("-");
   if (!year) return "";
   if (!month) return year;
-  return `${month.padStart(2, "0")}/${year}`;
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(date);
 };
 
 const formatDateRange = (startDate, endDate) => {
@@ -1006,14 +1048,49 @@ function ResumeForm({
   };
 
   const updatePersonalInfo = (event) => {
-    const { name, value } = event.target;
-    setFormData((prev) => ({
-      ...prev,
-      personalInfo: {
+    const { name } = event.target;
+    const value = ["firstName", "middleName", "lastName"].includes(name)
+      ? titleCaseNamePart(event.target.value)
+      : event.target.value;
+
+    setFormData((prev) => {
+      const nextPersonalInfo = {
         ...prev.personalInfo,
         [name]: value,
-      },
-    }));
+      };
+      if (["firstName", "middleName", "lastName"].includes(name)) {
+        nextPersonalInfo.fullName = buildFullName(nextPersonalInfo);
+      }
+      return { ...prev, personalInfo: nextPersonalInfo };
+    });
+  };
+
+  const handleBulletTextareaKeyDown = (event, commitValue) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const el = event.currentTarget;
+    const { selectionStart, selectionEnd, value } = el;
+    const prefix = value ? "\n- " : "- ";
+    const nextValue = value.slice(0, selectionStart) + prefix + value.slice(selectionEnd);
+    commitValue(nextValue);
+    requestAnimationFrame(() => {
+      el.selectionStart = selectionStart + prefix.length;
+      el.selectionEnd = selectionStart + prefix.length;
+    });
+  };
+
+  const generateDescriptionDraft = (kind, index) => {
+    const source = kind === "project" ? (formData.projects || [])[index] : (formData.experience || [])[index];
+    const name = kind === "project" ? source?.name : source?.role;
+    const context = kind === "project" ? source?.name : [source?.role, source?.company].filter(Boolean).join(" at ");
+    const fallback = kind === "project"
+      ? "- Built " + (name || "this project") + " with clear problem-solving, implementation, and testing ownership.\n- Improved usability, reliability, or performance through practical design and engineering decisions.\n- Documented outcomes, tools used, and measurable project impact for recruiter readability."
+      : "- Delivered responsibilities for " + (context || "this role") + " with ownership, consistency, and measurable execution.\n- Collaborated with teammates and stakeholders to solve practical problems and improve workflow quality.\n- Used relevant tools and processes to complete assigned work with reliable outcomes.";
+    if (kind === "project") {
+      updateProjectDetails(index, fallback);
+      return;
+    }
+    updateCollectionItem("experience", index, "description", fallback);
   };
 
   const updateCollectionItem = (section, index, field, value) => {
@@ -1175,7 +1252,7 @@ function ResumeForm({
         ...withEditableSkillCategories(prev.skills),
         {
           category: "",
-          items: [],
+          items: [""],
         },
       ],
     }));
@@ -1317,7 +1394,7 @@ function ResumeForm({
     }));
   };
 
-  const previewName = formData.personalInfo.fullName || formData.personalInfo.name || "Your Name";
+  const previewName = buildFullName(formData.personalInfo) || formData.personalInfo.fullName || formData.personalInfo.name || "Your Name";
   const previewTitle = formData.personalInfo.title || "Professional Title";
   const renderedSkillCategories = useMemo(() => sanitizeRenderedSkillCategories(formData.skills), [formData.skills]);
   const editableSkillCategories = useMemo(
@@ -1579,7 +1656,7 @@ function ResumeForm({
               </div>
               <button
                 type="button"
-                className="mt-auto inline-flex w-full items-center justify-center rounded-[16px] border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_14px_24px_rgba(15,23,42,0.14)] transition hover:bg-slate-800 hover:!text-white"
+                className="mt-auto inline-flex w-full items-center justify-center rounded-[16px] border border-cyan-700 bg-cyan-700 px-4 py-2.5 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_14px_24px_rgba(8,145,178,0.16)] transition hover:bg-cyan-800 hover:!text-white"
                 disabled={!importFile || importLoading}
                 onClick={onImportResume}
               >
@@ -1625,9 +1702,6 @@ function ResumeForm({
             ["4", "Save or export"],
           ].map(([step, label]) => (
             <div key={step} className="rounded-[18px] border border-slate-200 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs text-white">
-                {step}
-              </span>
               {label}
             </div>
           ))}
@@ -1638,10 +1712,19 @@ function ResumeForm({
             <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <h3 className="mb-4 text-lg font-semibold text-slate-900">Personal Info</h3>
               <div className="grid gap-4 md:grid-cols-2">
-                <input className="field" name="fullName" placeholder="Full name" value={formData.personalInfo.fullName} onChange={updatePersonalInfo} />
+                                <input className="field" name="firstName" placeholder="First name *" required value={formData.personalInfo.firstName || ""} onChange={updatePersonalInfo} />
+                <input className="field" name="middleName" placeholder="Middle name" value={formData.personalInfo.middleName || ""} onChange={updatePersonalInfo} />
+                <input className="field" name="lastName" placeholder="Last name *" required value={formData.personalInfo.lastName || ""} onChange={updatePersonalInfo} />
                 <input className="field" name="title" placeholder="Professional title" value={formData.personalInfo.title} onChange={updatePersonalInfo} />
                 <input className="field" name="email" placeholder="Email" type="email" value={formData.personalInfo.email} onChange={updatePersonalInfo} />
-                <input className="field" name="phone" placeholder="Phone" value={formData.personalInfo.phone} onChange={updatePersonalInfo} />
+                                <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-3">
+                  <select className="field" name="countryCode" value={formData.personalInfo.countryCode || "+91"} onChange={updatePersonalInfo} aria-label="Country code">
+                    {COUNTRY_CODES.map((item) => (
+                      <option key={item.code + item.country} value={item.code}>{item.flag} {item.code}</option>
+                    ))}
+                  </select>
+                  <input className="field" name="phone" placeholder="Phone number" value={formData.personalInfo.phone} onChange={updatePersonalInfo} />
+                </div>
                 <input className="field" name="portfolio" placeholder="LinkedIn / Portfolio URL" value={formData.personalInfo.portfolio || ""} onChange={updatePersonalInfo} />
                 <input className="field" name="github" placeholder="GitHub URL" value={formData.personalInfo.github || ""} onChange={updatePersonalInfo} />
                 <input className="field md:col-span-2" name="location" placeholder="Location" value={formData.personalInfo.location} onChange={updatePersonalInfo} />
@@ -1663,6 +1746,12 @@ function ResumeForm({
                   Add Education
                 </button>
               </div>
+              <datalist id="degree-options">
+                {DEGREE_OPTIONS.map((degree) => <option key={degree} value={degree} />)}
+              </datalist>
+              <datalist id="field-options">
+                {FIELD_OPTIONS.map((field) => <option key={field} value={field} />)}
+              </datalist>
               <div className="space-y-4">
                 {formData.education.map((item, index) => (
                   <div key={`education-${index}`} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
@@ -1672,12 +1761,12 @@ function ResumeForm({
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <input className="field md:col-span-2" placeholder="Institution / School / University" value={item.institution} onChange={(event) => updateCollectionItem("education", index, "institution", event.target.value)} />
-                      <input className="field md:col-span-2" placeholder="Degree / Certificate" value={item.degree} onChange={(event) => updateCollectionItem("education", index, "degree", event.target.value)} />
-                      <input className="field md:col-span-2" placeholder="Field of study / Branch / Stream" value={item.fieldOfStudy} onChange={(event) => updateCollectionItem("education", index, "fieldOfStudy", event.target.value)} />
+                      <input className="field md:col-span-2" list="degree-options" placeholder="Degree / Certificate" value={item.degree} onChange={(event) => updateCollectionItem("education", index, "degree", event.target.value)} />
+                      <input className="field md:col-span-2" list="field-options" placeholder="Field of study / Branch / Stream" value={item.fieldOfStudy} onChange={(event) => updateCollectionItem("education", index, "fieldOfStudy", event.target.value)} />
                       <input className="field" placeholder="Location" value={item.location || ""} onChange={(event) => updateCollectionItem("education", index, "location", event.target.value)} />
                       <input className="field" placeholder="GPA / CGPA / Percentage" value={item.score || ""} onChange={(event) => updateCollectionItem("education", index, "score", event.target.value)} />
-                      <input className="field" placeholder="Start date" value={item.startDate} onChange={(event) => updateCollectionItem("education", index, "startDate", event.target.value)} />
-                      <input className="field" placeholder="End date" value={item.endDate} onChange={(event) => updateCollectionItem("education", index, "endDate", event.target.value)} />
+                      <input className="field" type="month" placeholder="Start date" value={formatDateForInput(item.startDate)} onChange={(event) => updateCollectionItem("education", index, "startDate", event.target.value)} />
+                      <input className="field" type="month" placeholder="End date" value={formatDateForInput(item.endDate)} onChange={(event) => updateCollectionItem("education", index, "endDate", event.target.value)} />
                     </div>
                   </div>
                 ))}
@@ -1686,26 +1775,34 @@ function ResumeForm({
 
             <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-slate-900">{isSocsTemplate ? "Internships" : "Experience"}</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Work Experience</h3>
                 <button type="button" className="button-secondary" onClick={() => addCollectionItem("experience", blankExperience)}>
-                  {isSocsTemplate ? "Add Internship" : "Add Experience"}
+                  Add Work Experience
                 </button>
               </div>
               <div className="space-y-4">
                 {formData.experience.map((item, index) => (
                   <div key={`experience-${index}`} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
                     <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-medium text-slate-600">{isSocsTemplate ? "Internship" : "Role"} {index + 1}</p>
+                      <p className="text-sm font-medium text-slate-600">Work Experience {index + 1}</p>
                       <RemoveIconButton onClick={() => removeCollectionItem("experience", index)} label={`Remove experience entry ${index + 1}`} />
                     </div>
                     <div className="grid gap-4">
                       <div className="grid gap-4 md:grid-cols-2">
                         <input className="field" placeholder="Company" value={item.company} onChange={(event) => updateCollectionItem("experience", index, "company", event.target.value)} />
                         <input className="field" placeholder="Role" value={item.role} onChange={(event) => updateCollectionItem("experience", index, "role", event.target.value)} />
-                        <input className="field" placeholder="Start date" value={item.startDate} onChange={(event) => updateCollectionItem("experience", index, "startDate", event.target.value)} />
-                        <input className="field" placeholder="End date" value={item.endDate} onChange={(event) => updateCollectionItem("experience", index, "endDate", event.target.value)} />
+                        <input className="field" type="month" placeholder="Start date" value={formatDateForInput(item.startDate)} onChange={(event) => updateCollectionItem("experience", index, "startDate", event.target.value)} />
+                        <input className="field" type="month" placeholder="End date" value={formatDateForInput(item.endDate)} onChange={(event) => updateCollectionItem("experience", index, "endDate", event.target.value)} />
                       </div>
-                      <textarea className="field min-h-28" placeholder={isSocsTemplate ? "Skills Learnt, Responsibilities, and 2-3 quantified contribution bullets" : "Describe impact, achievements, and tools used"} value={item.description} onChange={(event) => updateCollectionItem("experience", index, "description", event.target.value)} />
+                      <div>
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Responsibilities</span>
+                          <button type="button" className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800 transition hover:border-cyan-300 hover:bg-cyan-100" onClick={() => generateDescriptionDraft("experience", index)}>
+                            <span aria-hidden="true">AI</span> Write bullets
+                          </button>
+                        </div>
+                        <textarea className="field min-h-28" placeholder={isSocsTemplate ? "- Skills learnt and quantified contribution\n- Responsibility with measurable outcome" : "- Describe impact, achievements, and tools used"} value={item.description} onChange={(event) => updateCollectionItem("experience", index, "description", event.target.value)} onKeyDown={(event) => handleBulletTextareaKeyDown(event, (value) => updateCollectionItem("experience", index, "description", value))} />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1743,13 +1840,25 @@ function ResumeForm({
                           value={project.name || ""}
                           onChange={(event) => updateProject(projectIndex, "name", event.target.value)}
                         />
-                        <textarea
-                          className="field min-h-32"
-                          placeholder={isSocsTemplate ? "Tech Stack, Skills Learnt, Description, and Contribution bullets. Press Enter to add the next bullet point." : "Describe the project. Press Enter to add the next bullet point."}
-                          value={projectDetailsValue}
-                          onChange={(event) => updateProjectDetails(projectIndex, event.target.value)}
-                          onKeyDown={(event) => handleProjectDetailsKeyDown(projectIndex, event)}
-                        />
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <input className="field" type="month" placeholder="Start date" value={formatDateForInput(project.startDate)} onChange={(event) => updateProject(projectIndex, "startDate", event.target.value)} />
+                          <input className="field" type="month" placeholder="End date" value={formatDateForInput(project.endDate)} onChange={(event) => updateProject(projectIndex, "endDate", event.target.value)} />
+                        </div>
+                        <div>
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contributions</span>
+                            <button type="button" className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800 transition hover:border-cyan-300 hover:bg-cyan-100" onClick={() => generateDescriptionDraft("project", projectIndex)}>
+                              <span aria-hidden="true">AI</span> Write bullets
+                            </button>
+                          </div>
+                          <textarea
+                            className="field min-h-32"
+                            placeholder={isSocsTemplate ? "- Tech stack and skills learnt\n- Description and measurable contribution" : "- Describe the project contribution. Press Enter for the next bullet."}
+                            value={projectDetailsValue}
+                            onChange={(event) => updateProjectDetails(projectIndex, event.target.value)}
+                            onKeyDown={(event) => handleProjectDetailsKeyDown(projectIndex, event)}
+                          />
+                        </div>
                       </div>
                     </div>
                   );
@@ -1952,7 +2061,7 @@ function ResumeForm({
               <div className="mt-4 flex items-center gap-3">
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center justify-center rounded-[18px] border border-cyan-700 bg-cyan-700 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(8,145,178,0.18)] transition hover:bg-cyan-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={Boolean(aiLoading)}
                   onClick={() => onAIAction("summary")}
                 >
@@ -1995,7 +2104,7 @@ function ResumeForm({
                   </button>
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white"
+                    className="inline-flex items-center justify-center rounded-[18px] border border-cyan-700 bg-cyan-700 px-4 py-2.5 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(8,145,178,0.18)] transition hover:bg-cyan-800 hover:!text-white"
                     onClick={addSkillCategory}
                   >
                     Add Category
@@ -2075,7 +2184,7 @@ function ResumeForm({
             <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Ready to ship</p>
               <h3 className="mt-2 text-xl font-semibold text-slate-900">
-                Save once, reuse across ATS analysis and job matching
+                Download, save drafts, and keep editing safely
               </h3>
               <p className="mt-3 text-sm leading-6 text-slate-500">
                 The selected template is saved with your resume and used for the live preview and PDF download.
@@ -2091,11 +2200,11 @@ function ResumeForm({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex w-full items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex w-full items-center justify-center rounded-[18px] border border-cyan-700 bg-cyan-700 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(8,145,178,0.18)] transition hover:bg-cyan-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={Boolean(saveAction)}
                   onClick={onSave}
                 >
-                  {saveAction === "resume" ? <Loader label="Saving resume..." /> : "Save Resume"}
+                  {saveAction === "resume" ? <Loader label="Preparing download..." /> : "Download Resume"}
                 </button>
               </div>
               <button
@@ -2104,7 +2213,7 @@ function ResumeForm({
                 disabled={Boolean(saveAction)}
                 onClick={onSaveHardCopy}
               >
-                {saveAction === "hard-copy" ? <Loader label="Preparing hard copy..." /> : "Save Hard Copy Mode"}
+                {saveAction === "hard-copy" ? <Loader label="Preparing hard copy..." /> : "Download in Hard Copy Format"}
               </button>
               <button
                 type="button"
@@ -2178,7 +2287,7 @@ function ResumeForm({
                       <div className="mt-[6px] flex flex-wrap justify-center gap-x-[7px] gap-y-[2px] text-[14.7px] leading-[1.15] text-black">
                         <span className="break-all">{formData.personalInfo.email || "professional.email@example.com"}</span>
                         <span>|</span>
-                        <span className="break-words">{formData.personalInfo.phone || "+91 9999999999"}</span>
+                        <span className="break-words">{[formData.personalInfo.countryCode, formData.personalInfo.phone].filter(Boolean).join(" ") || "+91 9999999999"}</span>
                         <span>|</span>
                         {renderSocsContactLink(formData.personalInfo.portfolio, "linkedin.com/in/firstname-lastname")}
                         <span>|</span>
@@ -2226,7 +2335,7 @@ function ResumeForm({
                       )}
 
                       {renderSocsSection(
-                        "Internships",
+                        "Work Experience",
                         socsInternships.length === 0,
                         <div className="space-y-[8px]">
                           {socsInternships.map((item, index) => {
@@ -2243,7 +2352,7 @@ function ResumeForm({
                             );
                           })}
                         </div>,
-                        "Add internship organisation, duration, skills learnt, responsibilities, and quantified contributions.",
+                        "Add organisation, duration, skills learnt, responsibilities, and quantified contributions.",
                       )}
 
                       {renderSocsSection(
@@ -2253,6 +2362,8 @@ function ResumeForm({
                           {filledProjects.map((project, index) => (
                             <div key={`socs-project-${index}`}>
                               <p className="font-bold">{project.name || `Project ${index + 1}`}</p>
+                              {formatDateRange(project.startDate, project.endDate) ? <p className="text-[13.3px]">{formatDateRange(project.startDate, project.endDate)}</p> : null}
+                              <p className="font-bold">Contributions:</p>
                               {renderSocsBulletList(getProjectBullets(project))}
                             </div>
                           ))}
@@ -2869,7 +2980,7 @@ function ResumeForm({
             </div>
             <button
               type="button"
-              className="mx-auto mt-3 inline-flex w-full max-w-[270px] items-center justify-center self-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="mx-auto mt-3 inline-flex w-full max-w-[270px] items-center justify-center self-center rounded-[18px] border border-cyan-700 bg-cyan-700 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(8,145,178,0.18)] transition hover:bg-cyan-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
               disabled={Boolean(aiLoading)}
               onClick={() => onAIAction("optimize")}
             >

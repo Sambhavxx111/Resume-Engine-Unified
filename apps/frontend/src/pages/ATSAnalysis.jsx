@@ -157,7 +157,7 @@ function ATSAnalysis() {
 
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center rounded-[18px] border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(15,23,42,0.16)] transition hover:bg-slate-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center rounded-[18px] border border-cyan-700 bg-cyan-700 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(8,145,178,0.18)] transition hover:bg-cyan-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!file || loading || optimizing}
             >
               {loading ? <Loader label="Analyzing resume..." /> : file ? "Run ATS Analysis" : "Choose a Resume to Analyze"}

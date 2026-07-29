@@ -18,17 +18,6 @@ const AtsAnalyzerIcon = () => (
   </svg>
 );
 
-const JdMatcherIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-6 w-6 text-cyan-200" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M5.75 6.75h6.5a1.75 1.75 0 0 1 1.75 1.75V15a1.75 1.75 0 0 1-1.75 1.75h-6.5A1.75 1.75 0 0 1 4 15V8.5a1.75 1.75 0 0 1 1.75-1.75Z" />
-    <path d="M9 9.75h3" />
-    <path d="M9 12.5h2" />
-    <path d="M15.5 8.25h4.75" />
-    <path d="M17.875 5.875v4.75" />
-    <path d="M16.25 14.75l1.25 1.25 2.5-2.75" />
-  </svg>
-);
-
 const CareerGuidanceIcon = () => (
   <svg viewBox="0 0 24 24" className="h-6 w-6 text-cyan-200" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12 4.75c4 0 7.25 3.25 7.25 7.25S16 19.25 12 19.25 4.75 16 4.75 12 8 4.75 12 4.75Z" />
@@ -51,13 +40,6 @@ const features = [
     to: "/ats",
     cta: "Run ATS Check",
     icon: AtsAnalyzerIcon,
-  },
-  {
-    title: "JD Matcher",
-    description: "Compare your resume against job descriptions and spot alignment gaps before you apply.",
-    to: "/jd-match",
-    cta: "Match Against JD",
-    icon: JdMatcherIcon,
   },
   {
     title: "Career Guidance",
@@ -86,7 +68,7 @@ function Landing() {
               Build a sharper resume with a cleaner, more production-ready workflow.
             </h1>
             <p className="max-w-2xl text-[17px] font-medium leading-8 text-slate-500">
-              Resume Engine blends a polished resume builder with ATS analysis, job description matching,
+              Resume Engine blends a polished resume builder with ATS analysis, career guidance,
               and AI-powered optimization in one fast workflow.
             </p>
           </div>
@@ -152,7 +134,7 @@ function Landing() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="metric-tile">
-                    <p className="text-sm text-slate-500">JD Match</p>
+                    <p className="text-sm text-slate-500">Career fit</p>
                     <p className="mt-2 text-3xl font-semibold text-slate-900">76%</p>
                   </div>
                   <div className="metric-tile">
@@ -166,7 +148,7 @@ function Landing() {
         </div>
       </section>
 
-      <section className="reveal-up delay-4 mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <section className="reveal-up delay-4 mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {features.map((feature) => (
           <Link
             key={feature.title}

@@ -67,7 +67,25 @@ const deriveNameFromResumeText = (resumeText = "") => {
   return normalizeImportedName(lines.find(isLikelyResumeNameLine) || "");
 };
 
+const splitNameParts = (value = "") => {
+  const parts = normalizeImportedName(value).split(/\s+/).filter(Boolean);
+  if (!parts.length) return { firstName: "", middleName: "", lastName: "" };
+  if (parts.length === 1) return { firstName: parts[0], middleName: "", lastName: "" };
+  return {
+    firstName: parts[0],
+    middleName: parts.slice(1, -1).join(" "),
+    lastName: parts[parts.length - 1],
+  };
+};
+
+const buildFullNameFromParts = (personalInfo = {}) =>
+  [personalInfo.firstName, personalInfo.middleName, personalInfo.lastName]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
 const resolveResumeFullName = (personalInfo = {}, resumeText = "", fileName = "") =>
+  normalizeImportedName(buildFullNameFromParts(personalInfo)) ||
   normalizeImportedName(personalInfo.fullName || personalInfo.name || "") ||
   deriveNameFromResumeText(resumeText) ||
   deriveNameFromFileName(fileName);
@@ -180,9 +198,13 @@ const buildConciseInsights = (items = []) =>
 const defaultResumeState = {
   template: "contemporary",
   personalInfo: {
+    firstName: "",
+    middleName: "",
+    lastName: "",
     fullName: "",
     title: "",
     email: "",
+    countryCode: "+91",
     phone: "",
     location: "",
     portfolio: "",
@@ -235,15 +257,26 @@ const MIN_SAVE_FEEDBACK_MS = 180;
 const normalizeResumeForBuilder = (resume = {}, fallbackTemplate = defaultResumeState.template, source = {}) => ({
   ...defaultResumeState,
   ...resume,
-  personalInfo: {
-    ...defaultResumeState.personalInfo,
-    ...(resume.personalInfo || {}),
-    fullName: resolveResumeFullName(
-      resume.personalInfo,
+  personalInfo: (() => {
+    const mergedPersonalInfo = {
+      ...defaultResumeState.personalInfo,
+      ...(resume.personalInfo || {}),
+    };
+    const resolvedFullName = resolveResumeFullName(
+      mergedPersonalInfo,
       source.resumeText || resume.raw_text || resume.rawText || "",
       source.fileName || "",
-    ),
-  },
+    );
+    const nameParts = splitNameParts(resolvedFullName);
+    return {
+      ...mergedPersonalInfo,
+      firstName: normalizeImportedName(mergedPersonalInfo.firstName || nameParts.firstName),
+      middleName: normalizeImportedName(mergedPersonalInfo.middleName || nameParts.middleName),
+      lastName: normalizeImportedName(mergedPersonalInfo.lastName || nameParts.lastName),
+      fullName: resolvedFullName,
+      countryCode: mergedPersonalInfo.countryCode || "+91",
+    };
+  })(),
   education:
     Array.isArray(resume.education) && resume.education.length
       ? resume.education.map((item) => ({
