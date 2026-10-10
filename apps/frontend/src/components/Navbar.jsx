@@ -64,7 +64,7 @@ function Navbar() {
         className={`nav-shell mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-[22px] px-3 py-3 backdrop-blur-2xl sm:grid-cols-[auto_1fr_auto] sm:gap-4 sm:rounded-[26px] sm:px-6 ${
           useDarkCareerNavbar
             ? "border border-slate-600/70 bg-slate-900/82 shadow-[0_20px_60px_rgba(2,6,23,0.42)]"
-            : "border border-slate-200/90 bg-white/82 shadow-[0_20px_60px_rgba(148,163,184,0.15)]"
+            : "border border-slate-300 bg-white/95 shadow-[0_12px_36px_rgba(148,163,184,0.14)]"
         }`}
       >
         <Link to="/" className="flex min-w-0 flex-shrink items-center gap-3">
@@ -144,7 +144,7 @@ function Navbar() {
                       : "border border-cyan-200 bg-cyan-50 text-cyan-700 shadow-[0_10px_25px_rgba(34,211,238,0.16)]"
                     : useDarkCareerNavbar
                       ? "border border-slate-600 bg-slate-800/90 text-slate-300 hover:bg-cyan-800"
-                      : "border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                      : "border border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-400"
                 }`}
               >
                 <span className="hidden sm:inline">Continue as Guest</span>
@@ -152,10 +152,10 @@ function Navbar() {
               </button>
               <Link
                 to="/login"
-                className={`inline-flex items-center justify-center rounded-[18px] border px-4 py-2 text-sm font-semibold shadow-[0_14px_26px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 ${
+                className={`inline-flex items-center justify-center rounded-[18px] border px-4 py-2 text-sm font-semibold shadow-xs transition hover:-translate-y-0.5 ${
                   useDarkCareerNavbar
                     ? "border-white/15 bg-white/10 !text-white [color:#ffffff] hover:bg-white/15"
-                    : "border-slate-200 bg-white !text-slate-700 [color:#334155] hover:bg-slate-50"
+                    : "border-slate-300 bg-white !text-slate-800 [color:#1e293b] hover:bg-slate-50 hover:border-slate-400"
                 }`}
               >
                 Login

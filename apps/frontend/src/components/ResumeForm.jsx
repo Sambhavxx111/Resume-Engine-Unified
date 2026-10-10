@@ -2,6 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Loader from "./Loader";
 import { flattenSkillCategories, normalizeSkillCategories } from "../utils/skills";
+import {
+  getMissingMandatoryFields,
+  getMissingFieldsForSection,
+  checkSectionNavigationAllowed,
+} from "../utils/resumeValidation";
 
 const blankEducation = {
   institution: "",
@@ -41,26 +46,162 @@ const TEMPLATE_ID_ALIASES = {
 const normalizeTemplateId = (templateId) => TEMPLATE_ID_ALIASES[templateId] || templateId || "contemporary";
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
+const RESUME_SECTIONS = [
+  { id: "personal", label: "Contact Info", shortLabel: "Contact", description: "Name, title, email, phone & links" },
+  { id: "photo", label: "Profile Photo", shortLabel: "Photo", description: "Portrait, zoom & placement" },
+  { id: "summary", label: "Summary", shortLabel: "Summary", description: "Professional executive summary" },
+  { id: "experience", label: "Experience", shortLabel: "Experience", description: "Work history & achievements" },
+  { id: "education", label: "Education", shortLabel: "Education", description: "Degrees, institutions & grades" },
+  { id: "projects", label: "Projects", shortLabel: "Projects", description: "Key projects & contributions" },
+  { id: "skills", label: "Skills", shortLabel: "Skills", description: "Categorized skills & tools" },
+  { id: "custom", label: "Additional", shortLabel: "Additional", description: "Custom headings & certifications" },
+  { id: "optimizer", label: "AI Audit", shortLabel: "AI Audit", description: "ATS and recruiter review" },
+];
+
+const SectionIcons = {
+  personal: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  ),
+  photo: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  ),
+  summary: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
+    </svg>
+  ),
+  experience: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  ),
+  education: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+    </svg>
+  ),
+  projects: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+    </svg>
+  ),
+  skills: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+  ),
+  custom: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  optimizer: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  ),
+};
+
+const SECTION_THEMES = {
+  personal: {
+    gradient: "from-emerald-500 to-teal-600",
+    shadow: "shadow-emerald-500/25",
+    activeClass: "bg-emerald-50/90 text-emerald-950 font-semibold border-emerald-300 shadow-xs border-l-4 border-l-emerald-500",
+    iconActive: "text-emerald-600",
+    dotActive: "bg-emerald-600 ring-2 ring-emerald-200",
+    hoverClass: "hover:bg-emerald-50/50 hover:text-emerald-900",
+  },
+  photo: {
+    gradient: "from-sky-500 to-blue-600",
+    shadow: "shadow-sky-500/25",
+    activeClass: "bg-sky-50/90 text-sky-950 font-semibold border-sky-300 shadow-xs border-l-4 border-l-sky-500",
+    iconActive: "text-sky-600",
+    dotActive: "bg-sky-600 ring-2 ring-sky-200",
+    hoverClass: "hover:bg-sky-50/50 hover:text-sky-900",
+  },
+  summary: {
+    gradient: "from-amber-500 to-orange-600",
+    shadow: "shadow-amber-500/25",
+    activeClass: "bg-amber-50/90 text-amber-950 font-semibold border-amber-300 shadow-xs border-l-4 border-l-amber-500",
+    iconActive: "text-amber-600",
+    dotActive: "bg-amber-600 ring-2 ring-amber-200",
+    hoverClass: "hover:bg-amber-50/50 hover:text-amber-900",
+  },
+  experience: {
+    gradient: "from-blue-600 to-indigo-600",
+    shadow: "shadow-blue-500/25",
+    activeClass: "bg-blue-50/90 text-blue-950 font-semibold border-blue-300 shadow-xs border-l-4 border-l-blue-500",
+    iconActive: "text-blue-600",
+    dotActive: "bg-blue-600 ring-2 ring-blue-200",
+    hoverClass: "hover:bg-blue-50/50 hover:text-blue-900",
+  },
+  education: {
+    gradient: "from-purple-500 to-indigo-600",
+    shadow: "shadow-purple-500/25",
+    activeClass: "bg-purple-50/90 text-purple-950 font-semibold border-purple-300 shadow-xs border-l-4 border-l-purple-500",
+    iconActive: "text-purple-600",
+    dotActive: "bg-purple-600 ring-2 ring-purple-200",
+    hoverClass: "hover:bg-purple-50/50 hover:text-purple-900",
+  },
+  projects: {
+    gradient: "from-rose-500 to-pink-600",
+    shadow: "shadow-rose-500/25",
+    activeClass: "bg-rose-50/90 text-rose-950 font-semibold border-rose-300 shadow-xs border-l-4 border-l-rose-500",
+    iconActive: "text-rose-600",
+    dotActive: "bg-rose-600 ring-2 ring-rose-200",
+    hoverClass: "hover:bg-rose-50/50 hover:text-rose-900",
+  },
+  skills: {
+    gradient: "from-violet-500 to-purple-600",
+    shadow: "shadow-violet-500/25",
+    activeClass: "bg-violet-50/90 text-violet-950 font-semibold border-violet-300 shadow-xs border-l-4 border-l-violet-500",
+    iconActive: "text-violet-600",
+    dotActive: "bg-violet-600 ring-2 ring-violet-200",
+    hoverClass: "hover:bg-violet-50/50 hover:text-violet-900",
+  },
+  custom: {
+    gradient: "from-teal-500 to-emerald-600",
+    shadow: "shadow-teal-500/25",
+    activeClass: "bg-teal-50/90 text-teal-950 font-semibold border-teal-300 shadow-xs border-l-4 border-l-teal-500",
+    iconActive: "text-teal-600",
+    dotActive: "bg-teal-600 ring-2 ring-teal-200",
+    hoverClass: "hover:bg-teal-50/50 hover:text-teal-900",
+  },
+  optimizer: {
+    gradient: "from-indigo-600 to-purple-600",
+    shadow: "shadow-indigo-500/25",
+    activeClass: "bg-indigo-50/90 text-indigo-950 font-semibold border-indigo-300 shadow-xs border-l-4 border-l-indigo-500",
+    iconActive: "text-indigo-600",
+    dotActive: "bg-indigo-600 ring-2 ring-indigo-200",
+    hoverClass: "hover:bg-indigo-50/50 hover:text-indigo-900",
+  },
+};
+
 const TEMPLATE_OPTIONS = [
   {
     id: "socs-official",
     name: "SOCS Official",
     blurb: "The official SOCS placement resume format: Calibri, ATS-safe, single-column, and print-ready.",
-    accent: "from-slate-200/70 to-white",
+    accent: "from-blue-600 to-indigo-700",
     recommended: true,
   },
   {
     id: "enhancv-replica",
     name: "Signature Timeline",
     blurb: "A polished statement layout with a crisp top banner, editorial spacing, and premium ATS-safe rhythm.",
-    accent: "from-orange-200/35 to-blue-300/20",
+    accent: "from-amber-500 to-orange-600",
     recommended: true,
   },
   {
     id: "enhancv-columns",
     name: "Emerald Columns",
     blurb: "A refined multi-column resume with elegant structure, balanced density, and strong recruiter readability.",
-    accent: "from-emerald-200/35 to-slate-300/20",
+    accent: "from-emerald-500 to-teal-600",
     recommended: true,
     locked: true,
   },
@@ -68,31 +209,31 @@ const TEMPLATE_OPTIONS = [
     id: "contemporary",
     name: "Modern Arc",
     blurb: "A crisp premium layout with modern hierarchy, clean whitespace, and ATS-safe structure.",
-    accent: "from-cyan-300/30 to-blue-500/20",
+    accent: "from-sky-500 to-indigo-600",
   },
   {
     id: "timeline",
     name: "Career Flow",
     blurb: "A progression-first resume design that highlights growth, promotions, and milestones clearly.",
-    accent: "from-slate-100/40 to-cyan-200/15",
+    accent: "from-purple-500 to-indigo-600",
   },
   {
     id: "compact",
     name: "Impact Grid",
     blurb: "A dense but highly readable one-page format built for content-rich resumes and fast scans.",
-    accent: "from-cyan-200/30 to-slate-200/20",
+    accent: "from-teal-500 to-cyan-600",
   },
   {
     id: "single-column",
     name: "Linear Luxe",
     blurb: "A focused linear layout that feels elegant, recruiter-friendly, and reliable for ATS parsing.",
-    accent: "from-slate-200/60 to-stone-300/30",
+    accent: "from-slate-700 to-slate-900",
   },
   {
     id: "creative",
     name: "Studio Slate",
     blurb: "A more expressive premium look with standout accents while staying printable and ATS-conscious.",
-    accent: "from-cyan-300/30 to-sky-200/20",
+    accent: "from-rose-500 to-purple-600",
   },
 ];
 
@@ -109,6 +250,26 @@ const COUNTRY_CODES = [
   { code: "+86", country: "China", flag: "CN" },
 ];
 
+const MAJOR_DEGREES = [
+  "B.Tech",
+  "B.E.",
+  "BCA",
+  "B.Sc",
+  "B.Com",
+  "BBA",
+  "BA",
+  "M.Tech",
+  "MCA",
+  "M.Sc",
+  "MBA",
+  "M.Com",
+  "MA",
+  "PhD",
+  "Diploma",
+  "Senior Secondary (12th)",
+  "Secondary School (10th)",
+];
+
 const DEGREE_OPTIONS = [
   "B.Tech", "B.E.", "B.Sc", "BCA", "BBA", "B.Com", "BA", "M.Tech", "M.E.", "M.Sc", "MCA", "MBA", "M.Com", "MA", "PhD", "Diploma", "Senior Secondary", "Secondary School Certificate"
 ];
@@ -117,11 +278,350 @@ const FIELD_OPTIONS = [
   "Computer Science", "Computer Applications", "Information Technology", "Cybersecurity", "Data Science", "Artificial Intelligence", "Machine Learning", "Electronics and Communication", "Electrical Engineering", "Mechanical Engineering", "Civil Engineering", "Business Administration", "Commerce", "Economics", "Mathematics", "Physics", "Chemistry", "Arts", "Humanities"
 ];
 
+const CALENDAR_MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+const CALENDAR_WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+const CALENDAR_YEARS = (() => {
+  const currentYear = new Date().getFullYear();
+  const list = [];
+  for (let y = currentYear + 8; y >= 1970; y--) {
+    list.push(y);
+  }
+  return list;
+})();
+
+const CalendarPickerInput = ({
+  value = "",
+  onChange,
+  placeholder = "Select date",
+  className = "field",
+  id,
+  name,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const parsedDate = useMemo(() => {
+    if (!value) return null;
+    const parts = String(value).trim().split("-");
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parts[2] ? parseInt(parts[2], 10) : 1;
+    if (!isNaN(y) && !isNaN(m)) {
+      return { year: y, month: m - 1, day: d, hasExplicitDay: Boolean(parts[2]) };
+    }
+    return null;
+  }, [value]);
+
+  const today = useMemo(() => new Date(), []);
+  const [viewYear, setViewYear] = useState(() => parsedDate?.year || today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => parsedDate?.month ?? today.getMonth());
+
+  useEffect(() => {
+    if (parsedDate) {
+      setViewYear(parsedDate.year);
+      setViewMonth(parsedDate.month);
+    }
+  }, [parsedDate]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  const calendarDays = useMemo(() => {
+    const firstDayIndex = new Date(viewYear, viewMonth, 1).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+    const days = [];
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      days.push({
+        day: daysInPrevMonth - i,
+        month: viewMonth === 0 ? 11 : viewMonth - 1,
+        year: viewMonth === 0 ? viewYear - 1 : viewYear,
+        isCurrentMonth: false,
+      });
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push({
+        day: i,
+        month: viewMonth,
+        year: viewYear,
+        isCurrentMonth: true,
+      });
+    }
+    const totalFilled = days.length;
+    const remaining = totalFilled % 7 === 0 ? 0 : 7 - (totalFilled % 7);
+    for (let i = 1; i <= remaining; i++) {
+      days.push({
+        day: i,
+        month: viewMonth === 11 ? 0 : viewMonth + 1,
+        year: viewMonth === 11 ? viewYear + 1 : viewYear,
+        isCurrentMonth: false,
+      });
+    }
+    return days;
+  }, [viewYear, viewMonth]);
+
+  const handleSelectDay = (dayObj) => {
+    const y = dayObj.year;
+    const m = String(dayObj.month + 1).padStart(2, "0");
+    const d = String(dayObj.day).padStart(2, "0");
+    const formatted = `${y}-${m}-${d}`;
+    onChange({ target: { value: formatted, name } });
+    setIsOpen(false);
+  };
+
+  const handlePrevMonth = (e) => {
+    e.stopPropagation();
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear((prev) => prev - 1);
+    } else {
+      setViewMonth((prev) => prev - 1);
+    }
+  };
+
+  const handleNextMonth = (e) => {
+    e.stopPropagation();
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear((prev) => prev + 1);
+    } else {
+      setViewMonth((prev) => prev + 1);
+    }
+  };
+
+  const handleClear = (e) => {
+    e.stopPropagation();
+    onChange({ target: { value: "", name } });
+    setIsOpen(false);
+  };
+
+  const handleToday = (e) => {
+    e.stopPropagation();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const formatted = `${y}-${m}-${d}`;
+    onChange({ target: { value: formatted, name } });
+    setIsOpen(false);
+  };
+
+  const handleSelectMonthOnly = (e) => {
+    e.stopPropagation();
+    const y = viewYear;
+    const m = String(viewMonth + 1).padStart(2, "0");
+    const formatted = `${y}-${m}`;
+    onChange({ target: { value: formatted, name } });
+    setIsOpen(false);
+  };
+
+  const displayValue = useMemo(() => {
+    if (!value) return "";
+    const parts = String(value).trim().split("-");
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parts[2] ? parseInt(parts[2], 10) : null;
+    if (isNaN(y) || isNaN(m)) return value;
+    const monthShort = CALENDAR_MONTHS[m - 1]?.slice(0, 3) || "";
+    if (d) {
+      return `${d} ${monthShort} ${y}`;
+    }
+    return `${monthShort} ${y}`;
+  }, [value]);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div
+        className="relative flex items-center cursor-pointer"
+        onClick={() => setIsOpen((prev) => !prev)}
+      >
+        <input
+          id={id}
+          name={name}
+          type="text"
+          readOnly
+          className={`${className} cursor-pointer pr-10 select-none`}
+          placeholder={placeholder}
+          title={placeholder}
+          value={displayValue}
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={`Open calendar for ${placeholder}`}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition p-1"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen((prev) => !prev);
+          }}
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </button>
+      </div>
+
+      {isOpen && (
+        <div
+          className="absolute z-50 mt-1.5 left-0 w-[285px] sm:w-[310px] rounded-2xl border border-slate-300 bg-white p-3.5 shadow-2xl ring-1 ring-black/10 backdrop-blur-sm"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between gap-1 mb-3">
+            <button
+              type="button"
+              className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition active:scale-95"
+              onClick={handlePrevMonth}
+              title="Previous month"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            <div className="flex items-center gap-1.5">
+              <select
+                className="text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg py-1 px-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                value={viewMonth}
+                onChange={(e) => setViewMonth(parseInt(e.target.value, 10))}
+              >
+                {CALENDAR_MONTHS.map((m, idx) => (
+                  <option key={m} value={idx}>{m}</option>
+                ))}
+              </select>
+
+              <select
+                className="text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg py-1 px-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                value={viewYear}
+                onChange={(e) => setViewYear(parseInt(e.target.value, 10))}
+              >
+                {CALENDAR_YEARS.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition active:scale-95"
+              onClick={handleNextMonth}
+              title="Next month"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center mb-1">
+            {CALENDAR_WEEKDAYS.map((wd) => (
+              <span key={wd} className="text-[11px] font-semibold text-slate-400 py-0.5">
+                {wd}
+              </span>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {calendarDays.map((d, idx) => {
+              const isSelected =
+                parsedDate &&
+                parsedDate.year === d.year &&
+                parsedDate.month === d.month &&
+                parsedDate.day === d.day;
+
+              const isCurrentDay =
+                today.getFullYear() === d.year &&
+                today.getMonth() === d.month &&
+                today.getDate() === d.day;
+
+              return (
+                <button
+                  key={`cal-day-${idx}`}
+                  type="button"
+                  className={`h-7 w-7 sm:h-8 sm:w-8 mx-auto flex items-center justify-center rounded-lg text-xs font-medium transition ${
+                    isSelected
+                      ? "bg-indigo-600 text-white font-bold shadow-sm shadow-indigo-500/30"
+                      : d.isCurrentMonth
+                        ? isCurrentDay
+                          ? "border border-indigo-400 text-indigo-700 font-bold bg-indigo-50/50 hover:bg-indigo-100"
+                          : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                        : "text-slate-300 hover:bg-slate-50"
+                  }`}
+                  onClick={() => handleSelectDay(d)}
+                >
+                  {d.day}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+            <button
+              type="button"
+              className="text-slate-500 hover:text-rose-600 font-medium px-2 py-1 rounded-md hover:bg-rose-50 transition"
+              onClick={handleClear}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              className="text-slate-600 hover:text-indigo-600 font-medium px-2 py-1 rounded-md hover:bg-slate-100 transition"
+              onClick={handleSelectMonthOnly}
+              title="Save selected month and year"
+            >
+              Select Month
+            </button>
+            <button
+              type="button"
+              className="text-indigo-600 hover:text-indigo-800 font-bold px-2 py-1 rounded-md hover:bg-indigo-50 transition"
+              onClick={handleToday}
+            >
+              Today
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const titleCaseNamePart = (value = "") =>
   String(value || "")
+    .replace(/[^A-Za-z\s]/g, "")
     .replace(/\s+/g, " ")
     .trimStart()
-    .replace(/(^|[\s'-])([a-z])/g, (_, prefix, letter) => prefix + letter.toUpperCase());
+    .replace(/(^|\s)([a-z])/g, (_, prefix, letter) => prefix + letter.toUpperCase());
+
+const cleanPhoneInput = (value = "") => {
+  let digits = String(value || "").replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) {
+    digits = digits.slice(2);
+  } else if (digits.length === 11 && digits.startsWith("0")) {
+    digits = digits.slice(1);
+  }
+  return digits.slice(0, 10);
+};
 
 const buildFullName = (personalInfo = {}) =>
   [personalInfo.firstName, personalInfo.middleName, personalInfo.lastName]
@@ -131,16 +631,22 @@ const buildFullName = (personalInfo = {}) =>
 
 const formatDateForInput = (value = "") => {
   const cleaned = String(value || "").trim();
-  const monthYear = cleaned.match(/^(\d{4})-(\d{2})/);
-  return monthYear ? monthYear[1] + "-" + monthYear[2] : "";
+  const match = cleaned.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/);
+  if (match) {
+    return match[3] ? `${match[1]}-${match[2]}-${match[3]}` : `${match[1]}-${match[2]}`;
+  }
+  return cleaned;
 };
 
 const formatMonthYear = (value) => {
   if (!value) return "";
-  const [year, month] = String(value).split("-");
+  const parts = String(value).trim().split("-");
+  const year = parts[0];
+  const month = parts[1];
+  const day = parts[2];
   if (!year) return "";
   if (!month) return year;
-  const date = new Date(Number(year), Number(month) - 1, 1);
+  const date = new Date(Number(year), Number(month) - 1, Number(day) || 1);
   return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(date);
 };
 
@@ -903,12 +1409,158 @@ function ResumeForm({
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [isTemplatePickerVisible, setIsTemplatePickerVisible] = useState(false);
   const [activeSkillInput, setActiveSkillInput] = useState(null);
+  const [activeMobileTab, setActiveMobileTab] = useState("editor");
+  const [isQuickSetupOpen, setIsQuickSetupOpen] = useState(false);
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const [collapsedExperience, setCollapsedExperience] = useState({});
+  const [collapsedEducation, setCollapsedEducation] = useState({});
+  const [collapsedProjects, setCollapsedProjects] = useState({});
+  const [activeSection, setActiveSection] = useState("personal");
+  const [showAllSections, setShowAllSections] = useState(false);
+  const [missingFields, setMissingFields] = useState([]);
+  const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
+  const [validationContext, setValidationContext] = useState("download");
+  const [validationBlockingSection, setValidationBlockingSection] = useState("");
+
+  const handleDownloadAttempt = (mode = "resume") => {
+    const missing = getMissingMandatoryFields(formData);
+    if (missing.length > 0) {
+      setMissingFields(missing);
+      setValidationContext("download");
+      setValidationBlockingSection("");
+      setIsValidationModalOpen(true);
+      return;
+    }
+    if (mode === "hard-copy") {
+      onSaveHardCopy();
+    } else {
+      onSave();
+    }
+  };
+
+  const handleJumpToMissingField = (missingItem) => {
+    setIsValidationModalOpen(false);
+    setShowAllSections(false);
+    setActiveSection(missingItem.sectionId);
+    setActiveMobileTab("editor");
+
+    setTimeout(() => {
+      if (editorColumnRef.current) {
+        editorColumnRef.current.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      if (missingItem.inputName) {
+        const inputEl = document.querySelector(`[name="${missingItem.inputName}"]`);
+        if (inputEl) {
+          inputEl.focus({ preventScroll: true });
+          inputEl.classList.add("ring-2", "ring-rose-500", "transition-all");
+          setTimeout(() => {
+            inputEl.classList.remove("ring-2", "ring-rose-500");
+          }, 2500);
+        }
+      }
+    }, 120);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsValidationModalOpen(false);
+      }
+    };
+    if (isValidationModalOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [isValidationModalOpen]);
+
+  const sectionCompletion = useMemo(() => {
+    const isPersonalComplete = getMissingFieldsForSection("personal", formData).length === 0;
+    const isPhotoComplete = Boolean(resumePhoto);
+    const isSummaryComplete = getMissingFieldsForSection("summary", formData).length === 0;
+    const isExperienceComplete = Boolean(
+      formData.experience?.some((e) => e.company?.trim() && e.role?.trim())
+    );
+    const isEducationComplete = getMissingFieldsForSection("education", formData).length === 0;
+    const isProjectsComplete = Boolean(formData.projects?.some((p) => p.name?.trim()));
+    const isSkillsComplete = getMissingFieldsForSection("skills", formData).length === 0;
+    const isCustomComplete = Boolean(formData.customSections?.some((s) => s.title?.trim()));
+    const isOptimizerComplete = Boolean(aiInsights);
+
+    return {
+      personal: isPersonalComplete,
+      photo: isPhotoComplete,
+      summary: isSummaryComplete,
+      experience: isExperienceComplete,
+      education: isEducationComplete,
+      projects: isProjectsComplete,
+      skills: isSkillsComplete,
+      custom: isCustomComplete,
+      optimizer: isOptimizerComplete,
+    };
+  }, [formData, resumePhoto, aiInsights]);
+
+  const strengthScore = useMemo(() => {
+    let score = 0;
+    if (sectionCompletion.personal) score += 20;
+    if (sectionCompletion.summary) score += 15;
+    if (sectionCompletion.experience) score += 25;
+    if (sectionCompletion.education) score += 15;
+    if (sectionCompletion.projects) score += 15;
+    if (sectionCompletion.skills) score += 10;
+    return Math.min(100, score);
+  }, [sectionCompletion]);
+  const moreActionsRef = useRef(null);
   const aiInsightsRef = useRef(null);
   const aiScrollPendingActionRef = useRef("");
   const previewCanvasRef = useRef(null);
   const photoDragRef = useRef(null);
   const photoImageRef = useRef(null);
   const editorSectionRef = useRef(null);
+  const editorColumnRef = useRef(null);
+
+  const navigateToSection = (sectionId, bypassValidation = false) => {
+    if (!bypassValidation) {
+      const check = checkSectionNavigationAllowed(sectionId, activeSection, formData, RESUME_SECTIONS);
+      if (!check.allowed) {
+        setMissingFields(check.missingFields || []);
+        setValidationContext("section-navigation");
+        setValidationBlockingSection(check.blockingSectionName || "the current section");
+        setIsValidationModalOpen(true);
+
+        if (check.missingFields && check.missingFields.length > 0) {
+          const firstMissing = check.missingFields[0];
+          if (firstMissing.inputName) {
+            setTimeout(() => {
+              const inputEl = document.querySelector(`[name="${firstMissing.inputName}"]`);
+              if (inputEl) {
+                inputEl.focus({ preventScroll: true });
+                inputEl.classList.add("ring-2", "ring-rose-500", "transition-all");
+                setTimeout(() => {
+                  inputEl.classList.remove("ring-2", "ring-rose-500");
+                }, 2500);
+              }
+            }, 80);
+          }
+        }
+        return;
+      }
+    }
+
+    if (showAllSections) {
+      const sectionElement = document.getElementById(`section-${sectionId}`);
+      if (sectionElement && editorColumnRef.current) {
+        const topPos = sectionElement.offsetTop - editorColumnRef.current.offsetTop;
+        editorColumnRef.current.scrollTo({ top: Math.max(0, topPos - 12), behavior: "smooth" });
+        return;
+      }
+    }
+    setShowAllSections(false);
+    setActiveSection(sectionId);
+    if (editorColumnRef.current) {
+      editorColumnRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
   const templatePickerTimeoutRef = useRef(null);
   const templatePickerCloseTimeoutRef = useRef(null);
 
@@ -1030,6 +1682,29 @@ function ResumeForm({
     };
   }, [isTemplatePickerOpen, isTemplatePickerVisible]);
 
+  useEffect(() => {
+    if (!moreActionsOpen) return undefined;
+    const handleOutsideClick = (event) => {
+      if (moreActionsRef.current && !moreActionsRef.current.contains(event.target)) {
+        setMoreActionsOpen(false);
+      }
+    };
+    window.addEventListener("pointerdown", handleOutsideClick);
+    return () => window.removeEventListener("pointerdown", handleOutsideClick);
+  }, [moreActionsOpen]);
+
+  const toggleExperienceCollapse = (index) => {
+    setCollapsedExperience((prev) => ({ ...prev, [index]: !prev[index] }));
+  };
+
+  const toggleEducationCollapse = (index) => {
+    setCollapsedEducation((prev) => ({ ...prev, [index]: !prev[index] }));
+  };
+
+  const toggleProjectCollapse = (index) => {
+    setCollapsedProjects((prev) => ({ ...prev, [index]: !prev[index] }));
+  };
+
   const openTemplatePicker = () => {
     if (templatePickerCloseTimeoutRef.current) {
       window.clearTimeout(templatePickerCloseTimeoutRef.current);
@@ -1047,11 +1722,35 @@ function ResumeForm({
     setIsTemplatePickerVisible(false);
   };
 
+  useEffect(() => {
+    if (!Array.isArray(formData.skills) || formData.skills.length === 0) {
+      setFormData((prev) => {
+        if (Array.isArray(prev.skills) && prev.skills.length > 0) return prev;
+        return {
+          ...prev,
+          skills: [{ category: "", items: [""] }],
+        };
+      });
+    } else if (
+      formData.skills.length === 1 &&
+      formData.skills[0]?.category === "Technical Skills" &&
+      (!formData.skills[0]?.items || formData.skills[0].items.every((it) => !String(it || "").trim()))
+    ) {
+      setFormData((prev) => ({
+        ...prev,
+        skills: [{ category: "", items: [""] }],
+      }));
+    }
+  }, []);
+
   const updatePersonalInfo = (event) => {
     const { name } = event.target;
-    const value = ["firstName", "middleName", "lastName"].includes(name)
-      ? titleCaseNamePart(event.target.value)
-      : event.target.value;
+    let value = event.target.value;
+    if (["firstName", "middleName", "lastName"].includes(name)) {
+      value = titleCaseNamePart(value);
+    } else if (name === "phone") {
+      value = cleanPhoneInput(value);
+    }
 
     setFormData((prev) => {
       const nextPersonalInfo = {
@@ -1204,18 +1903,19 @@ function ResumeForm({
 
   const withEditableSkillCategories = (skills = []) => {
     if (!Array.isArray(skills) || !skills.length) {
-      return [];
+      return [{ category: "", items: [""] }];
     }
 
     const hasCategoryObjects = skills.some((skill) => skill && typeof skill === "object" && !Array.isArray(skill));
     if (!hasCategoryObjects) {
-      return normalizeSkillCategories(skills).map((group) => ({
+      const normalized = normalizeSkillCategories(skills).map((group) => ({
         category: group.category,
         items: group.items,
       }));
+      return normalized.length ? normalized : [{ category: "", items: [""] }];
     }
 
-    return skills.flatMap((group) => {
+    const categories = skills.flatMap((group) => {
       if (!group || typeof group !== "object" || Array.isArray(group)) {
         return [];
       }
@@ -1243,6 +1943,8 @@ function ResumeForm({
         items: rawItems.map((item) => String(item ?? "")),
       }];
     });
+
+    return categories.length ? categories : [{ category: "", items: [""] }];
   };
 
   const addSkillCategory = () => {
@@ -1268,10 +1970,13 @@ function ResumeForm({
   };
 
   const removeSkillCategory = (categoryIndex) => {
-    setFormData((prev) => ({
-      ...prev,
-      skills: withEditableSkillCategories(prev.skills).filter((_, currentIndex) => currentIndex !== categoryIndex),
-    }));
+    setFormData((prev) => {
+      const remaining = withEditableSkillCategories(prev.skills).filter((_, currentIndex) => currentIndex !== categoryIndex);
+      return {
+        ...prev,
+        skills: remaining.length ? remaining : [{ category: "", items: [""] }],
+      };
+    });
   };
 
   const addSkillToCategory = (categoryIndex) => {
@@ -1495,6 +2200,8 @@ function ResumeForm({
         return;
       }
 
+      event.preventDefault();
+
       const previewRect = previewCanvasRef.current.getBoundingClientRect();
       const photoRect = photoImageRef.current.getBoundingClientRect();
       const maxLeft = Math.max(previewRect.width - photoRect.width, 0);
@@ -1515,7 +2222,19 @@ function ResumeForm({
     };
 
     const handlePointerUp = () => {
-      photoDragRef.current = null;
+      if (photoDragRef.current) {
+        if (photoDragRef.current.pointerId !== undefined && photoImageRef.current) {
+          try {
+            photoImageRef.current.releasePointerCapture?.(photoDragRef.current.pointerId);
+          } catch (_) {}
+        }
+        photoDragRef.current = null;
+      }
+      document.body.style.userSelect = "";
+      document.body.style.webkitUserSelect = "";
+      try {
+        window.getSelection()?.removeAllRanges();
+      } catch (_) {}
     };
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -1524,6 +2243,8 @@ function ResumeForm({
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
+      document.body.style.userSelect = "";
+      document.body.style.webkitUserSelect = "";
     };
   }, [onPhotoPlacementChange]);
 
@@ -1532,11 +2253,24 @@ function ResumeForm({
       return;
     }
 
+    event.preventDefault();
+    try {
+      window.getSelection()?.removeAllRanges();
+    } catch (_) {}
+
     const photoRect = photoImageRef.current.getBoundingClientRect();
     photoDragRef.current = {
       offsetX: event.clientX - photoRect.left,
       offsetY: event.clientY - photoRect.top,
+      pointerId: event.pointerId,
     };
+
+    try {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    } catch (_) {}
+
+    document.body.style.userSelect = "none";
+    document.body.style.webkitUserSelect = "none";
   };
 
   const syncPreviewRef = (node) => {
@@ -1550,22 +2284,28 @@ function ResumeForm({
     resumePhoto && !templateUsesBuiltInPhoto ? (
       <div
         ref={photoImageRef}
-        className="absolute z-20 aspect-square cursor-grab overflow-hidden rounded-full border border-white/15 bg-white/10 shadow-[0_18px_35px_rgba(15,23,42,0.2)] active:cursor-grabbing"
+        className="absolute z-20 aspect-square cursor-grab overflow-hidden rounded-full border border-white/15 bg-white/10 shadow-[0_18px_35px_rgba(15,23,42,0.2)] active:cursor-grabbing select-none touch-none"
         style={{
           left: `${(resumePhoto.placement?.x ?? 0.72) * 100}%`,
           top: `${(resumePhoto.placement?.y ?? 0.06) * 100}%`,
           width: `clamp(${96 * photoFrameScale}px, ${19.5 * photoFrameScale}%, ${128 * photoFrameScale}px)`,
+          userSelect: "none",
+          WebkitUserSelect: "none",
         }}
         onPointerDown={handlePhotoPointerDown}
+        onDragStart={(e) => e.preventDefault()}
+        onSelectStart={(e) => e.preventDefault()}
       >
         <img
           src={resumePhoto.src}
           alt="Resume profile"
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover select-none pointer-events-none"
           style={{
             objectPosition: `${photoCropX * 100}% ${photoCropY * 100}%`,
             transform: `scale(${photoZoom})`,
             transformOrigin: `${photoCropX * 100}% ${photoCropY * 100}%`,
+            userSelect: "none",
+            WebkitUserSelect: "none",
           }}
           draggable={false}
         />
@@ -1591,694 +2331,1351 @@ function ResumeForm({
     </ul>
   );
 
+  const currentSectionIndex = Math.max(
+    0,
+    RESUME_SECTIONS.findIndex((s) => s.id === activeSection)
+  );
+  const prevSection = currentSectionIndex > 0 ? RESUME_SECTIONS[currentSectionIndex - 1] : null;
+  const nextSection = currentSectionIndex < RESUME_SECTIONS.length - 1 ? RESUME_SECTIONS[currentSectionIndex + 1] : null;
+
+  const renderSectionStepper = () => (
+    <div className="mt-8 flex items-center justify-between border-t border-slate-200/80 pt-4">
+      {prevSection ? (
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200/90 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 hover:text-slate-900 active:scale-95"
+          onClick={() => navigateToSection(prevSection.id)}
+        >
+          <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Previous: {prevSection.shortLabel || prevSection.label}</span>
+        </button>
+      ) : (
+        <div />
+      )}
+
+      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 hidden sm:inline-block">
+        Step {currentSectionIndex + 1} of {RESUME_SECTIONS.length}
+      </span>
+
+      {nextSection ? (
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-500 hover:via-purple-500 hover:to-indigo-600 px-4 py-2 text-xs font-semibold !text-white [color:#ffffff] shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
+          onClick={() => navigateToSection(nextSection.id)}
+        >
+          <span>Next: {nextSection.shortLabel || nextSection.label}</span>
+          <svg className="h-4 w-4 text-indigo-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-500 hover:via-purple-500 hover:to-indigo-600 px-4 py-2 text-xs font-bold !text-white [color:#ffffff] shadow-md shadow-indigo-500/25 transition active:scale-95"
+          onClick={() => handleDownloadAttempt("resume")}
+          disabled={Boolean(saveAction)}
+        >
+          <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span>Download PDF</span>
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <div className="space-y-8">
-      <section className="glass-card panel-grid p-6 sm:p-8">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Resume Studio</p>
-            <h2 className="section-title">Craft a resume that passes both people and bots</h2>
+    <div className="space-y-6">
+      <section className="glass-card panel-grid p-4 sm:p-6 lg:p-8">
+        {/* Studio Top Action Bar */}
+        <div className="sticky top-[4.5rem] sm:top-[5.25rem] z-30 -mx-4 -mt-4 mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-300 bg-white px-4 py-3.5 backdrop-blur-md sm:-mx-6 sm:-mt-6 sm:px-6 lg:-mx-8 lg:-mt-8 lg:px-8 shadow-xs rounded-t-[28px]">
+          {/* Left: Studio branding & template pill */}
+          <div className="flex items-center gap-3">
+            <div>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-indigo-50 to-purple-50 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.2em] text-indigo-700 ring-1 ring-inset ring-indigo-500/20 shadow-2xs">
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 shadow-[0_0_6px_rgba(99,102,241,0.8)]" />
+                Resume Builder
+              </span>
+              <h2 className="text-base font-bold text-slate-900 leading-tight hidden sm:block mt-0.5">Editor & Live Preview</h2>
+            </div>
+
+            {/* Template Selector Pill */}
+            <button
+              type="button"
+              className="flex items-center gap-2.5 rounded-xl border border-slate-300 bg-white py-1.5 pl-2 pr-3.5 text-left transition hover:border-indigo-400 hover:shadow-xs active:scale-95 shadow-2xs"
+              onClick={openTemplatePicker}
+              title="Click to change template"
+            >
+              <div className={`h-6 w-6 overflow-hidden rounded-lg bg-gradient-to-br p-[1px] ${selectedTemplateOption.accent} flex items-center justify-center shadow-2xs`}>
+                <span className="text-[10px] font-bold text-indigo-700">T</span>
+              </div>
+              <div className="min-w-0">
+                <span className="block text-xs font-semibold text-slate-800 leading-none truncate max-w-[130px] sm:max-w-[180px]">
+                  {selectedTemplateOption.name}
+                </span>
+                <span className="text-[10px] font-medium text-indigo-600">Change template ▾</span>
+              </div>
+            </button>
+          </div>
+
+          {/* Center on mobile/tablet: View Tab Switcher */}
+          <div className="flex xl:hidden rounded-xl border border-slate-300 bg-slate-100 p-0.5">
+            <button
+              type="button"
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                activeMobileTab === "editor"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+              onClick={() => setActiveMobileTab("editor")}
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              <span>Editor</span>
+            </button>
+            <button
+              type="button"
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                activeMobileTab === "preview"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+              onClick={() => setActiveMobileTab("preview")}
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span>Preview</span>
+            </button>
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2">
+            {/* Quick Setup Toggle */}
+            <button
+              type="button"
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition shadow-xs active:scale-95 ${
+                isQuickSetupOpen
+                  ? "border-sky-400 bg-sky-100 text-sky-900"
+                  : "border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100 hover:border-sky-400"
+              }`}
+              onClick={() => setIsQuickSetupOpen(!isQuickSetupOpen)}
+              title="Toggle Import / Fresh Start"
+            >
+              <svg className="h-4 w-4 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <span className="hidden md:inline">{isQuickSetupOpen ? "Close Setup" : "Import / Setup"}</span>
+            </button>
+
+            {/* Save Draft */}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-300 bg-gradient-to-r from-indigo-50/70 to-purple-50/50 px-3.5 py-2 text-xs font-semibold text-indigo-700 shadow-xs transition hover:from-indigo-100 hover:to-purple-100 hover:border-indigo-400 hover:text-indigo-900 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={onSaveDraft}
+              disabled={Boolean(saveAction)}
+            >
+              {saveAction === "draft" ? <Loader label="" /> : (
+                <svg className="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+              )}
+              <span>{saveAction === "draft" ? "Saving..." : "Save Draft"}</span>
+            </button>
+
+            {/* Download Resume (Primary) */}
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-500 hover:via-purple-500 hover:to-indigo-600 px-4 py-2 text-xs font-bold !text-white [color:#ffffff] shadow-md shadow-indigo-500/25 active:scale-95 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => handleDownloadAttempt("resume")}
+              disabled={Boolean(saveAction)}
+            >
+              {saveAction === "resume" ? <Loader label="" /> : (
+                <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              )}
+              <span>{saveAction === "resume" ? "Exporting..." : "Download PDF"}</span>
+            </button>
+
+            {/* More Actions Dropdown */}
+            <div className="relative" ref={moreActionsRef}>
+              <button
+                type="button"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 shadow-xs transition hover:bg-slate-50 hover:border-slate-400"
+                onClick={() => setMoreActionsOpen(!moreActionsOpen)}
+                aria-label="More export options"
+                title="More options"
+              >
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <circle cx="10" cy="4" r="2" />
+                  <circle cx="10" cy="10" r="2" />
+                  <circle cx="10" cy="16" r="2" />
+                </svg>
+              </button>
+
+              {moreActionsOpen && (
+                <div className="absolute right-0 z-50 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-black/5 animate-in fade-in zoom-in-95">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    onClick={() => { setMoreActionsOpen(false); handleDownloadAttempt("hard-copy"); }}
+                    disabled={Boolean(saveAction)}
+                  >
+                    <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    Download Hard Copy
+                  </button>
+                  <div className="my-1 border-t border-slate-100" />
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50"
+                    onClick={() => { setMoreActionsOpen(false); onDiscardResume(); }}
+                    disabled={Boolean(saveAction)}
+                  >
+                    <TrashIcon className="h-4 w-4 text-rose-500" />
+                    Discard Resume
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
+        {/* Feedback / Alert Banners */}
         {error ? (
-          <div className="mb-4 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-[0_10px_24px_rgba(244,63,94,0.08)]">
+          <div className="mb-4 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-xs">
             {error}
           </div>
         ) : null}
 
-        {successMessage && !draftSaveConfirmation ? (
-          <div className="mb-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+        {draftSaveConfirmation ? (
+          <div className="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-xs">
+            <svg className="h-4 w-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>{successMessage}</span>
+          </div>
+        ) : successMessage ? (
+          <div className="mb-4 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-xs">
             {successMessage}
           </div>
         ) : null}
 
         {exportError ? (
-          <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700 shadow-[0_10px_24px_rgba(250,179,8,0.08)]">
+          <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700 shadow-xs">
             {exportError}
           </div>
         ) : null}
 
-        <button
-          type="button"
-          className="mb-8 flex w-full items-center justify-between gap-4 rounded-[24px] border border-slate-200 bg-white/90 p-5 text-left shadow-[0_18px_45px_rgba(148,163,184,0.12)] transition hover:border-slate-300 hover:bg-slate-50"
-          onClick={openTemplatePicker}
-        >
-          <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Resume Template</p>
-            <h3 className="mt-2 text-xl font-semibold text-slate-900">Select a template</h3>
-            <p className="mt-2 text-sm text-slate-500">
-              Current: <span className="font-medium text-slate-700">{selectedTemplateOption.name}</span>
-            </p>
-          </div>
-          <div className={`w-[148px] shrink-0 rounded-[1.25rem] bg-gradient-to-br p-[1px] ${selectedTemplateOption.accent}`}>
-            <TemplateThumbnail templateId={selectedTemplateOption.id} />
-          </div>
-        </button>
-
-        <div className="mb-8 grid gap-4 xl:grid-cols-2">
-          <div className="rounded-[24px] border border-slate-200 bg-gradient-to-br from-sky-50 via-white to-slate-50 p-4 shadow-[0_20px_46px_rgba(148,163,184,0.12)]">
-            <div className="flex h-full flex-col gap-4">
-              <div className="max-w-lg">
-                <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Import Existing Resume</p>
-                <h3 className="mt-2 text-xl font-semibold text-slate-900">Upload a resume and continue upgrading it here</h3>
-              </div>
-              <div className="rounded-[18px] border border-slate-200 bg-white/90 p-3">
-                <span className="block text-sm font-medium text-slate-600">Choose a resume file to import</span>
-                <input
-                  type="file"
-                  accept=".pdf,.docx,.txt"
-                  className="mt-4 block w-full text-sm text-slate-300 file:mr-4 file:rounded-full file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-medium file:text-slate-950"
-                  onChange={(event) => onImportFileChange(event.target.files?.[0] || null)}
-                />
-                {importFile ? (
-                  <span className="mt-4 block text-sm text-slate-900">{importFile.name}</span>
-                ) : (
-                  <span className="mt-4 block text-sm text-slate-400">No file selected yet.</span>
-                )}
-              </div>
-              <button
-                type="button"
-                className="mt-auto inline-flex w-full items-center justify-center rounded-[16px] border border-cyan-700 bg-cyan-700 px-4 py-2.5 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_14px_24px_rgba(8,145,178,0.16)] transition hover:bg-cyan-800 hover:!text-white"
-                disabled={!importFile || importLoading}
-                onClick={onImportResume}
-              >
-                {importLoading ? <Loader label="Importing your resume..." /> : importFile ? "Import Into Builder" : "Choose a Resume to Import"}
-              </button>
-              <p className="text-xs leading-5 text-slate-500">
-                Privacy: your resume is used only to parse content into this builder.
-              </p>
-              <p className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-                Import note: parsing may not be 100% accurate for every resume format. Please manually review the imported sections before saving or downloading.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-[24px] border border-slate-200 bg-gradient-to-br from-sky-50 via-white to-slate-50 p-4 shadow-[0_20px_46px_rgba(148,163,184,0.12)]">
-            <div className="flex h-full flex-col gap-4">
-              <div className="max-w-lg">
-                <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Fresh Start</p>
-                <h3 className="mt-2 text-xl font-semibold text-slate-900">Begin from scratch and write directly in the builder</h3>
-              </div>
-              <div className="rounded-[18px] border border-slate-200 bg-white/90 p-3">
-                <span className="block text-sm font-medium text-slate-600">Start with a clean editor</span>
-                <div className="mt-3 rounded-[16px] border border-dashed border-slate-200 bg-slate-50/70 px-3 py-4 text-sm leading-6 text-slate-500">
-                  This will clear imported details, reset the live preview, and scroll you straight to the editor section.
+        {/* Collapsible Quick Setup Bar */}
+        {isQuickSetupOpen && (
+          <div className="mb-6 rounded-2xl border border-slate-200/90 bg-gradient-to-r from-sky-50/50 via-white to-slate-50 p-4 shadow-sm animate-in fade-in duration-200">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-800">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
                 </div>
-              </div>
-              <button
-                type="button"
-                className="mt-auto inline-flex w-full items-center justify-center rounded-[16px] border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-[0_12px_22px_rgba(148,163,184,0.08)] transition hover:border-slate-300 hover:bg-slate-50"
-                onClick={handleBeginFromScratchClick}
-              >
-                Begin from Scratch
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-6 grid gap-3 sm:grid-cols-4">
-          {[
-            ["1", "Import or start"],
-            ["2", "Fill details"],
-            ["3", "Review preview"],
-            ["4", "Save or export"],
-          ].map(([step, label]) => (
-            <div key={step} className="rounded-[18px] border border-slate-200 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-              {label}
-            </div>
-          ))}
-        </div>
-
-        <div ref={editorSectionRef} className="grid gap-8 xl:h-[calc(100vh-9.5rem)] xl:min-h-[38rem] xl:grid-cols-[0.7fr_0.665fr_1.635fr] xl:items-stretch">
-          <div className="space-y-8 xl:h-full xl:min-h-0 xl:overflow-y-auto xl:pr-2">
-            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
-              <h3 className="mb-4 text-lg font-semibold text-slate-900">Personal Info</h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                                <input className="field" name="firstName" placeholder="First name *" required value={formData.personalInfo.firstName || ""} onChange={updatePersonalInfo} />
-                <input className="field" name="middleName" placeholder="Middle name" value={formData.personalInfo.middleName || ""} onChange={updatePersonalInfo} />
-                <input className="field" name="lastName" placeholder="Last name *" required value={formData.personalInfo.lastName || ""} onChange={updatePersonalInfo} />
-                <input className="field" name="title" placeholder="Professional title" value={formData.personalInfo.title} onChange={updatePersonalInfo} />
-                <input className="field" name="email" placeholder="Email" type="email" value={formData.personalInfo.email} onChange={updatePersonalInfo} />
-                <div className="grid gap-3 md:col-span-2 sm:grid-cols-[7rem_minmax(12rem,1fr)]">
-                  <select className="field" name="countryCode" value={formData.personalInfo.countryCode || "+91"} onChange={updatePersonalInfo} aria-label="Country code">
-                    {COUNTRY_CODES.map((item) => (
-                      <option key={item.code + item.country} value={item.code}>{item.flag} {item.code}</option>
-                    ))}
-                  </select>
-                  <input className="field min-w-0" name="phone" placeholder="Phone number" inputMode="tel" value={formData.personalInfo.phone} onChange={updatePersonalInfo} />
-                </div>
-                <input className="field" name="portfolio" placeholder="LinkedIn / Portfolio URL" value={formData.personalInfo.portfolio || ""} onChange={updatePersonalInfo} />
-                <input className="field" name="github" placeholder="GitHub URL" value={formData.personalInfo.github || ""} onChange={updatePersonalInfo} />
-                <input className="field md:col-span-2" name="location" placeholder="Location" value={formData.personalInfo.location} onChange={updatePersonalInfo} />
-              </div>
-              {isSocsTemplate ? (
-                <div className="mt-4 space-y-1.5 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
-                  <p className={socsPhoneLooksValid ? "" : "font-semibold text-amber-700"}>SOCS phone format: +91 followed by 10 digits.</p>
-                  <p className={socsLinkedInLooksValid ? "" : "font-semibold text-amber-700"}>LinkedIn should be shortened, e.g. linkedin.com/in/firstname-lastname.</p>
-                  <p className={socsGithubLooksValid ? "" : "font-semibold text-amber-700"}>GitHub should be concise, e.g. github.com/firstname-lastname.</p>
-                </div>
-              ) : null}
-            </div>
-
-
-            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-slate-900">Education</h3>
-                <button type="button" className="button-secondary" onClick={() => addCollectionItem("education", blankEducation)}>
-                  Add Education
-                </button>
-              </div>
-              <datalist id="degree-options">
-                {DEGREE_OPTIONS.map((degree) => <option key={degree} value={degree} />)}
-              </datalist>
-              <datalist id="field-options">
-                {FIELD_OPTIONS.map((field) => <option key={field} value={field} />)}
-              </datalist>
-              <div className="space-y-4">
-                {formData.education.map((item, index) => (
-                  <div key={`education-${index}`} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-                    <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-medium text-slate-600">Entry {index + 1}</p>
-                      <RemoveIconButton onClick={() => removeCollectionItem("education", index)} label={`Remove education entry ${index + 1}`} />
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <input className="field md:col-span-2" placeholder="Institution / School / University" value={item.institution} onChange={(event) => updateCollectionItem("education", index, "institution", event.target.value)} />
-                      <input className="field md:col-span-2" list="degree-options" placeholder="Degree / Certificate" value={item.degree} onChange={(event) => updateCollectionItem("education", index, "degree", event.target.value)} />
-                      <input className="field md:col-span-2" list="field-options" placeholder="Field of study / Branch / Stream" value={item.fieldOfStudy} onChange={(event) => updateCollectionItem("education", index, "fieldOfStudy", event.target.value)} />
-                      <input className="field" placeholder="Location" value={item.location || ""} onChange={(event) => updateCollectionItem("education", index, "location", event.target.value)} />
-                      <input className="field" placeholder="GPA / CGPA / Percentage" value={item.score || ""} onChange={(event) => updateCollectionItem("education", index, "score", event.target.value)} />
-                      <input className="field" type="month" placeholder="Start date" value={formatDateForInput(item.startDate)} onChange={(event) => updateCollectionItem("education", index, "startDate", event.target.value)} />
-                      <input className="field" type="month" placeholder="End date" value={formatDateForInput(item.endDate)} onChange={(event) => updateCollectionItem("education", index, "endDate", event.target.value)} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-slate-900">Work Experience</h3>
-                <button type="button" className="button-secondary" onClick={() => addCollectionItem("experience", blankExperience)}>
-                  Add Work Experience
-                </button>
-              </div>
-              <div className="space-y-4">
-                {formData.experience.map((item, index) => (
-                  <div key={`experience-${index}`} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-                    <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-medium text-slate-600">Work Experience {index + 1}</p>
-                      <RemoveIconButton onClick={() => removeCollectionItem("experience", index)} label={`Remove experience entry ${index + 1}`} />
-                    </div>
-                    <div className="grid gap-4">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <input className="field" placeholder="Company" value={item.company} onChange={(event) => updateCollectionItem("experience", index, "company", event.target.value)} />
-                        <input className="field" placeholder="Role" value={item.role} onChange={(event) => updateCollectionItem("experience", index, "role", event.target.value)} />
-                        <input className="field" type="month" placeholder="Start date" value={formatDateForInput(item.startDate)} onChange={(event) => updateCollectionItem("experience", index, "startDate", event.target.value)} />
-                        <input className="field" type="month" placeholder="End date" value={formatDateForInput(item.endDate)} onChange={(event) => updateCollectionItem("experience", index, "endDate", event.target.value)} />
-                      </div>
-                      <div>
-                        <div className="mb-2 flex items-center justify-between gap-3">
-                          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Responsibilities</span>
-                          <button type="button" className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800 transition hover:border-cyan-300 hover:bg-cyan-100" onClick={() => generateDescriptionDraft("experience", index)}>
-                            <span aria-hidden="true">AI</span> Write bullets
-                          </button>
-                        </div>
-                        <textarea className="field min-h-28" placeholder={isSocsTemplate ? "- Skills learnt and quantified contribution\n- Responsibility with measurable outcome" : "- Describe impact, achievements, and tools used"} value={item.description} onChange={(event) => updateCollectionItem("experience", index, "description", event.target.value)} onKeyDown={(event) => handleBulletTextareaKeyDown(event, (value) => updateCollectionItem("experience", index, "description", value))} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
-              <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Projects</h3>
-                  <p className="mt-1 text-sm text-slate-500">Add a bold project name and supporting details.</p>
+                  <h4 className="text-sm font-bold text-slate-900">Import Resume or Begin Fresh</h4>
+                  <p className="text-xs text-slate-500">
+                    Upload an existing PDF/DOCX to parse sections directly into this builder, or start with a clean blank slate.
+                  </p>
                 </div>
-                <button type="button" className="button-secondary" onClick={addProject}>
-                  Add Project
-                </button>
               </div>
-              <div className="space-y-4">
-                {(formData.projects?.length ? formData.projects : [blankProject]).map((project, projectIndex) => {
-                  const projectDetailsValue = formatProjectDetailsEditorValue(project);
-
-                  return (
-                    <div key={`project-${projectIndex}`} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <p className="text-sm font-medium text-slate-600">Project {projectIndex + 1}</p>
-                        <RemoveIconButton
-                          onClick={() => removeProject(projectIndex)}
-                          disabled={!formData.projects?.length}
-                          label={`Remove project ${projectIndex + 1}`}
-                        />
-                      </div>
-                      <div className="space-y-3">
-                        <input
-                          className="field"
-                          placeholder="Project name"
-                          value={project.name || ""}
-                          onChange={(event) => updateProject(projectIndex, "name", event.target.value)}
-                        />
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <input className="field" type="month" placeholder="Start date" value={formatDateForInput(project.startDate)} onChange={(event) => updateProject(projectIndex, "startDate", event.target.value)} />
-                          <input className="field" type="month" placeholder="End date" value={formatDateForInput(project.endDate)} onChange={(event) => updateProject(projectIndex, "endDate", event.target.value)} />
-                        </div>
-                        <div>
-                          <div className="mb-2 flex items-center justify-between gap-3">
-                            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contributions</span>
-                            <button type="button" className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800 transition hover:border-cyan-300 hover:bg-cyan-100" onClick={() => generateDescriptionDraft("project", projectIndex)}>
-                              <span aria-hidden="true">AI</span> Write bullets
-                            </button>
-                          </div>
-                          <textarea
-                            className="field min-h-32"
-                            placeholder={isSocsTemplate ? "- Tech stack and skills learnt\n- Description and measurable contribution" : "- Describe the project contribution. Press Enter for the next bullet."}
-                            value={projectDetailsValue}
-                            onChange={(event) => updateProjectDetails(projectIndex, event.target.value)}
-                            onKeyDown={(event) => handleProjectDetailsKeyDown(projectIndex, event)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50">
+                  <input
+                    type="file"
+                    accept=".pdf,.docx,.txt"
+                    className="hidden"
+                    onChange={(event) => onImportFileChange(event.target.files?.[0] || null)}
+                  />
+                  <span>{importFile ? importFile.name : "Select File"}</span>
+                </label>
+                {importFile ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-700 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-cyan-800 disabled:opacity-60"
+                    disabled={importLoading}
+                    onClick={onImportResume}
+                  >
+                    {importLoading ? <Loader label="Importing..." /> : "Import Into Builder"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50"
+                  onClick={handleBeginFromScratchClick}
+                >
+                  Fresh Start
+                </button>
               </div>
             </div>
+            {importFile ? (
+              <p className="mt-2 text-[11px] text-amber-700">
+                Note: Parsing may not be 100% accurate for every format. Please verify the imported sections before exporting.
+              </p>
+            ) : null}
+          </div>
+        )}
 
-            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-slate-900">Additional Sections</h3>
-                <button type="button" className="button-secondary" onClick={addCustomSection}>
-                  Add Section
-                </button>
+        <div ref={editorSectionRef} className="grid gap-5 xl:grid-cols-[220px_minmax(420px,1.15fr)_minmax(460px,1.3fr)] xl:items-start">
+          {/* Column 1: Desktop Sidebar Section Navigator */}
+          <aside className="hidden xl:block space-y-3 sticky top-20">
+            {/* Resume Strength Progress Card */}
+            <div className="rounded-2xl border border-slate-300 bg-white p-3.5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-md bg-indigo-100 text-indigo-700">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Profile Strength</span>
+                </div>
+                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-black text-indigo-700 ring-1 ring-inset ring-indigo-600/20 shadow-2xs">
+                  {strengthScore}%
+                </span>
               </div>
-              <div className="space-y-4">
-                {formData.customSections?.length ? (
-                  formData.customSections.map((section, sectionIndex) => (
-                    <div
-                      key={`custom-section-${sectionIndex}`}
-                      className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4"
-                    >
-                      <div className="mb-3 flex items-center justify-between">
-                        <p className="text-sm font-medium text-slate-600">Custom Section {sectionIndex + 1}</p>
-                        <RemoveIconButton
-                          onClick={() => removeCustomSection(sectionIndex)}
-                          label={`Remove custom section ${sectionIndex + 1}`}
-                        />
+              <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-slate-100 p-0.5 ring-1 ring-slate-300">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 transition-all duration-500 shadow-sm"
+                  style={{ width: `${strengthScore}%` }}
+                />
+              </div>
+              <p className="mt-2 text-[10px] font-medium text-slate-500">
+                {strengthScore >= 80 ? "Optimized for ATS & recruiters" : `${Math.round(strengthScore / 12)} of 8 sections complete`}
+              </p>
+            </div>
+
+            {/* Dedicated Sections Navigation List */}
+            <nav className="rounded-2xl border border-slate-300 bg-white p-1.5 shadow-xs space-y-0.5" aria-label="Resume Sections">
+              {RESUME_SECTIONS.map((sec) => {
+                const isCurrent = activeSection === sec.id && !showAllSections;
+                const isDone = sectionCompletion[sec.id];
+                const theme = SECTION_THEMES[sec.id] || SECTION_THEMES.personal;
+                const count =
+                  sec.id === "experience"
+                    ? formData.experience?.length || 0
+                    : sec.id === "education"
+                    ? formData.education?.length || 0
+                    : sec.id === "projects"
+                    ? formData.projects?.length || 0
+                    : sec.id === "custom"
+                    ? formData.customSections?.length || 0
+                    : null;
+
+                return (
+                  <button
+                    key={sec.id}
+                    type="button"
+                    className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs transition-all ${
+                      isCurrent
+                        ? theme.activeClass
+                        : `border border-transparent text-slate-600 ${theme.hoverClass} hover:text-slate-900`
+                    }`}
+                    onClick={() => navigateToSection(sec.id)}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className={`transition-colors ${isCurrent ? theme.iconActive : "text-slate-400 group-hover:text-slate-600"}`}>
+                        {SectionIcons[sec.id]}
+                      </span>
+                      <span className={`truncate ${isCurrent ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>
+                        {sec.label}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {count !== null && count > 0 && !isCurrent ? (
+                        <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                          sec.id === "experience" ? "bg-blue-100 text-blue-700" :
+                          sec.id === "education" ? "bg-purple-100 text-purple-700" :
+                          sec.id === "projects" ? "bg-rose-100 text-rose-700" :
+                          sec.id === "custom" ? "bg-teal-100 text-teal-800" :
+                          "bg-slate-100 text-slate-600"
+                        }`}>
+                          {count}
+                        </span>
+                      ) : null}
+                      {isDone ? (
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                          <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <span className={`h-2 w-2 rounded-full ${isCurrent ? theme.dotActive : "bg-slate-200"}`} />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* Show All Sections Toggle */}
+            <button
+              type="button"
+              className={`w-full flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-semibold transition shadow-xs ${
+                showAllSections
+                  ? "border-indigo-400 bg-indigo-50 text-indigo-800"
+                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 shadow-2xs"
+              }`}
+              onClick={() => setShowAllSections((all) => !all)}
+            >
+              <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              <span>{showAllSections ? "Focus on Active Section" : "Show All Sections"}</span>
+            </button>
+          </aside>
+
+          {/* Column 2: Dedicated Section Editor */}
+          <div ref={editorColumnRef} className={`space-y-4 xl:block ${activeMobileTab === "editor" ? "block" : "hidden"} xl:h-[calc(100vh-8.5rem)] xl:overflow-y-auto xl:pr-2 [scrollbar-gutter:stable]`}>
+            {/* Tablet/Mobile Horizontal Section Pill Navigation */}
+            <div className="xl:hidden flex items-center gap-1.5 overflow-x-auto rounded-2xl border border-slate-300 bg-white p-1.5 shadow-sm scrollbar-none [scrollbar-width:none]">
+              {RESUME_SECTIONS.map((sec) => {
+                const isCurrent = activeSection === sec.id && !showAllSections;
+                const theme = SECTION_THEMES[sec.id] || SECTION_THEMES.personal;
+                return (
+                  <button
+                    key={sec.id}
+                    type="button"
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+                      isCurrent
+                        ? theme.activeClass
+                        : `border border-slate-300 bg-white text-slate-600 ${theme.hoverClass} hover:text-slate-900`
+                    }`}
+                    onClick={() => navigateToSection(sec.id)}
+                  >
+                    <span className={isCurrent ? theme.iconActive : "text-slate-400"}>
+                      {SectionIcons[sec.id]}
+                    </span>
+                    <span className={isCurrent ? "font-bold text-slate-900" : "font-medium text-slate-700"}>
+                      {sec.shortLabel || sec.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {(showAllSections || activeSection === "personal") && (
+              <div id="section-personal" className="relative overflow-hidden rounded-2xl border border-slate-300 bg-white p-5 shadow-xs transition hover:border-emerald-400 hover:shadow-sm">
+                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500" />
+                <div className="mb-5 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm shadow-emerald-500/25">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">Personal Information</h3>
+                      <p className="text-xs text-slate-500">Contact details and portfolio links for recruiters.</p>
+                    </div>
+                  </div>
+                  <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700 ring-1 ring-inset ring-rose-600/20">
+                    Mandatory Section
+                  </span>
+                </div>
+                <div className="grid gap-3.5 md:grid-cols-2">
+                  <input className="field" name="firstName" placeholder="First name *" required value={formData.personalInfo.firstName || ""} onChange={updatePersonalInfo} />
+                  <input className="field" name="middleName" placeholder="Middle name" value={formData.personalInfo.middleName || ""} onChange={updatePersonalInfo} />
+                  <input className="field" name="lastName" placeholder="Last name" value={formData.personalInfo.lastName || ""} onChange={updatePersonalInfo} />
+                  <input className="field" name="title" placeholder="Professional title *" required value={formData.personalInfo.title} onChange={updatePersonalInfo} />
+                  <input className="field" name="email" placeholder="Email *" type="email" required value={formData.personalInfo.email} onChange={updatePersonalInfo} />
+                  <div className="grid gap-2 md:col-span-2 sm:grid-cols-[7rem_minmax(12rem,1fr)]">
+                    <select className="field" name="countryCode" value={formData.personalInfo.countryCode || "+91"} onChange={updatePersonalInfo} aria-label="Country code">
+                      {COUNTRY_CODES.map((item) => (
+                        <option key={item.code + item.country} value={item.code}>{item.flag} {item.code}</option>
+                      ))}
+                    </select>
+                    <input className="field min-w-0" name="phone" placeholder="10-digit Phone number *" inputMode="numeric" maxLength={10} required value={formData.personalInfo.phone} onChange={updatePersonalInfo} />
+                  </div>
+                  <input className="field" name="portfolio" placeholder="LinkedIn / Portfolio URL" value={formData.personalInfo.portfolio || ""} onChange={updatePersonalInfo} />
+                  <input className="field" name="github" placeholder="GitHub URL" value={formData.personalInfo.github || ""} onChange={updatePersonalInfo} />
+                  <input className="field md:col-span-2" name="location" placeholder="Location" value={formData.personalInfo.location} onChange={updatePersonalInfo} />
+                </div>
+                {isSocsTemplate ? (
+                  <div className="mt-4 space-y-1.5 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
+                    <p className={socsPhoneLooksValid ? "" : "font-semibold text-amber-700"}>SOCS phone format: +91 followed by 10 digits.</p>
+                    <p className={socsLinkedInLooksValid ? "" : "font-semibold text-amber-700"}>LinkedIn should be shortened, e.g. linkedin.com/in/firstname-lastname.</p>
+                    <p className={socsGithubLooksValid ? "" : "font-semibold text-amber-700"}>GitHub should be concise, e.g. github.com/firstname-lastname.</p>
+                  </div>
+                ) : null}
+                {!showAllSections && renderSectionStepper()}
+              </div>
+            )}
+
+            {(showAllSections || activeSection === "photo") && (
+              <div id="section-photo" className="relative overflow-hidden rounded-2xl border border-slate-300 bg-white p-5 shadow-xs transition hover:border-sky-400 hover:shadow-sm">
+                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500" />
+                <div className="mb-5 flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-sm shadow-sky-500/25">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">Profile Photo</h3>
+                      <p className="text-xs text-slate-500">Upload portrait, zoom, and frame placement.</p>
+                    </div>
+                  </div>
+                  {resumePhoto ? (
+                    <RemoveIconButton
+                      onClick={onPhotoRemove}
+                      label="Remove resume photo"
+                      className="text-slate-400 transition hover:text-rose-500"
+                    />
+                  ) : null}
+                </div>
+                <div className="mt-4 rounded-[22px] border border-slate-300 bg-slate-50 p-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:font-medium file:text-white hover:file:bg-indigo-700 cursor-pointer"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] || null;
+                      onPhotoUpload?.(file);
+                      event.target.value = "";
+                    }}
+                  />
+                  {resumePhoto ? (
+                    <div className="mt-4 flex items-center gap-4 rounded-[18px] bg-white p-3 shadow-xs">
+                      <img
+                        src={resumePhoto.src}
+                        alt="Resume profile preview"
+                        className="h-14 w-14 rounded-full object-cover"
+                        style={{
+                          objectPosition: `${photoCropX * 100}% ${photoCropY * 100}%`,
+                        }}
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">{resumePhoto.name}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {(resumePhoto.size / (1024 * 1024)).toFixed(2)} MB
+                          {templateUsesBuiltInPhoto
+                            ? " • Auto-fitted into template"
+                            : " • Drag inside preview to position"}
+                        </p>
                       </div>
-                      <div className="space-y-3">
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs text-slate-400">No photo uploaded yet.</p>
+                  )}
+                  {resumePhoto ? (
+                    <div className="mt-4 space-y-3 rounded-[18px] bg-white p-4 shadow-xs">
+                      <label className="block">
+                        <div className="mb-1.5 flex items-center justify-between text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                          <span>Frame size</span>
+                          <span>{Math.round(photoFrameScale * 100)}%</span>
+                        </div>
                         <input
-                          className="field"
-                          placeholder="Section title (Projects, Certifications, Achievements...)"
-                          value={section.title}
-                          onChange={(event) =>
-                            updateCustomSectionTitle(sectionIndex, event.target.value)
-                          }
+                          type="range"
+                          min="0.5"
+                          max="1.4"
+                          step="0.01"
+                          value={photoFrameScale}
+                          className="w-full accent-indigo-600"
+                          onChange={(event) => onPhotoFrameScaleChange?.(Number(event.target.value))}
                         />
-                        {section.items.map((item, itemIndex) => (
-                          <div key={`custom-item-${sectionIndex}-${itemIndex}`} className="flex gap-3">
+                      </label>
+                      <label className="block">
+                        <div className="mb-1.5 flex items-center justify-between text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                          <span>Zoom</span>
+                          <span>{photoZoom.toFixed(2)}x</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1"
+                          max="3.5"
+                          step="0.01"
+                          value={photoZoom}
+                          className="w-full accent-indigo-600"
+                          onChange={(event) => onPhotoZoomChange?.(Number(event.target.value))}
+                        />
+                      </label>
+                      <label className="block">
+                        <div className="mb-1.5 flex items-center justify-between text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                          <span>Horizontal Position</span>
+                          <span>{Math.round(photoCropX * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={photoCropX}
+                          className="w-full accent-indigo-600"
+                          onChange={(event) => onPhotoCropChange?.({ x: Number(event.target.value) })}
+                        />
+                      </label>
+                      <label className="block">
+                        <div className="mb-1.5 flex items-center justify-between text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                          <span>Vertical Position</span>
+                          <span>{Math.round(photoCropY * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={photoCropY}
+                          className="w-full accent-indigo-600"
+                          onChange={(event) => onPhotoCropChange?.({ y: Number(event.target.value) })}
+                        />
+                      </label>
+                    </div>
+                  ) : null}
+                </div>
+                {!showAllSections && renderSectionStepper()}
+              </div>
+            )}
+
+            {(showAllSections || activeSection === "summary") && (
+              <div id="section-summary" className="relative overflow-hidden rounded-2xl border border-slate-300 bg-white p-5 shadow-xs transition hover:border-amber-400 hover:shadow-sm">
+                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500" />
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-sm shadow-amber-500/25">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-slate-900">Professional Summary</h3>
+                        <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 ring-1 ring-inset ring-rose-600/20">
+                          Mandatory Section
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">Executive pitch highlighting your unique value and career focus.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200/90 bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50/60 px-3.5 py-2 text-xs font-semibold text-indigo-700 shadow-xs transition hover:from-indigo-100 hover:to-purple-100 hover:border-indigo-300 hover:text-indigo-900 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={Boolean(aiLoading)}
+                      onClick={() => onAIAction("summary")}
+                    >
+                      {aiLoading === "summary" ? <Loader label="Polishing..." /> : (
+                        <>
+                          <svg className="h-3.5 w-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          <span>AI Polish</span>
+                        </>
+                      )}
+                    </button>
+                    {summaryUpdateSuccess ? (
+                      <span
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600"
+                        aria-label="Summary updated"
+                        title="Summary updated"
+                      >
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                          <path d="M20 7L10 17l-5-5" />
+                        </svg>
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <textarea
+                  className="field min-h-36"
+                  name="summary"
+                  placeholder={isSocsTemplate ? "Write 30-40 words with skills, measurable outcomes, project impact, and action words. *" : "Write a concise, impact-focused professional summary * (Mandatory Section)"}
+                  value={formData.summary}
+                  onChange={(event) => setFormData((prev) => ({ ...prev, summary: event.target.value }))}
+                />
+                {isSocsTemplate ? (
+                  <p className={`mt-2 text-xs ${socsSummaryWords && (socsSummaryWords < 30 || socsSummaryWords > 40) ? "font-semibold text-amber-700" : "text-slate-500"}`}>
+                    SOCS guidance: keep the summary to 2-3 lines, roughly 30-40 words, with measurable impact. Current word count: {socsSummaryWords}
+                  </p>
+                ) : null}
+                {!showAllSections && renderSectionStepper()}
+              </div>
+            )}
+
+            {(showAllSections || activeSection === "experience") && (
+              <div id="section-experience" className="relative rounded-2xl border border-slate-300 bg-white p-5 shadow-xs transition hover:border-blue-400 hover:shadow-sm">
+                <div className="absolute top-0 inset-x-0 h-1 rounded-t-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
+                <div className="mb-5 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-500/25">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-slate-900">Work Experience</h3>
+                        <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                          Experience or Project Required
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">Roles, internships, and professional employment.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50/60 px-3.5 py-2 text-xs font-semibold text-blue-700 shadow-xs transition hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 hover:text-blue-800 active:scale-95"
+                    onClick={() => addCollectionItem("experience", blankExperience)}
+                  >
+                    <svg className="h-3.5 w-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Add Experience</span>
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {formData.experience.map((item, index) => {
+                    const isCollapsed = Boolean(collapsedExperience[index]);
+                    const entryTitle = item.role || item.company ? `${item.role || "Role"} ${item.company ? `at ${item.company}` : ""}` : `Work Experience ${index + 1}`;
+                    const entryDates = formatDateRange(item.startDate, item.endDate);
+
+                    return (
+                      <div key={`experience-${index}`} className={`rounded-[22px] border border-slate-300 bg-slate-50/50 ${isCollapsed ? "overflow-hidden" : "overflow-visible"} transition hover:border-blue-400 hover:shadow-xs shadow-2xs`}>
+                        <div
+                          className="flex items-center justify-between px-4 py-3 cursor-pointer select-none bg-gradient-to-r from-blue-50/60 to-indigo-50/30 hover:from-blue-100/60 hover:to-indigo-100/40 transition"
+                          onClick={() => toggleExperienceCollapse(index)}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <svg className={`h-3.5 w-3.5 text-blue-500 transition-transform duration-200 ${isCollapsed ? "" : "rotate-90"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span className="inline-flex items-center rounded-md bg-blue-100/80 px-2 py-0.5 text-[11px] font-bold text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                              Role #{index + 1}
+                            </span>
+                            <span className="text-sm font-semibold text-slate-800 truncate">
+                              {entryTitle}
+                            </span>
+                            {entryDates ? (
+                              <span className="text-xs text-slate-400 hidden sm:inline">
+                                • {entryDates}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
+                            <RemoveIconButton onClick={() => removeCollectionItem("experience", index)} label={`Remove experience entry ${index + 1}`} />
+                          </div>
+                        </div>
+
+                        {!isCollapsed && (
+                          <div className="p-4 pt-2 space-y-4 border-t border-slate-200 bg-white/60">
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <input className="field" name={`experience-${index}-company`} placeholder="Company *" value={item.company} onChange={(event) => updateCollectionItem("experience", index, "company", event.target.value)} />
+                              <input className="field" name={`experience-${index}-role`} placeholder="Role / Job Title *" value={item.role} onChange={(event) => updateCollectionItem("experience", index, "role", event.target.value)} />
+                              <CalendarPickerInput className="field" placeholder="Start date" value={formatDateForInput(item.startDate)} onChange={(event) => updateCollectionItem("experience", index, "startDate", event.target.value)} />
+                              <CalendarPickerInput className="field" placeholder="End date" value={formatDateForInput(item.endDate)} onChange={(event) => updateCollectionItem("experience", index, "endDate", event.target.value)} />
+                            </div>
+                            <div>
+                              <div className="mb-2 flex items-center justify-between gap-3">
+                                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Responsibilities</span>
+                                <button type="button" className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200/90 bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50/60 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-xs transition hover:from-indigo-100 hover:to-purple-100 hover:border-indigo-300 hover:text-indigo-900 active:scale-95" onClick={() => generateDescriptionDraft("experience", index)}>
+                                  <svg className="h-3.5 w-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                  </svg>
+                                  <span>AI Write Bullets</span>
+                                </button>
+                              </div>
+                              <textarea className="field min-h-28" placeholder={isSocsTemplate ? "- Skills learnt and quantified contribution\n- Responsibility with measurable outcome" : "- Describe impact, achievements, and tools used"} value={item.description} onChange={(event) => updateCollectionItem("experience", index, "description", event.target.value)} onKeyDown={(event) => handleBulletTextareaKeyDown(event, (value) => updateCollectionItem("experience", index, "description", value))} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {!showAllSections && renderSectionStepper()}
+              </div>
+            )}
+
+            {(showAllSections || activeSection === "education") && (
+              <div id="section-education" className="relative rounded-2xl border border-slate-300 bg-white p-5 shadow-xs transition hover:border-purple-400 hover:shadow-sm">
+                <div className="absolute top-0 inset-x-0 h-1 rounded-t-2xl bg-gradient-to-r from-purple-500 via-violet-500 to-indigo-600" />
+                <div className="mb-5 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-sm shadow-purple-500/25">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-slate-900">Education</h3>
+                        <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 ring-1 ring-inset ring-purple-600/20">
+                          1+ Required (Mandatory)
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">Academic background, degrees, and scores.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50 to-violet-50/60 px-3.5 py-2 text-xs font-semibold text-purple-700 shadow-xs transition hover:from-purple-100 hover:to-violet-100 hover:border-purple-300 hover:text-purple-800 active:scale-95"
+                    onClick={() => addCollectionItem("education", blankEducation)}
+                  >
+                    <svg className="h-3.5 w-3.5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Add Education</span>
+                  </button>
+                </div>
+                <datalist id="degree-options">
+                  {DEGREE_OPTIONS.map((degree) => <option key={degree} value={degree} />)}
+                </datalist>
+                <datalist id="field-options">
+                  {FIELD_OPTIONS.map((field) => <option key={field} value={field} />)}
+                </datalist>
+                <div className="space-y-3">
+                  {formData.education.map((item, index) => {
+                    const isCollapsed = Boolean(collapsedEducation[index]);
+                    const entryTitle = item.degree || item.institution ? `${item.degree || "Degree"} ${item.institution ? `at ${item.institution}` : ""}` : `Education Entry ${index + 1}`;
+                    const entryDates = formatDateRange(item.startDate, item.endDate);
+
+                    return (
+                      <div key={`education-${index}`} className={`rounded-[22px] border border-slate-300 bg-slate-50/50 ${isCollapsed ? "overflow-hidden" : "overflow-visible"} transition hover:border-purple-400 hover:shadow-xs shadow-2xs`}>
+                        <div
+                          className="flex items-center justify-between px-4 py-3 cursor-pointer select-none bg-gradient-to-r from-purple-50/60 to-violet-50/30 hover:from-purple-100/60 hover:to-violet-100/40 transition"
+                          onClick={() => toggleEducationCollapse(index)}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <svg className={`h-3.5 w-3.5 text-purple-500 transition-transform duration-200 ${isCollapsed ? "" : "rotate-90"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span className="inline-flex items-center rounded-md bg-purple-100/80 px-2 py-0.5 text-[11px] font-bold text-purple-700 ring-1 ring-inset ring-purple-600/20">
+                              Degree #{index + 1}
+                            </span>
+                            <span className="text-sm font-semibold text-slate-800 truncate">
+                              {entryTitle}
+                            </span>
+                            {entryDates ? (
+                              <span className="text-xs text-slate-400 hidden sm:inline">
+                                • {entryDates}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
+                            <RemoveIconButton onClick={() => removeCollectionItem("education", index)} label={`Remove education entry ${index + 1}`} />
+                          </div>
+                        </div>
+
+                        {!isCollapsed && (
+                          <div className="p-4 pt-2 space-y-3.5 border-t border-slate-200 bg-white/60">
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <input className="field md:col-span-2" name={`education-${index}-institution`} placeholder="Institution / School / University *" value={item.institution} onChange={(event) => updateCollectionItem("education", index, "institution", event.target.value)} />
+                              <select
+                                className="field md:col-span-2"
+                                name={`education-${index}-degree`}
+                                value={MAJOR_DEGREES.includes(item.degree) ? item.degree : (item.degree ? "Other" : "")}
+                                onChange={(event) => {
+                                  const val = event.target.value;
+                                  if (val === "Other") {
+                                    updateCollectionItem("education", index, "degree", item.degree && !MAJOR_DEGREES.includes(item.degree) ? item.degree : "Other");
+                                  } else {
+                                    updateCollectionItem("education", index, "degree", val);
+                                  }
+                                }}
+                              >
+                                <option value="">Select Degree *</option>
+                                {MAJOR_DEGREES.map((deg) => (
+                                  <option key={deg} value={deg}>{deg}</option>
+                                ))}
+                                <option value="Other">Other (Custom Degree)</option>
+                              </select>
+                              {(!MAJOR_DEGREES.includes(item.degree) && Boolean(item.degree)) ? (
+                                <input
+                                  className="field md:col-span-2"
+                                  placeholder="Enter custom degree / certificate name *"
+                                  value={item.degree === "Other" ? "" : item.degree}
+                                  onChange={(event) => updateCollectionItem("education", index, "degree", event.target.value || "Other")}
+                                />
+                              ) : null}
+                              <input className="field md:col-span-2" list="field-options" placeholder="Field of study / Branch / Stream" value={item.fieldOfStudy} onChange={(event) => updateCollectionItem("education", index, "fieldOfStudy", event.target.value)} />
+                              <input className="field" placeholder="Location" value={item.location || ""} onChange={(event) => updateCollectionItem("education", index, "location", event.target.value)} />
+                              <input className="field" placeholder="GPA / CGPA / Percentage" value={item.score || ""} onChange={(event) => updateCollectionItem("education", index, "score", event.target.value)} />
+                              <CalendarPickerInput className="field" placeholder="Start date" value={formatDateForInput(item.startDate)} onChange={(event) => updateCollectionItem("education", index, "startDate", event.target.value)} />
+                              <CalendarPickerInput className="field" placeholder="End date" value={formatDateForInput(item.endDate)} onChange={(event) => updateCollectionItem("education", index, "endDate", event.target.value)} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {!showAllSections && renderSectionStepper()}
+              </div>
+            )}
+
+            {(showAllSections || activeSection === "projects") && (
+              <div id="section-projects" className="relative rounded-2xl border border-slate-300 bg-white p-5 shadow-xs transition hover:border-rose-400 hover:shadow-sm">
+                <div className="absolute top-0 inset-x-0 h-1 rounded-t-2xl bg-gradient-to-r from-rose-500 via-pink-500 to-purple-600" />
+                <div className="mb-5 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow-sm shadow-rose-500/25">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-slate-900">Key Projects</h3>
+                        <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 ring-1 ring-inset ring-rose-600/20">
+                          Experience or Project Required
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">Key personal, academic, or open-source projects.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-gradient-to-r from-rose-50 to-pink-50/60 px-3.5 py-2 text-xs font-semibold text-rose-700 shadow-xs transition hover:from-rose-100 hover:to-pink-100 hover:border-rose-300 hover:text-rose-800 active:scale-95"
+                    onClick={addProject}
+                  >
+                    <svg className="h-3.5 w-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Add Project</span>
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {(formData.projects?.length ? formData.projects : [blankProject]).map((project, projectIndex) => {
+                    const projectDetailsValue = formatProjectDetailsEditorValue(project);
+                    const isCollapsed = Boolean(collapsedProjects[projectIndex]);
+                    const entryTitle = project.name ? project.name : `Project ${projectIndex + 1}`;
+                    const entryDates = formatDateRange(project.startDate, project.endDate);
+
+                    return (
+                      <div key={`project-${projectIndex}`} className={`rounded-[22px] border border-slate-300 bg-slate-50/50 ${isCollapsed ? "overflow-hidden" : "overflow-visible"} transition hover:border-rose-400 hover:shadow-xs shadow-2xs`}>
+                        <div
+                          className="flex items-center justify-between px-4 py-3 cursor-pointer select-none bg-gradient-to-r from-rose-50/60 to-pink-50/30 hover:from-rose-100/60 hover:to-pink-100/40 transition"
+                          onClick={() => toggleProjectCollapse(projectIndex)}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <svg className={`h-3.5 w-3.5 text-rose-500 transition-transform duration-200 ${isCollapsed ? "" : "rotate-90"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span className="inline-flex items-center rounded-md bg-rose-100/80 px-2 py-0.5 text-[11px] font-bold text-rose-700 ring-1 ring-inset ring-rose-600/20">
+                              Project #{projectIndex + 1}
+                            </span>
+                            <span className="text-sm font-semibold text-slate-800 truncate">
+                              {entryTitle}
+                            </span>
+                            {entryDates ? (
+                              <span className="text-xs text-slate-400 hidden sm:inline">
+                                • {entryDates}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
+                            <RemoveIconButton
+                              onClick={() => removeProject(projectIndex)}
+                              disabled={!formData.projects?.length}
+                              label={`Remove project ${projectIndex + 1}`}
+                            />
+                          </div>
+                        </div>
+
+                        {!isCollapsed && (
+                          <div className="p-4 pt-2 space-y-3.5 border-t border-slate-200 bg-white/60">
                             <input
                               className="field"
-                              placeholder="Section item"
-                              value={item}
-                              onChange={(event) =>
-                                updateCustomSectionItem(sectionIndex, itemIndex, event.target.value)
-                              }
+                              name={`project-${projectIndex}-name`}
+                              placeholder="Project name *"
+                              value={project.name || ""}
+                              onChange={(event) => updateProject(projectIndex, "name", event.target.value)}
                             />
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <CalendarPickerInput className="field" placeholder="Start date" value={formatDateForInput(project.startDate)} onChange={(event) => updateProject(projectIndex, "startDate", event.target.value)} />
+                              <CalendarPickerInput className="field" placeholder="End date" value={formatDateForInput(project.endDate)} onChange={(event) => updateProject(projectIndex, "endDate", event.target.value)} />
+                            </div>
+                            <div>
+                              <div className="mb-2 flex items-center justify-between gap-3">
+                                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Contributions</span>
+                                <button type="button" className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200/90 bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50/60 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-xs transition hover:from-indigo-100 hover:to-purple-100 hover:border-indigo-300 hover:text-indigo-900 active:scale-95" onClick={() => generateDescriptionDraft("project", projectIndex)}>
+                                  <svg className="h-3.5 w-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                  </svg>
+                                  <span>AI Write Bullets</span>
+                                </button>
+                              </div>
+                              <textarea
+                                className="field min-h-32"
+                                placeholder={isSocsTemplate ? "- Tech stack and skills learnt\n- Description and measurable contribution" : "- Describe the project contribution. Press Enter for the next bullet."}
+                                value={projectDetailsValue}
+                                onChange={(event) => updateProjectDetails(projectIndex, event.target.value)}
+                                onKeyDown={(event) => handleProjectDetailsKeyDown(projectIndex, event)}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {!showAllSections && renderSectionStepper()}
+              </div>
+            )}
+
+            {(showAllSections || activeSection === "skills") && (
+              <div id="section-skills" className="relative overflow-hidden rounded-2xl border border-slate-300 bg-white p-5 shadow-xs transition hover:border-violet-400 hover:shadow-sm">
+                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-600" />
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-sm shadow-violet-500/25">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-slate-900">Skills & Proficiencies</h3>
+                        <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700 ring-1 ring-inset ring-violet-600/20">
+                          1+ Required (Mandatory)
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">Categorize your technical and soft skills.</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200/90 bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50/60 px-3.5 py-2 text-xs font-semibold text-indigo-700 shadow-xs transition hover:from-indigo-100 hover:to-purple-100 hover:border-indigo-300 hover:text-indigo-900 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={Boolean(aiLoading)}
+                      onClick={() => onAIAction("skills")}
+                    >
+                      {aiLoading === "skills" ? <Loader label="Suggesting..." /> : (
+                        <>
+                          <svg className="h-3.5 w-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          <span>AI Suggest Skills</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-purple-50/60 px-3.5 py-2 text-xs font-semibold text-violet-700 shadow-xs transition hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 hover:text-violet-800 active:scale-95"
+                      onClick={addSkillCategory}
+                    >
+                      <svg className="h-3.5 w-3.5 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span>Add Category</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  {editableSkillCategories.length ? (
+                    editableSkillCategories.map((group, categoryIndex) => (
+                      <div
+                        key={`skill-editor-category-${categoryIndex}`}
+                        className="group rounded-[22px] border border-slate-300 bg-slate-50/50 p-4 transition hover:border-violet-400 hover:shadow-xs shadow-2xs"
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            className="field"
+                            placeholder="Category, e.g. Programming Languages, Databases"
+                            value={group.category}
+                            onChange={(event) => updateSkillCategory(categoryIndex, event.target.value)}
+                          />
+                          <div className="opacity-40 transition group-hover:opacity-100 focus-within:opacity-100">
                             <RemoveIconButton
-                              onClick={() => removeCustomSectionItem(sectionIndex, itemIndex)}
-                              disabled={section.items.length === 1}
-                              label={`Remove item ${itemIndex + 1} from custom section ${sectionIndex + 1}`}
-                              className="border border-slate-200 text-slate-400 transition hover:border-rose-100 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-35"
+                              onClick={() => removeSkillCategory(categoryIndex)}
+                              label="Remove skill category"
+                              className="text-slate-400 transition hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-35"
                             />
                           </div>
-                        ))}
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          {(group.items || []).map((skill, skillIndex) => (
+                            <div key={`skill-editor-item-${categoryIndex}-${skillIndex}`} className="group/skill flex items-center gap-2">
+                              <input
+                                className="field"
+                                placeholder="Skill, e.g. React, Python, SQL"
+                                value={skill}
+                                data-skill-input={`${categoryIndex}-${skillIndex}`}
+                                onChange={(event) => updateSkillItem(categoryIndex, skillIndex, event.target.value)}
+                                onBlur={(event) => removeEmptySkillItem(categoryIndex, skillIndex, event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    addSkillToCategory(categoryIndex);
+                                  }
+                                }}
+                              />
+                              <span className="opacity-0 transition group-hover/skill:opacity-100 focus-within:opacity-100">
+                                <InlineRemoveButton
+                                  onClick={() => removeSkillItem(categoryIndex, skillIndex)}
+                                  label="Remove skill"
+                                />
+                              </span>
+                            </div>
+                          ))}
+                          {!(group.items || []).length ? (
+                            <p className="rounded-[16px] border border-dashed border-slate-200 bg-white/70 px-3 py-2 text-xs text-slate-400">
+                              No skills in this category yet.
+                            </p>
+                          ) : null}
+                        </div>
                         <button
                           type="button"
-                          className="button-secondary"
-                          onClick={() => addCustomSectionItem(sectionIndex)}
+                          className="mt-3 inline-flex items-center justify-center rounded-xl border border-violet-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 hover:border-violet-300 active:scale-95"
+                          onClick={() => addSkillToCategory(categoryIndex)}
                         >
-                          Add Item
+                          + Add Skill
                         </button>
                       </div>
+                    ))
+                  ) : (
+                    <div className="rounded-[22px] border border-dashed border-slate-300 bg-slate-50/60 px-4 py-5 text-center text-xs text-slate-500">
+                      No skill categories added yet. Click &quot;Add Category&quot; or &quot;Suggest Skills&quot; to begin.
                     </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-400">
-                    Add projects, certifications, achievements, languages, or any custom section you need.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <aside className="space-y-6 xl:h-full xl:min-h-0 xl:overflow-y-auto xl:pr-2">
-            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Resume Photo</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
-                    Upload an image up to 2 MB. Drag it anywhere in the preview, then adjust the frame size, zoom, and crop until it sits right.
-                  </p>
+                  )}
                 </div>
-                {resumePhoto ? (
-                  <RemoveIconButton
-                    onClick={onPhotoRemove}
-                    label="Remove resume photo"
-                    className="text-slate-400 transition hover:text-rose-400"
-                  />
-                ) : null}
+                {!showAllSections && renderSectionStepper()}
               </div>
-              <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="block w-full text-sm text-slate-400 file:mr-4 file:rounded-full file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-medium file:text-slate-950"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0] || null;
-                    onPhotoUpload?.(file);
-                    event.target.value = "";
-                  }}
-                />
-                {resumePhoto ? (
-                  <div className="mt-4 flex items-center gap-4 rounded-[18px] bg-white p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
-                    <img
-                      src={resumePhoto.src}
-                      alt="Resume profile preview"
-                      className="h-16 w-16 rounded-full object-cover"
-                      style={{
-                        objectPosition: `${photoCropX * 100}% ${photoCropY * 100}%`,
-                      }}
-                    />
+            )}
+
+            {(showAllSections || activeSection === "custom") && (
+              <div id="section-custom" className="relative overflow-hidden rounded-2xl border border-slate-300 bg-white p-5 shadow-xs transition hover:border-teal-400 hover:shadow-sm">
+                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-teal-500 via-emerald-500 to-cyan-600" />
+                <div className="mb-5 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-sm shadow-teal-500/25">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
                     <div>
-                      <p className="text-sm font-medium text-slate-900">{resumePhoto.name}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {(resumePhoto.size / (1024 * 1024)).toFixed(2)} MB
-                        {templateUsesBuiltInPhoto
-                          ? " • Auto-fitted into this template"
-                          : " • Drag it inside the preview to place it"}
+                      <h3 className="text-lg font-bold text-slate-900">Additional Sections</h3>
+                      <p className="text-xs text-slate-500">Certifications, awards, leadership, or custom headings.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-gradient-to-r from-teal-50 to-emerald-50/60 px-3.5 py-2 text-xs font-semibold text-teal-800 shadow-xs transition hover:from-teal-100 hover:to-emerald-100 hover:border-teal-300 active:scale-95"
+                    onClick={addCustomSection}
+                  >
+                    <svg className="h-3.5 w-3.5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Add Section</span>
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  {formData.customSections?.length ? (
+                    formData.customSections.map((section, sectionIndex) => (
+                      <div
+                        key={`custom-section-${sectionIndex}`}
+                        className="rounded-[22px] border border-slate-300 bg-slate-50/50 p-4 transition hover:border-teal-400 hover:shadow-xs shadow-2xs"
+                      >
+                        <div className="mb-3 flex items-center justify-between">
+                          <span className="inline-flex items-center rounded-md bg-teal-100/80 px-2 py-0.5 text-[11px] font-bold text-teal-800 ring-1 ring-inset ring-teal-600/20">
+                            Custom Section {sectionIndex + 1}
+                          </span>
+                          <RemoveIconButton
+                            onClick={() => removeCustomSection(sectionIndex)}
+                            label={`Remove custom section ${sectionIndex + 1}`}
+                          />
+                        </div>
+                        <div className="space-y-3">
+                          <input
+                            className="field"
+                            placeholder="Section title (Projects, Certifications, Achievements...)"
+                            value={section.title}
+                            onChange={(event) =>
+                              updateCustomSectionTitle(sectionIndex, event.target.value)
+                            }
+                          />
+                          {section.items.map((item, itemIndex) => (
+                            <div key={`custom-item-${sectionIndex}-${itemIndex}`} className="flex gap-2">
+                              <input
+                                className="field"
+                                placeholder="Section item"
+                                value={item}
+                                onChange={(event) =>
+                                  updateCustomSectionItem(sectionIndex, itemIndex, event.target.value)
+                                }
+                              />
+                              <RemoveIconButton
+                                onClick={() => removeCustomSectionItem(sectionIndex, itemIndex)}
+                                disabled={section.items.length === 1}
+                                label={`Remove item ${itemIndex + 1} from custom section ${sectionIndex + 1}`}
+                                className="border border-slate-200 text-slate-400 transition hover:border-rose-100 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-35"
+                              />
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50/70 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-100 hover:border-teal-300 transition-all active:scale-95"
+                            onClick={() => addCustomSectionItem(sectionIndex)}
+                          >
+                            + Add Item
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-400 text-center py-3">
+                      Add certifications, achievements, publications, languages, or any custom section you need.
+                    </p>
+                  )}
+                </div>
+                {!showAllSections && renderSectionStepper()}
+              </div>
+            )}
+
+            {(showAllSections || activeSection === "optimizer") && (
+              <div id="section-ai-optimizer" className="relative overflow-hidden rounded-2xl border border-slate-300 bg-white p-5 shadow-xs transition hover:border-indigo-400 hover:shadow-sm">
+                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500" />
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 text-white shadow-sm shadow-indigo-500/25">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">AI Resume Optimizer</h3>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        Audit content against recruiter standards, ATS clarity, and impact phrasing.
                       </p>
                     </div>
                   </div>
-                ) : (
-                  <p className="mt-3 text-sm text-slate-400">No photo uploaded yet.</p>
-                )}
-                {resumePhoto ? (
-                  <div className="mt-4 space-y-3 rounded-[18px] bg-white p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
-                    <label className="block">
-                      <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-                        <span>Frame size</span>
-                        <span>{Math.round(photoFrameScale * 100)}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0.5"
-                        max="1.4"
-                        step="0.01"
-                        value={photoFrameScale}
-                        className="w-full accent-slate-900"
-                        onChange={(event) => onPhotoFrameScaleChange?.(Number(event.target.value))}
-                      />
-                    </label>
-                    <label className="block">
-                      <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-                        <span>Zoom</span>
-                        <span>{photoZoom.toFixed(2)}x</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="1"
-                        max="3.5"
-                        step="0.01"
-                        value={photoZoom}
-                        className="w-full accent-slate-900"
-                        onChange={(event) => onPhotoZoomChange?.(Number(event.target.value))}
-                      />
-                    </label>
-                    <label className="block">
-                      <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-                        <span>Horizontal</span>
-                        <span>{Math.round(photoCropX * 100)}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={photoCropX}
-                        className="w-full accent-slate-900"
-                        onChange={(event) => onPhotoCropChange?.({ x: Number(event.target.value) })}
-                      />
-                    </label>
-                    <label className="block">
-                      <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-                        <span>Vertical</span>
-                        <span>{Math.round(photoCropY * 100)}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={photoCropY}
-                        className="w-full accent-slate-900"
-                        onChange={(event) => onPhotoCropChange?.({ y: Number(event.target.value) })}
-                      />
-                    </label>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
-              <h3 className="mb-4 text-lg font-semibold text-slate-900">Professional Summary</h3>
-              <textarea className="field min-h-44" placeholder={isSocsTemplate ? "Write 30-40 words with skills, measurable outcomes, project impact, and action words." : "Write a concise, impact-focused professional summary"} value={formData.summary} onChange={(event) => setFormData((prev) => ({ ...prev, summary: event.target.value }))} />
-              {isSocsTemplate ? (
-                <p className={`mt-2 text-xs ${socsSummaryWords && (socsSummaryWords < 30 || socsSummaryWords > 40) ? "font-semibold text-amber-700" : "text-slate-500"}`}>
-                  SOCS guidance: keep the summary to 2-3 lines, roughly 30-40 words, with measurable impact.
-                </p>
-              ) : null}
-              <div className="mt-4 flex items-center gap-3">
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-[18px] border border-cyan-700 bg-cyan-700 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(8,145,178,0.18)] transition hover:bg-cyan-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={Boolean(aiLoading)}
-                  onClick={() => onAIAction("summary")}
-                >
-                  {aiLoading === "summary" ? <Loader label="Updating..." /> : "Update Summary"}
-                </button>
-                {summaryUpdateSuccess ? (
-                  <span
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600"
-                    aria-label="Summary updated successfully"
-                    title="Summary updated successfully"
-                  >
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4"
-                    >
-                      <path d="M20 7L10 17l-5-5" />
-                    </svg>
-                  </span>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-slate-900">Skills</h3>
-                <div className="flex flex-wrap justify-end gap-2">
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center rounded-[18px] border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500 px-4 py-2 text-xs font-bold !text-white [color:#ffffff] shadow-md shadow-indigo-500/25 active:scale-95 transition-all disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={Boolean(aiLoading)}
-                    onClick={() => onAIAction("skills")}
+                    onClick={() => onAIAction("optimize")}
                   >
-                    {aiLoading === "skills" ? <Loader label="Suggesting..." /> : "Suggest Skills"}
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center rounded-[18px] border border-cyan-700 bg-cyan-700 px-4 py-2.5 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(8,145,178,0.18)] transition hover:bg-cyan-800 hover:!text-white"
-                    onClick={addSkillCategory}
-                  >
-                    Add Category
+                    <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span>{aiLoading === "optimize" ? "Optimizing..." : "Run Optimizer"}</span>
                   </button>
                 </div>
-              </div>
-              <div className="space-y-4">
-                {editableSkillCategories.length ? (
-                  editableSkillCategories.map((group, categoryIndex) => (
-                    <div
-                      key={`skill-editor-category-${categoryIndex}`}
-                      className="group rounded-[22px] border border-slate-200 bg-slate-50/70 p-4 transition hover:border-slate-300"
-                    >
-                      <div className="flex items-start gap-3">
-                        <input
-                          className="field"
-                          placeholder="Category name, e.g. Technical Skills"
-                          value={group.category}
-                          onChange={(event) => updateSkillCategory(categoryIndex, event.target.value)}
+
+                {showAiInsightsPanel ? (
+                  <div
+                    ref={aiInsightsRef}
+                    className="mt-4 pt-4 border-t border-slate-100"
+                  >
+                    <h4 className="mb-3 text-sm font-semibold text-slate-800">{aiInsightsTitle}</h4>
+                    {shouldShowAiLoadingCard ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 shadow-inner">
+                        <Loader
+                          label={
+                            aiLoading === "optimize"
+                              ? "Optimizing your resume. Your suggestions will appear here in a moment..."
+                              : "Suggesting new skills. Your recommendations will appear here in a moment..."
+                          }
                         />
-                        <div className="opacity-40 transition group-hover:opacity-100 focus-within:opacity-100">
-                          <RemoveIconButton
-                            onClick={() => removeSkillCategory(categoryIndex)}
-                            label="Remove skill category"
-                            className="text-slate-400 transition hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-35"
-                          />
-                        </div>
                       </div>
-                      <div className="mt-3 space-y-2">
-                        {(group.items || []).map((skill, skillIndex) => (
-                          <div key={`skill-editor-item-${categoryIndex}-${skillIndex}`} className="group/skill flex items-center gap-2">
-                            <input
-                              className="field"
-                              placeholder="Skill"
-                              value={skill}
-                              data-skill-input={`${categoryIndex}-${skillIndex}`}
-                              onChange={(event) => updateSkillItem(categoryIndex, skillIndex, event.target.value)}
-                              onBlur={(event) => removeEmptySkillItem(categoryIndex, skillIndex, event.target.value)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  event.preventDefault();
-                                  addSkillToCategory(categoryIndex);
-                                }
-                              }}
-                            />
-                            <span className="opacity-0 transition group-hover/skill:opacity-100 focus-within:opacity-100">
-                              <InlineRemoveButton
-                                onClick={() => removeSkillItem(categoryIndex, skillIndex)}
-                                label="Remove skill"
-                              />
-                            </span>
+                    ) : (
+                      <div className="grid max-h-[22rem] gap-2.5 overflow-y-auto pr-1">
+                        {aiInsights?.lines.map((line, index) => (
+                          <div
+                            key={`${aiInsightsTitle}-${index}`}
+                            className="rounded-xl border border-slate-200/80 bg-slate-50/90 px-4 py-3 text-xs leading-5 text-slate-700 shadow-xs"
+                          >
+                            {line}
                           </div>
                         ))}
-                        {!(group.items || []).length ? (
-                          <p className="rounded-[16px] border border-dashed border-slate-200 bg-white/70 px-3 py-2 text-sm text-slate-400">
-                            No skills in this category yet.
-                          </p>
-                        ) : null}
                       </div>
+                    )}
+                  </div>
+                ) : null}
+                {!showAllSections && renderSectionStepper()}
+              </div>
+            )}
+          </div>
+
+          {/* Right Pane: Live Preview Studio */}
+          <aside className={`space-y-4 xl:block ${activeMobileTab === "preview" ? "block" : "hidden"} xl:sticky xl:top-20 xl:h-[calc(100vh-8.5rem)] xl:overflow-y-auto xl:pr-1`}>
+            <div className="rounded-2xl border border-slate-300 bg-white p-4 sm:p-5 shadow-sm">
+              {/* Preview Toolbar */}
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Live Preview</p>
+                    <p className="text-xs font-semibold text-slate-800">{selectedTemplateOption.name}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Zoom Controls */}
+                  <div className="flex items-center rounded-xl border border-slate-300 bg-slate-50 p-0.5 shadow-2xs">
+                    <button
+                      type="button"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-slate-600 transition hover:bg-white hover:shadow-xs disabled:opacity-30"
+                      onClick={() => setPreviewZoom((z) => Math.max(0.6, Number((z - 0.1).toFixed(1))))}
+                      disabled={previewZoom <= 0.6}
+                      title="Zoom Out"
+                    >
+                      −
+                    </button>
+                    <span className="min-w-[3rem] px-2 text-center text-[11px] font-semibold text-slate-700">
+                      {Math.round(previewZoom * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-slate-600 transition hover:bg-white hover:shadow-xs disabled:opacity-30"
+                      onClick={() => setPreviewZoom((z) => Math.min(1.4, Number((z + 0.1).toFixed(1))))}
+                      disabled={previewZoom >= 1.4}
+                      title="Zoom In"
+                    >
+                      +
+                    </button>
+                    {previewZoom !== 1 && (
                       <button
                         type="button"
-                        className="mt-3 inline-flex items-center justify-center rounded-[16px] border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                        onClick={() => addSkillToCategory(categoryIndex)}
+                        className="ml-1 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 hover:underline"
+                        onClick={() => setPreviewZoom(1)}
+                        title="Reset Zoom"
                       >
-                        Add Skill
+                        Reset
                       </button>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-[22px] border border-dashed border-slate-300 bg-slate-50/60 px-4 py-5 text-sm text-slate-500">
-                    No skill categories added yet.
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Ready to ship</p>
-              <h3 className="mt-2 text-xl font-semibold text-slate-900">
-                Download, save drafts, and keep editing safely
-              </h3>
-              <p className="mt-3 text-sm leading-6 text-slate-500">
-                The selected template is saved with your resume and used for the live preview and PDF download.
-              </p>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  className="inline-flex w-full items-center justify-center rounded-[18px] border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-[0_14px_26px_rgba(148,163,184,0.1)] transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={Boolean(saveAction)}
-                  onClick={onSaveDraft}
-                >
-                  {saveAction === "draft" ? <Loader label="Saving draft..." /> : "Save Draft"}
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex w-full items-center justify-center rounded-[18px] border border-cyan-700 bg-cyan-700 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(8,145,178,0.18)] transition hover:bg-cyan-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={Boolean(saveAction)}
-                  onClick={onSave}
-                >
-                  {saveAction === "resume" ? <Loader label="Preparing download..." /> : "Download Resume"}
-                </button>
-              </div>
-              <button
-                type="button"
-                className="mt-3 inline-flex w-full items-center justify-center rounded-[18px] border border-cyan-700 bg-cyan-700 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(8,145,178,0.16)] transition hover:bg-cyan-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={Boolean(saveAction)}
-                onClick={onSaveHardCopy}
-              >
-                {saveAction === "hard-copy" ? <Loader label="Preparing hard copy..." /> : "Download in Hard Copy Format"}
-              </button>
-              <button
-                type="button"
-                className="mt-3 inline-flex w-full items-center justify-center rounded-[18px] border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 shadow-[0_12px_22px_rgba(244,63,94,0.08)] transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={Boolean(saveAction)}
-                onClick={onDiscardResume}
-              >
-                {saveAction === "discard" ? <Loader label="Discarding resume..." /> : "Discard Resume"}
-              </button>
-              {draftSaveConfirmation ? (
-                <div className="mt-4 rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-                  {successMessage}
+                  {/* Switch Template */}
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-300 bg-gradient-to-r from-indigo-50 to-purple-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-xs transition hover:from-indigo-100 hover:to-purple-100 hover:border-indigo-400 hover:text-indigo-900 active:scale-95"
+                    onClick={openTemplatePicker}
+                  >
+                    <span>Change</span>
+                  </button>
                 </div>
-              ) : null}
-            </div>
-
-            {showAiInsightsPanel ? (
-              <div
-                ref={aiInsightsRef}
-                className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)]"
-              >
-                <h3 className="mb-4 text-lg font-semibold text-slate-900">{aiInsightsTitle}</h3>
-                {shouldShowAiLoadingCard ? (
-                  <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                    <Loader
-                      label={
-                        aiLoading === "optimize"
-                          ? "Optimizing your resume. Your suggestions will appear here in a moment..."
-                          : "Suggesting new skills. Your recommendations will appear here in a moment..."
-                      }
-                    />
-                  </div>
-                ) : (
-                  <div className="grid max-h-[24rem] gap-3 overflow-y-auto pr-1">
-                    {aiInsights?.lines.map((line, index) => (
-                      <div
-                        key={`${aiInsightsTitle}-${index}`}
-                        className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
-                      >
-                        {line}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
-            ) : null}
-          </aside>
 
-          <aside className="space-y-6 xl:h-full xl:min-h-0 xl:overflow-y-auto xl:pr-2">
-            <div className="rounded-[28px] border border-slate-200 bg-white/92 p-5 shadow-[0_22px_50px_rgba(148,163,184,0.14)]">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Live Preview</p>
-              <p className="mt-2 text-[11px] uppercase tracking-[0.22em] text-slate-400">
-                {TEMPLATE_OPTIONS.find((template) => template.id === formData.template)?.name ||
-                  TEMPLATE_OPTIONS.find((template) => template.id === normalizedTemplate)?.name ||
-                  "Contemporary"}
-              </p>
-              <div
-                ref={syncPreviewRef}
-                data-resume-pdf-root="true"
-                data-resume-template={normalizedTemplate}
-                className={`relative mt-4 min-h-[720px] overflow-visible rounded-[1.75rem] border text-slate-900 shadow-2xl ${isSocsTemplate ? "p-0" : "p-6"} ${templateStyle.shell}`}
-              >
+              {/* Drafting Desk Preview Canvas Wrapper */}
+              <div className="rounded-2xl border border-slate-300 drafting-canvas p-3 sm:p-5 overflow-x-auto pb-4 shadow-inner">
+                <div
+                  style={{
+                    transform: previewZoom !== 1 ? `scale(${previewZoom})` : undefined,
+                    transformOrigin: "top center",
+                    transition: "transform 0.15s ease-out",
+                  }}
+                >
+                  <div
+                    ref={syncPreviewRef}
+                    data-resume-pdf-root="true"
+                    data-resume-template={normalizedTemplate}
+                    className={`relative mt-1 min-h-[720px] overflow-visible rounded-2xl border border-slate-300 text-slate-900 shadow-2xl ring-1 ring-black/5 ${isSocsTemplate ? "p-0" : "p-6"} ${templateStyle.shell}`}
+                  >
                 {renderFloatingResumePhoto()}
                 {templateStyle.layout === "socs-official" ? (
                   <div
@@ -2981,17 +4378,11 @@ function ResumeForm({
                 )}
               </div>
             </div>
-            <button
-              type="button"
-              className="mx-auto mt-3 inline-flex w-full max-w-[270px] items-center justify-center self-center rounded-[18px] border border-cyan-700 bg-cyan-700 px-5 py-3 text-sm font-semibold !text-white [color:#ffffff] shadow-[0_16px_30px_rgba(8,145,178,0.18)] transition hover:bg-cyan-800 hover:!text-white disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={Boolean(aiLoading)}
-              onClick={() => onAIAction("optimize")}
-            >
-              {aiLoading === "optimize" ? <Loader label="Optimizing..." /> : "Optimize Resume"}
-            </button>
-          </aside>
+          </div>
         </div>
-      </section>
+      </aside>
+    </div>
+  </section>
 
       {isTemplatePickerOpen && typeof document !== "undefined"
         ? createPortal(
@@ -3057,33 +4448,190 @@ function ResumeForm({
                             locked
                               ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-65"
                               : active
-                              ? "border-slate-900 bg-slate-50 shadow-[0_18px_45px_rgba(15,23,42,0.08)]"
-                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                              ? "border-indigo-600 bg-indigo-50/40 ring-2 ring-indigo-500/20 shadow-md"
+                              : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50/80 hover:shadow-xs"
                           }`}
                         >
-                          <div className={`mb-4 rounded-[1.4rem] bg-gradient-to-br p-[1px] ${template.accent}`}>
+                          <div className={`mb-4 rounded-[1.4rem] bg-gradient-to-br p-[1px] ${template.accent} shadow-2xs`}>
                             <TemplateThumbnail templateId={template.id} />
                           </div>
                           <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm font-semibold text-slate-900">{template.name}</p>
+                            <p className="text-sm font-bold text-slate-900">{template.name}</p>
                             {locked ? (
-                              <span className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                              <span className="rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
                                 Locked
                               </span>
+                            ) : active ? (
+                              <span className="rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-white shadow-2xs">
+                                Active
+                              </span>
                             ) : template.recommended ? (
-                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                              <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-700">
                                 Recommended
                               </span>
                             ) : null}
                           </div>
                           <p className="mt-2 min-h-[4.75rem] text-xs leading-5 text-slate-500">{template.blurb}</p>
-                          <p className="mt-auto pt-4 text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">
-                            {locked ? "Locked" : active ? "Selected" : "Use Template"}
+                          <p className="mt-auto pt-4 text-[11px] font-bold uppercase tracking-[0.24em]">
+                            {locked ? (
+                              <span className="text-slate-400">Locked</span>
+                            ) : active ? (
+                              <span className="text-indigo-600 font-extrabold">Selected</span>
+                            ) : (
+                              <span className="text-slate-500 hover:text-indigo-600">Use Template →</span>
+                            )}
                           </p>
                         </button>
                       );
                     })}
                   </div>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {isValidationModalOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6 bg-slate-950/50 backdrop-blur-sm animate-in fade-in duration-200"
+              onClick={() => setIsValidationModalOpen(false)}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="validation-modal-title"
+            >
+              <div
+                className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[88vh]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Gradient Header Stripe */}
+                <div className="h-1.5 w-full bg-gradient-to-r from-amber-500 via-rose-500 to-indigo-600 shrink-0" />
+
+                {/* Modal Header */}
+                <div className="p-5 pb-4 border-b border-slate-100 flex items-start justify-between gap-3 shrink-0">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow-md shadow-rose-500/25 ring-2 ring-rose-200">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 id="validation-modal-title" className="text-base font-bold text-slate-900 leading-tight">
+                          {validationContext === "section-navigation"
+                            ? "Mandatory Section Incomplete"
+                            : "Mandatory Fields Required"}
+                        </h3>
+                        <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-bold text-rose-700 ring-1 ring-inset ring-rose-600/20">
+                          {missingFields.length} {missingFields.length === 1 ? "field missing" : "fields missing"}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+                        {validationContext === "section-navigation"
+                          ? `You cannot move to the next section until all mandatory fields in ${validationBlockingSection || "this section"} are completed:`
+                          : "To download your resume, the following mandatory sections and fields must be filled:"}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                    onClick={() => setIsValidationModalOpen(false)}
+                    aria-label="Close dialog"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Modal Body / Scrollable Missing List */}
+                <div className="p-5 overflow-y-auto space-y-3.5 max-h-[52vh]">
+                  {Object.values(
+                    missingFields.reduce((acc, item) => {
+                      if (!acc[item.sectionId]) {
+                        acc[item.sectionId] = {
+                          sectionId: item.sectionId,
+                          sectionName: item.sectionName,
+                          items: [],
+                        };
+                      }
+                      acc[item.sectionId].items.push(item);
+                      return acc;
+                    }, {})
+                  ).map((group) => (
+                    <div key={group.sectionId} className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3.5 space-y-2.5 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white text-slate-700 shadow-2xs border border-slate-200/80">
+                            {SectionIcons[group.sectionId]}
+                          </span>
+                          <span className="text-xs font-bold text-slate-800">
+                            {group.sectionName}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md ring-1 ring-inset ring-rose-200">
+                          {group.items.length} {group.items.length === 1 ? "required field" : "required fields"}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {group.items.map((item, idx) => (
+                          <div
+                            key={`${item.sectionId}-${item.field}-${idx}`}
+                            className="flex items-center justify-between gap-3 rounded-xl bg-white p-2.5 border border-slate-200/70 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition"
+                          >
+                            <div className="min-w-0 pr-2">
+                              <span className="block text-xs font-semibold text-slate-900 leading-tight">
+                                {item.field}
+                              </span>
+                              <span className="block text-[11px] text-slate-500 leading-tight mt-0.5 truncate">
+                                {item.description}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 text-xs font-bold transition active:scale-95 border border-indigo-200/60"
+                              onClick={() => handleJumpToMissingField(item)}
+                            >
+                              <span>Fix</span>
+                              <svg className="h-3 w-3 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="p-4 bg-slate-50/90 border-t border-slate-200/80 flex items-center justify-between gap-3 shrink-0">
+                  <button
+                    type="button"
+                    className="rounded-xl border border-slate-200/90 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition shadow-2xs"
+                    onClick={() => setIsValidationModalOpen(false)}
+                  >
+                    {validationContext === "section-navigation" ? "Stay on Section" : "Dismiss"}
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-500 hover:via-purple-500 hover:to-indigo-600 px-4 py-2 text-xs font-bold !text-white [color:#ffffff] shadow-md shadow-indigo-500/25 active:scale-95 transition"
+                    onClick={() => {
+                      if (missingFields.length > 0) {
+                        handleJumpToMissingField(missingFields[0]);
+                      } else {
+                        setIsValidationModalOpen(false);
+                      }
+                    }}
+                  >
+                    <span>Fix Incomplete Fields</span>
+                    <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>,
